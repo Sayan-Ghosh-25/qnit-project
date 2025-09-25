@@ -1,0 +1,614 @@
+/* ===== Enhanced UI For Others Section ===== */
+:root {
+  /* Colors */
+  --navy: #001436;
+  --dark-slate: #495670;
+  --light-slate: #a8b2d1;
+  --accent: #64ffda;
+  --accent-tint: rgba(100, 255, 218, 0.1);
+  --white: #e6f1ff;
+  --pink: #f57dff;
+  --blue: #57cbff;
+
+  /* Sizes & Transitions */
+  --border-radius: 0.5rem;
+  --transition: all 0.25s cubic-bezier(0.645, 0.045, 0.355, 1);
+  --transition-slow: all 0.5s cubic-bezier(0.645, 0.045, 0.355, 1);
+  --shadow: 0 10px 30px -15px rgba(2, 12, 27, 0.7);
+  --shadow-med: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  --shadow-hover: 0 20px 30px -15px rgba(2, 12, 27, 0.7);
+  --easing: cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+.others-section {
+  padding: clamp(1.5rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
+  background: #001436;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-med);
+  transition: var(--transition-slow);
+  margin: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.others-section h2 {
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  text-align: left;
+  font-size: clamp(1.125rem, 2.4vw, 1.5rem);
+  color: var(--white);
+  position: relative;
+}
+
+.other-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, max-content));
+  justify-content: start;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.ot-latest-tag {
+  background: linear-gradient(45deg, var(--pink), var(--blue));
+  color: var(--white);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.7rem;
+  border-radius: 20px;
+  margin-left: 0.75rem;
+  vertical-align: middle;
+  transition: var(--transition);
+  animation: pulse 2s infinite, GlowUp 1s alternate;
+  box-shadow: 0 0 15px rgba(245, 125, 255, 0.5);
+  animation-delay: 0.05s;
+}
+
+.ot-latest-tag:hover {
+  box-shadow: 0 0 30px rgba(245, 125, 255, 0.5);
+}
+
+@keyframes GlowUp {
+  from {
+    box-shadow: 0 0 15px rgba(245, 125, 255, 0.5);
+  }
+  to {
+    box-shadow: 0 0 100px rgba(245, 125, 255, 0.5);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.ot-archive-section {
+  padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 2rem);
+  margin-top: 2rem;
+  background: var(--navy);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-med);
+  transition: var(--transition-slow);
+  border: 1px solid var(--navy);
+  margin: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.ot-archive-section h2 {
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-size: clamp(1.25rem, 2.5vw, 1.7rem);
+  color: var(--white);
+  position: relative;
+}
+
+.ot-archive-question {
+  cursor: pointer;
+  padding: 1.2rem 1.5rem;
+  background: #001232;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--dark-slate);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--white);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.ot-archive-question:hover {
+  transform: translateX(-5px);
+  background: var(--navy);
+  box-shadow: var(--shadow-med);
+}
+
+.ot-archive-question.active {
+  transform: scale(1.01);
+  background: var(--navy);
+  box-shadow: var(--shadow-med);
+  border-color: var(--accent);
+}
+
+.ot-archive-question::after {
+  content: "\25BC";
+  font-size: 0.65rem;
+  transition: transform 0.4s var(--easing);
+}
+
+.ot-archive-question.active::after {
+  transform: rotate(180deg);
+}
+
+.ot-archive-answer {
+  overflow: hidden;
+  transition: height 0.4s var(--easing);
+  background: rgba(10, 25, 47, 0.5);
+  border-left: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  will-change: height;
+  will-change: padding;
+}
+
+.ot-archive-answer-container {
+  padding: 1.5rem;
+}
+
+.ot-archive-answer-container h2 {
+  margin-top: 1.5rem;
+}
+
+.ot-pdf-feature-box {
+  position: relative;
+  padding: 1.2rem;
+  border: 1px solid var(--dark-slate);
+  border-radius: var(--border-radius);
+  background: var(--navy);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 157, 255, 0.5);
+  transition: var(--transition);
+  overflow: hidden;
+}
+
+.ot-pdf-feature-box:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-hover);
+  box-shadow: 0 0 15px rgba(0, 157, 255, 0.6);
+}
+
+.ot-pdf-card {
+  width: clamp(14rem, 38vw, 16rem);
+  border: 1px solid var(--dark-slate);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  margin: 0.75rem;
+  display: inline-block;
+  vertical-align: top;
+  background: var(--navy);
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow);
+}
+
+.ot-pdf-title {
+  text-align: center;
+  margin-top: 0.75rem;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--white);
+}
+
+.ot-pdf-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  border-radius: var(--border-radius);
+}
+
+.ot-pdf-canvas canvas {
+  width: 100%;
+  height: 20rem;
+  border: 1px solid var(--dark-slate);
+  display: block;
+  border-radius: var(--border-radius);
+}
+
+.ot-pdf-canvas figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  text-align: center;
+  color: var(--white);
+  font-weight: 600;
+}
+
+.ot-menu-btn {
+  position: absolute;
+  bottom: 1.1rem;
+  right: 0.45rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 50;
+  transition: var(--transition);
+  color: var(--light-slate);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+}
+
+.ot-menu-btn:hover {
+  transform: scale(1.1);
+  color: var(--accent);
+}
+
+.ot-menu-options {
+  display: none;
+  position: absolute;
+  bottom: 2.8rem;
+  right: 0.5rem;
+  background: var(--accent);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10001;
+  min-width: 2.25rem;
+  padding: 0.25rem;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.ot-menu-options a {
+  display: block;
+  padding: 0.5rem 0.625rem;
+  font-size: 1rem;
+  color: #000;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.ot-menu-options a:hover {
+  border-radius: 0.5rem;
+  transform: translateX(3px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translate(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ot-pdfModal {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(2, 12, 27, 0.9);
+  animation: fadeIn 0.4s var(--easing) forwards;
+  backdrop-filter: blur(5px);
+}
+
+.ot-pdfModal-inner {
+  display: block;
+  margin: auto;
+  width: min(92vw, 80rem);
+  height: min(88vh, 60rem);
+  background: #111;
+  border-radius: var(--border-radius);
+  animation: scaleIn 0.5s var(--easing) forwards;
+  border: 1px solid var(--dark-slate);
+  box-shadow: var(--shadow-hover);
+  margin-top: 1rem;
+}
+
+.ot-close {
+  all: unset;
+  position: absolute;
+  right: 1.5rem;
+  top: 1rem;
+  font-size: 2.5rem;
+  color: var(--white);
+  cursor: pointer;
+  line-height: 1;
+  transition: var(--transition);
+  z-index: 10000;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.ot-close:hover {
+  color: #f44336;
+  transform: rotate(90deg);
+  background: var(--accent-tint);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.ot-toast {
+  visibility: hidden;
+  min-width: 12.5rem;
+  background: var(--navy);
+  color: var(--white);
+  text-align: center;
+  border-radius: var(--border-radius);
+  padding: 0.875rem 1.25rem;
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  box-shadow: var(--shadow-hover);
+  backdrop-filter: blur(10px);
+}
+
+.ot-toast.show {
+  visibility: visible;
+  opacity: 1;
+  animation: slideUp 0.4s var(--easing) forwards;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+/* ===== Empty State Styling ===== */
+.ot-empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem;
+  margin: 12rem auto;
+  max-width: 500px;
+}
+
+.ot-empty-state img {
+  width: 5rem;
+  height: 5rem;
+  margin-bottom: 1rem;
+}
+
+.ot-empty-state p {
+  font-size: 1.2rem;
+  color: var(--white);
+}
+
+/* =========================
+  Light Theme
+  ========================= */
+.light-theme .others-section {
+  background: rgba(0, 217, 255, 0.216);
+}
+.light-theme .others-section h2 {
+  color: #000;
+}
+.light-theme .ot-archive-section {
+  background: rgba(0, 217, 255, 0.216);
+  border: none;
+}
+.light-theme .ot-archive-section h2 {
+  color: #000;
+}
+.light-theme .ot-archive-question {
+  background: rgb(238, 252, 255);
+  color: #111;
+  border: 1.5px solid var(--blue);
+}
+.light-theme .ot-archive-answer {
+  background: rgb(209, 249, 255);
+  border-left: 1px solid var(--blue);
+  border-right: 1px solid var(--blue);
+}
+.light-theme .ot-pdf-feature-box {
+  background: rgb(229, 251, 255);
+  border: 0.5px solid var(--blue);
+}
+.light-theme .ot-pdf-canvas canvas {
+  border: 0.5px solid var(--blue);
+}
+.light-theme .ot-pdf-canvas figcaption {
+  color: #111;
+}
+.light-theme .ot-menu-btn {
+  color: #444;
+}
+.light-theme .ot-menu-options {
+  background: #c1ebff;
+}
+.light-theme .ot-latest-tag {
+  background: #e60f00;
+  animation: none;
+}
+.light-theme .ot-empty-state p {
+  color: #333;
+}
+.light-theme .ot-toast {
+  background: #fff;
+  color: #000;
+}
+
+/* ===== Enhanced Responsiveness ===== */
+@media (max-width: 768px) {
+  .other-container {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .other-box {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .ot-archive-question {
+    padding: 1rem 1.25rem;
+    font-size: 1rem;
+  }
+
+  .ot-pdf-card {
+    width: calc(50% - 1.5rem);
+    margin: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .others-section {
+    padding: 1.75rem 1rem;
+    margin: 0.5rem;
+    margin-bottom: 1rem;
+    border-radius: calc(var(--border-radius) - 2px);
+  }
+
+  .others-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .other-container {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .ot-latest-tag {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.6rem;
+  }
+
+  .ot-archive-section {
+    padding: 1.75rem 1rem;
+    margin: 0.5rem;
+    border-radius: calc(var(--border-radius) - 2px);
+  }
+
+  .ot-archive-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .ot-archive-question {
+    padding: 1rem;
+    font-size: 0.95rem;
+    margin-top: 0.75rem;
+  }
+
+  .ot-archive-question:hover {
+    transform: none;
+  }
+
+  .ot-archive-answer {
+    padding: 0;
+  }
+
+  .ot-archive-answer-container {
+    padding: 0.4rem;
+  }
+
+  .ot-archive-answer-container h2 {
+    margin-top: 1.25rem;
+  }
+
+  .ot-pdf-feature-box {
+    padding: 1rem;
+    margin: 0.5rem;
+  }
+
+  .ot-pdf-card {
+    width: 100%;
+    margin: 0.5rem 0;
+  }
+
+  .ot-pdf-canvas canvas {
+    height: 18rem;
+  }
+
+  .ot-menu-btn {
+    bottom: 1.25rem;
+    right: 0.25rem;
+  }
+
+  .ot-menu-btn:hover {
+    background: none;
+  }
+
+  .ot-menu-options {
+    bottom: 2.5rem;
+    right: 0.25rem;
+  }
+
+  .ot-menu-options a {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .ot-close {
+    right: 1.5rem;
+    top: 1.7rem;
+    font-size: 2rem;
+    width: 35px;
+    height: 35px;
+  }
+
+  .ot-toast {
+    min-width: 10rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 2rem);
+    max-width: 300px;
+  }
+
+  .ot-empty-state {
+    margin-top: 15rem;
+  }
+
+  .ot-empty-state img {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .ot-empty-state p {
+    font-size: 0.9rem;
+  }
+}

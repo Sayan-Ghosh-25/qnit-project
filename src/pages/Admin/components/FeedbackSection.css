@@ -1,0 +1,345 @@
+/* ===== Enhanced Feedback Section Styles ===== */
+:root {
+  --shadow-soft: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+  --shadow-med: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  --transition-med: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-fast: all 0.2s ease;
+  --radius: 0.625rem;
+  --radius-lg: 0.75rem;
+  --primary-button: linear-gradient(0deg, #001d4e, #022869);
+  --white: #e6f1ff;
+  --pink: #f57dff;
+  --blue: #57cbff;
+}
+
+.feedback-section {
+  background: #001232;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-med);
+  width: 100%;
+  max-width: 50rem;
+  margin: 1.5rem auto;
+  transition: var(--transition-med);
+  border: 1px solid var(--blue);
+  overflow: hidden;
+  position: relative;
+}
+
+.feedback-section h2 {
+  font-weight: 700;
+  margin: 0.5rem 0 1.5rem;
+  text-align: center;
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  color: var(--white);
+  transition: var(--transition-med);
+  position: relative;
+  padding-bottom: 0.75rem;
+ }
+
+ .feedback-section h2::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 3px;
+  background: linear-gradient(45deg, var(--pink), var(--blue));
+  border-radius: 3px;
+}
+
+.star-rating {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.star {
+  font-size: 2.1rem;
+  color: #ddd;
+  cursor: pointer;
+  transition: color 0.3s ease, transform 0.2s ease;
+  animation: fadeInFlow 0.5s ease forwards;
+}
+
+.star:nth-child(1) { animation-delay: 0.05s; }
+.star:nth-child(2) { animation-delay: 0.1s; }
+.star:nth-child(3) { animation-delay: 0.15s; }
+.star:nth-child(4) { animation-delay: 0.2s; }
+.star:nth-child(5) { animation-delay: 0.25s; }
+
+.star.selected,
+.star:hover {
+  color: #ffcc00;
+}
+
+.star.dimmed {
+  pointer-events: none;
+  cursor: default;
+}
+
+.star.dimmed.selected {
+  color: #ffcc00;
+}
+
+.star.dimmed:not(.selected) {
+  color: #ddd;
+}
+
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.feedback-form label {
+  color: var(--white);
+  font-weight: 500;
+}
+
+.feedback-form textarea {
+  width: 100%;
+  height: 8rem;
+  padding: 0.75rem;
+  border: 0.0625rem solid var(--blue);
+  border-radius: 0.3125rem;
+  background: #001232;
+  color: var(--white);
+  font-size: 1rem;
+  font-weight: 400;
+  resize: none;
+  font-family: inherit;
+  transition: var(--transition-med);
+  animation: fadeInFeedback 0.3s ease forwards;
+  opacity: 1;
+}
+
+.feedback-form textarea::-webkit-input-placeholder {
+  color: var(--white);
+  font-size: 1rem;
+  font-weight: 400;
+  opacity: 1;
+}
+
+.feedback-form textarea:focus {
+  border-color: #31f8ff;
+  box-shadow: 0 0 0 5px rgba(0, 123, 255, 0.15);
+  outline: none;
+}
+
+textarea.dimmed {
+  color: #ffffffa4;
+}
+
+.feedback-form p {
+  color: var(--white);
+  font-size: 0.9rem;
+}
+
+.edit-note {
+  display:block; 
+  color:var(--white); 
+  margin-top:0.5rem;
+}
+
+.feedback-form-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+}
+
+.feedback-form-buttons button {
+  padding: 0.85rem 2rem;
+  color: var(--white);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: var(--transition-med);
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+  border: none;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.feedback-form-buttons button:active {
+  transform: scale(0.98);
+}
+
+.submit-button {
+  background: var(--primary-button);
+}
+
+.submit-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.cancel-button {
+  background: linear-gradient(0deg, #ff00007a, #ff0000aa);
+}
+
+.cancel-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.edit-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.45rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  z-index: 50;
+  transition: var(--transition-med);
+  color: aqua;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+}
+
+.edit-button:hover {
+  transform: scale(1.05);
+  background: #00e1ff14;
+}
+
+@keyframes fadeInFlow {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInFeedback {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================
+  Light Theme
+  ========================= */
+.light-theme .feedback-section {
+  background: #fff;
+  border: none;
+}
+.light-theme .feedback-section h2 {
+  color: #000;
+}
+.light-theme .feedback-form label {
+  color: #333;
+}
+.light-theme .feedback-form textarea {
+  background: #f9f9f9;
+  border: 0.0625rem solid #ddd;
+  color: #000;
+}
+.light-theme .feedback-form textarea:focus {
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
+}
+.light-theme textarea.dimmed {
+  color: #0000006e;
+}
+.light-theme .feedback-form textarea::-webkit-input-placeholder {
+  color: #999;
+}
+.light-theme .feedback-form p {
+    color: #222;
+}
+.light-theme .submit-button {
+  background: #0038c5e6;
+}
+.light-theme .submit-button:hover {
+  background: #0030aae6;
+}
+.light-theme .cancel-button {
+  background: #222;
+}
+.light-theme .cancel-button:hover {
+  background: #000;
+}
+.light-theme .edit-button {
+  color: #0037c2e6;
+}
+.light-theme .edit-note {
+    color: #222;
+}
+
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 768px) {
+  .feedback-section {
+    padding: 1.25rem;
+    margin: 1.25rem auto;
+    border-radius: var(--radius);
+  }
+  
+  .feedback-section h2 {
+    font-size: 1.4rem;
+  }
+
+  .star {
+    font-size: 2rem;
+  }
+  
+  .feedback-form-buttons {
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 1.75rem;
+  }
+  
+  .feedback-form-buttons button {
+    width: 100%;
+    padding: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .feedback-section {
+    padding: 1rem 1rem;
+    margin: 1rem auto;
+    width: 95%;
+    border-radius: var(--radius);
+  }
+  
+  .feedback-section h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .star {
+    font-size: 2rem;
+  }
+  
+  .feedback-form-buttons {
+    width: 100%;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+}
