@@ -1,4 +1,4 @@
-// server.js
+// src/server.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -23,8 +23,24 @@ app.use(helmet());
 app.use(express.json());
 
 // CORS: allow frontend origin
+const allowedOrigins = process.env.FRONTEND_ORIGIN
+  ? process.env.FRONTEND_ORIGIN.split(",").map(o => o.trim().replace(/\/$/, ""))
+  : [];
+
 app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN || "*"
+  origin: function(origin, callback) {
+    // allow requests like Postman (no origin)
+    if (!origin) return callback(null, true);
+
+    const normalizedOrigin = origin.replace(/\/$/, "");
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+    } else {
+      console.error("Blocked by CORS:", origin);
+      callback(new Error("Not allowed by CORS"));
+    }
+  }
 }));
 
 // Routes
