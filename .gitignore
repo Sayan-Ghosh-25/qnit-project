@@ -45,3 +45,4 @@ vite.config.ts.timestamp*
 # Misc
 coverage/
 *.tgz
+.vercel
