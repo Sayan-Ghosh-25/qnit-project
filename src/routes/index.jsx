@@ -1,4 +1,4 @@
-//routes/index.jsx
+// src/routes/index.jsx
 import { Routes, Route } from "react-router-dom";
 import HomeLander from "../pages/Authentication/HomeLander";
 import AuthModal from "../pages/Authentication/components/AuthModal";
