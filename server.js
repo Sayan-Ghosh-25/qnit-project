@@ -49,18 +49,3 @@ app.use("/user", userRoutes);
 
 // Basic health
 app.get("/", (req, res) => res.json({ ok: true }));
-
-// Connection Test
-app.get("/test-db", async (req, res) => {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .limit(1);
-
-  if (error) {
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-  res.json({ ok: true, data });
-});
-
-app.listen(PORT, () => console.log(`Backend listening on http://localhost:${PORT}`));
