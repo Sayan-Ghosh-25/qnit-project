@@ -421,20 +421,20 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
             purpose: "signup",
           }),
         });
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
-          throw new Error(j.message || "OTP generation failed");
+      
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.email_sent) {
+          throw new Error(j.error || j.email_error || "OTP generation failed");
         }
-      } else {
-        // If you don't have a backend, you must configure SMS/Email service — otherwise we can't send OTP from frontend securely.
-        throw new Error("No OTP backend configured. Set API_BASE_URL to your server or integrate Supabase SMS/Email on the backend.");
+      
+        // success — server confirmed email was sent
+        setOtpGenerated(true);
+        setOtpVerified(false);
+        setOtpTimer(OTP_TIMEOUT_SECONDS);
+        setOtpMessage("OTP sent! Check your email / phone");
+        setOtpRequestsCount((c) => c + 1);
       }
-
-      setOtpGenerated(true);
-      setOtpVerified(false);
-      setOtpTimer(OTP_TIMEOUT_SECONDS);
-      setOtpMessage("OTP sent! Check your email / phone");
-      setOtpRequestsCount((c) => c + 1);
+      
       // start timer
       if (otpIntervalRef.current) clearInterval(otpIntervalRef.current);
       otpIntervalRef.current = setInterval(() => {
@@ -594,19 +594,6 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
         console.warn("profile creation err", err);
       }
 
-      // If private key used, mark it as consumed (server-side preferred)
-      if (privateKeyVerified) {
-        try {
-          await supabase
-            .from("admin_private_keys")
-            .update({ used: true, used_by: signData?.user?.id ?? null, used_at: new Date().toISOString() })
-            .eq("code", privateKey.trim());
-        } catch (err) {
-          // Not fatal on client
-          console.warn("Failed to mark private key used:", err);
-        }
-      }
-
       // show success and optionally sign in automatically if session created
       setSuccessModal(true);
       setTimeout(async () => {
@@ -619,9 +606,6 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
             if (signData.user.email_confirmed_at || true) {
               // best-effort: fetch session
               navigate(isAdmin ? "/Admin/Dashboard" : "/User/Dashboard", { replace: true });
-            } else {
-              // instruct user to confirm
-              navigate("/", { replace: true });
             }
           } else {
             // email confirmation required — send user to landing page
