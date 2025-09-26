@@ -385,6 +385,40 @@ export async function registerUser(req, res) {
     }
     const email = String(rawEmail).trim().toLowerCase();
 
+    // --- Pre-checks to provide friendly errors and avoid DB constraint failures ---
+    // 1) check if email already exists in auth.users (prevents auth duplicate error)
+    try {
+      const { data: existingAuthUser } = await supabaseAdmin
+        .from("auth.users")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existingAuthUser?.id) {
+        return res.status(400).json({ ok: false, error: "Email already registered. Please sign in or use password reset." });
+      }
+    } catch (e) {
+      // Querying auth.users can fail in some setups; don't block registration, just log.
+      console.warn("registerUser: checking auth.users failed (continuing):", e);
+    }
+
+    // 2) check contact uniqueness in profiles (if provided)
+    if (contact) {
+      try {
+        const { data: existingContact } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("contact", String(contact).trim())
+          .maybeSingle();
+        if (existingContact?.id) {
+          return res.status(400).json({ ok: false, error: "Contact number already in use. Use a different contact or sign in." });
+        }
+      } catch (e) {
+        console.warn("registerUser: checking profiles contact failed (continuing):", e);
+      }
+    }
+
+    // create user in Supabase Auth (service role)
     const createPayload = {
       email,
       password,
@@ -394,7 +428,12 @@ export async function registerUser(req, res) {
     const { data, error } = await supabaseAdmin.auth.admin.createUser(createPayload);
     if (error) {
       console.warn("registerUser: createUser error:", error);
-      return res.status(400).json({ ok: false, error: error.message || "Failed to create user" });
+      // Provide a clearer message for duplicates and other common errors
+      const msg = error?.message || String(error);
+      if (/duplicate|already exists/i.test(msg)) {
+        return res.status(400).json({ ok: false, error: "Email already registered. Please sign in or reset password." });
+      }
+      return res.status(400).json({ ok: false, error: msg || "Failed to create user" });
     }
 
     const userId = data.user?.id ?? data?.id ?? null;
@@ -402,21 +441,30 @@ export async function registerUser(req, res) {
       console.warn("registerUser: user created but id missing:", data);
     }
 
-    const now = new Date().toISOString();
-    const profileRow = {
-      id: userId,
-      full_name: String(full_name).trim(),
-      email,
-      contact,
-      role,
-      stream,
-      year_of_study,
-      access_key: role === "student" ? (access_key || null) : null,
-      last_password_change: now
-    };
+    // The DB trigger (handle_auth_user_created) should create a profiles row automatically.
+    // We will do a best-effort upsert to add any missing fields (access_key, last_password_change).
+    try {
+      const now = new Date().toISOString();
+      const profileRow = {
+        id: userId,
+        full_name: String(full_name).trim(),
+        email,
+        contact,
+        role,
+        stream,
+        year_of_study,
+        access_key: role === "student" ? (access_key || null) : null,
+        last_password_change: now
+      };
 
-    const { error: pErr } = await supabaseAdmin.from("profiles").upsert([profileRow], { onConflict: "id", returning: "minimal" });
-    if (pErr) console.warn("registerUser: profiles upsert failed:", pErr);
+      const { error: pErr } = await supabaseAdmin.from("profiles").upsert([profileRow], { onConflict: "id", returning: "minimal" });
+      if (pErr) {
+        // Do not fail the whole flow for non-critical profile upsert errors.
+        console.warn("registerUser: profiles upsert warning:", pErr);
+      }
+    } catch (err) {
+      console.warn("registerUser: profiles upsert failed (continuing):", err);
+    }
 
     return res.json({ ok: true, userId });
   } catch (err) {
