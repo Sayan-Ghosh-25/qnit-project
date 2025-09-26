@@ -6,14 +6,17 @@ dotenv.config();
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
-// Configuration (customize via .env if needed)
 const DEFAULT_TIMEOUT_MS = Number(process.env.EMAIL_REQUEST_TIMEOUT_MS || 15000);
 const MAX_RETRIES = Number(process.env.EMAIL_REQUEST_RETRIES || 1);
-const DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL;
-const DEFAULT_FROM_NAME = process.env.FROM_NAME;
+const DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL || null;
+const DEFAULT_FROM_NAME = process.env.FROM_NAME || "QNIT Organization";
 
+// NOTE: do not throw at import. Throw inside sendEmail if missing at runtime.
+if (!process.env.EMAIL_API_KEY) {
+  console.warn("Warning: EMAIL_API_KEY not set. sendEmail will fail until configured.");
+}
 if (!DEFAULT_FROM_EMAIL) {
-  throw new Error("FROM_EMAIL Missing");
+  console.warn("Warning: FROM_EMAIL not set. sendEmail will fail until configured.");
 }
 
 export async function sendEmail(to, subject, html = null, opts = {}) {
@@ -23,6 +26,7 @@ export async function sendEmail(to, subject, html = null, opts = {}) {
   const fromEmail = opts.fromEmail || DEFAULT_FROM_EMAIL;
   const fromName = opts.fromName || DEFAULT_FROM_NAME;
 
+  if (!fromEmail) throw new Error("FROM_EMAIL not configured");
   if (!to) throw new Error("`to` is required");
 
   const toArr = Array.isArray(to)
@@ -81,11 +85,9 @@ export async function sendEmail(to, subject, html = null, opts = {}) {
 
       const raw = await res.text();
       let body;
-      try {
-        body = raw ? JSON.parse(raw) : null;
-      } catch {
-        body = raw;
-      }
+      try { body = raw ? JSON.parse(raw) : null; } catch { body = raw; }
+
+      console.log("sendEmail: Brevo response status:", res.status, "body:", body);
 
       if (!res.ok) {
         const err = new Error(`Brevo send error ${res.status}: ${typeof body === "object" ? JSON.stringify(body) : body}`);
@@ -94,12 +96,13 @@ export async function sendEmail(to, subject, html = null, opts = {}) {
         throw err;
       }
 
-      return body;
+      // Normalize return object to include messageId when present
+      const out = (body && typeof body === "object") ? body : { raw: body };
+      return out;
     } catch (err) {
       clearTimeout(timeout);
       lastError = err;
 
-      // simple transient detection (network/timeouts)
       const code = err.code || (err.name === "AbortError" ? "ETIMEDOUT" : undefined);
       const transientCodes = ["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN", "ECONNREFUSED", "ENOTFOUND"];
       const isTransient = code && transientCodes.includes(code);
@@ -111,12 +114,10 @@ export async function sendEmail(to, subject, html = null, opts = {}) {
         throw out;
       }
 
-      // exponential backoff before retry
       const backoffMs = 500 * Math.pow(2, attempt);
       await new Promise(r => setTimeout(r, backoffMs));
     }
   }
 
-  // Fallback
   throw lastError || new Error("Unknown error sending email");
 }

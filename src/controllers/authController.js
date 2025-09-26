@@ -88,35 +88,73 @@ export async function generateOtp(req, res) {
       otp_salt: salt,
       expires_at,
       attempts: 0,
-      verified: false
+      verified: false,
+      email_sent: false,      // audit field (will update after send)
+      email_response: null,   // will store Brevo response
+      message_id: null
     };
 
-    const { error: insertErr } = await supabaseAdmin.from("otp_requests").insert([insertPayload]);
+    // Insert and return inserted row id
+    const { data: insertData, error: insertErr } = await supabaseAdmin
+      .from("otp_requests")
+      .insert([insertPayload])
+      .select("id")
+      .single();
+
     if (insertErr) {
       console.error("generateOtp: DB insert error:", insertErr);
       return res.status(500).json({ ok: false, error: "Failed to create OTP request." });
     }
 
-    // Build and send email (if email provided). Use simple HTML + text (no templates).
+    const otpRequestId = insertData?.id ?? null;
+
+    // Build email content
     let emailSent = false;
     let emailError = null;
+    let sendResp = null;
+
     if (email) {
       try {
         const { html, text } = buildOtpEmailContent({ otp, expiresMinutes: OTP_EXPIRE_MINUTES });
-        await sendEmail(email, "Your QNIT verification code", html, {
+        sendResp = await sendEmail(email, "Your QNIT verification code", html, {
           text,
           fromName: DEFAULT_FROM_NAME,
           replyTo: { email: process.env.REPLY_TO_EMAIL || process.env.FROM_EMAIL, name: DEFAULT_FROM_NAME }
         });
+
+        // log success & mark sent
+        console.log("generateOtp: sendEmail response:", sendResp);
         emailSent = true;
+
+        // update DB row with audit info
+        await supabaseAdmin.from("otp_requests").update({
+          email_sent: true,
+          email_response: sendResp,
+          message_id: (sendResp && sendResp.messageId) ? sendResp.messageId : null
+        }).eq("id", otpRequestId);
       } catch (e) {
-        // log and continue — OTP exists in DB so user can still ask to resend
         emailError = (e && (e.response || e.message)) || "Unknown email send error";
         console.error("generateOtp: email send failed:", emailError);
+
+        // update DB row to record failure and response if present
+        try {
+          await supabaseAdmin.from("otp_requests").update({
+            email_sent: false,
+            email_response: e.response || e.message || String(e)
+          }).eq("id", otpRequestId);
+        } catch (updErr) {
+          console.error("generateOtp: failed to update otp_requests with email failure:", updErr);
+        }
       }
     }
 
-    return res.json({ ok: true, email_sent: emailSent, email_error: emailError || undefined });
+    // If email was requested but failed, return explicit error (so frontend won't show OTP as sent)
+    if (email && !emailSent) {
+      return res.status(502).json({ ok: false, email_sent: false, error: emailError || "Failed to send OTP email" });
+    }
+
+    // success path
+    return res.json({ ok: true, email_sent: email ? true : false, email_error: emailError || undefined, otp_request_id: otpRequestId });
   } catch (err) {
     console.error("generateOtp:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
