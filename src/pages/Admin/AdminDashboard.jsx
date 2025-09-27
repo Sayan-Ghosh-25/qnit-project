@@ -187,6 +187,11 @@ export default function AdminDashboard() {
     setGreetingText(`${greeting} ${userName}`);
   }, []);
 
+  // Preload LogoutModal immediately
+  useEffect(() => {
+    import("@/common/LogoutModal.jsx").catch(() => {});
+  }, []);
+  
   /* -----------------------
      Load motivational quote from Quotes.json (safe fetch + JSON parsing)
      ----------------------- */
