@@ -8,8 +8,8 @@ const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.EMAIL_REQUEST_TIMEOUT_MS || 15000);
 const MAX_RETRIES = Number(process.env.EMAIL_REQUEST_RETRIES || 1);
-const DEFAULT_FROM_EMAIL = null;
-const DEFAULT_FROM_NAME = null;
+const DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL;
+const DEFAULT_FROM_NAME = process.env.FROM_NAME;
 
 // NOTE: do not throw at import. Throw inside sendEmail if missing at runtime.
 if (!process.env.EMAIL_API_KEY) {

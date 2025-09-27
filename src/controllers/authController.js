@@ -118,8 +118,7 @@ export async function generateOtp(req, res) {
         const { html, text } = buildOtpEmailContent({ otp, expiresMinutes: OTP_EXPIRE_MINUTES });
         sendResp = await sendEmail(email, "Your QNIT verification code", html, {
           text,
-          fromName: DEFAULT_FROM_NAME,
-          replyTo: { email: process.env.REPLY_TO_EMAIL || process.env.FROM_EMAIL, name: DEFAULT_FROM_NAME }
+          fromName: DEFAULT_FROM_NAME
         });
 
         // log success & mark sent
