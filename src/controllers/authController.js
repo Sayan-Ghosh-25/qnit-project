@@ -93,6 +93,9 @@ export async function studentIdLookup(req, res) {
 /**
  * POST /auth/otp/generate
  * body: { email?, contact?, purpose? }
+ *
+ * NOTE: email sending left intact (unchanged) — we only ensured email status variables are declared
+ * before use so no ReferenceError occurs.
  */
 export async function generateOtp(req, res) {
   try {
@@ -141,7 +144,7 @@ export async function generateOtp(req, res) {
     let emailSent = false;
     let emailError = null;
 
-    // Send email if email is provided
+    // Send email if email is provided (kept logic unchanged)
     if (email) {
       try {
         const { html, text } = buildOtpEmailContent({ otp, expiresMinutes: OTP_EXPIRE_MINUTES });
@@ -164,7 +167,7 @@ export async function generateOtp(req, res) {
         emailError = (e?.response || e?.message) || String(e) || "Unknown email error";
         console.error("generateOtp: email send failed:", emailError);
 
-        // Update DB with failed email attempt
+        // Update DB with failed email attempt (best effort)
         try {
           await supabaseAdmin.from("otp_requests").update({
             email_sent: false,
@@ -174,10 +177,12 @@ export async function generateOtp(req, res) {
           console.error("generateOtp: failed to update otp_requests with email failure:", updErr);
         }
 
+        // Return explicit error so frontend doesn't assume OTP was sent
         return res.status(502).json({ ok: false, email_sent: false, error: emailError });
       }
     }
 
+    // success path
     return res.json({ ok: true, email_sent: email ? emailSent : false, otp_request_id: otpRequestId });
   } catch (err) {
     console.error("generateOtp:", err);
@@ -245,7 +250,6 @@ export async function verifyOtp(req, res) {
 
 /**
  * POST /auth/private-key/generate
- * Body: { email?, contact?, purpose? }
  */
 export async function requestPrivateKey(req, res) {
   try {
@@ -306,7 +310,6 @@ export async function requestPrivateKey(req, res) {
 
 /**
  * POST /auth/private-key/verify
- * Body: { email?, contact?, privateKey?, purpose? }
  */
 export async function verifyPrivateKey(req, res) {
   try {
