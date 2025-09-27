@@ -8,25 +8,16 @@ const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.EMAIL_REQUEST_TIMEOUT_MS || 15000);
 const MAX_RETRIES = Number(process.env.EMAIL_REQUEST_RETRIES || 1);
-const DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL || null;
-const DEFAULT_FROM_NAME = process.env.FROM_NAME || "QNIT Organization";
 
 // NOTE: do not throw at import. Throw inside sendEmail if missing at runtime.
 if (!process.env.EMAIL_API_KEY) {
   console.warn("Warning: EMAIL_API_KEY not set. sendEmail will fail until configured.");
-}
-if (!DEFAULT_FROM_EMAIL) {
-  console.warn("Warning: FROM_EMAIL not set. sendEmail will fail until configured.");
 }
 
 export async function sendEmail(to, subject, html = null, opts = {}) {
   const EMAIL_API_KEY = process.env.EMAIL_API_KEY;
   if (!EMAIL_API_KEY) throw new Error("Email API key not configured (EMAIL_API_KEY)");
 
-  const fromEmail = opts.fromEmail || DEFAULT_FROM_EMAIL;
-  const fromName = opts.fromName || DEFAULT_FROM_NAME;
-
-  if (!fromEmail) throw new Error("FROM_EMAIL not configured");
   if (!to) throw new Error("`to` is required");
 
   const toArr = Array.isArray(to)
@@ -39,7 +30,6 @@ export async function sendEmail(to, subject, html = null, opts = {}) {
   };
 
   const payload = {
-    sender: { name: fromName, email: fromEmail },
     to: toArr,
     subject: subject || "",
     ...(opts.templateId
@@ -50,6 +40,7 @@ export async function sendEmail(to, subject, html = null, opts = {}) {
         }),
     ...(opts.cc ? { cc: buildRecipientArray(opts.cc) } : {}),
     ...(opts.bcc ? { bcc: buildRecipientArray(opts.bcc) } : {}),
+    ...(opts.replyTo ? { replyTo: { email: opts.replyTo.email, name: opts.replyTo.name } } : {}),
   };
 
   if (opts.attachments && Array.isArray(opts.attachments) && opts.attachments.length) {
