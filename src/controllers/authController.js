@@ -9,8 +9,8 @@ const OTP_EXPIRE_MINUTES = parseInt(process.env.OTP_EXPIRE_MINUTES || "10", 10);
 const OTP_MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || "5", 10);
 const PRIVATE_KEY_LENGTH = parseInt(process.env.PRIVATE_KEY_LENGTH || "6", 10);
 
-const DEFAULT_FROM_NAME = process.env.FROM_NAME || "QNIT Support";
-const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || null;
+const DEFAULT_FROM_NAME = process.env.FROM_NAME;
+const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL;
 
 /** helper to build professional OTP email */
 function buildOtpEmailContent({ otp, expiresMinutes, appName = "QNIT" }) {

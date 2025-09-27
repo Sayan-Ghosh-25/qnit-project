@@ -49,8 +49,7 @@ export async function sendEmail(to, subject, html = null, opts = {}) {
           ...(opts.text ? { textContent: opts.text } : {}),
         }),
     ...(opts.cc ? { cc: buildRecipientArray(opts.cc) } : {}),
-    ...(opts.bcc ? { bcc: buildRecipientArray(opts.bcc) } : {}),
-    ...(opts.replyTo ? { replyTo: { email: opts.replyTo.email, name: opts.replyTo.name } } : {}),
+    ...(opts.bcc ? { bcc: buildRecipientArray(opts.bcc) } : {})
   };
 
   if (opts.attachments && Array.isArray(opts.attachments) && opts.attachments.length) {
