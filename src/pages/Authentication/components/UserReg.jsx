@@ -1,4 +1,3 @@
-// src/pages/Authentication/components/UserReg.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,8 +8,6 @@ import styles from "./UserReg.module.css";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const OTP_TIMEOUT_SECONDS = 10 * 60; // 10 minutes
 const PRIVATE_KEY_TIMEOUT_SECONDS = 10 * 60; // 10 minutes
-const OTP_MAX_ATTEMPTS = 5; // server should enforce; UI shows count
-const ACCESS_MAX_WRONG = 3; // server should enforce ban; UI will reflect server response
 // ----------------------------------------
 
 const TICK_SVG = (
@@ -44,6 +41,7 @@ export default function UserReg() {
   // Access key (student) and private key (admin)
   const [accessKey, setAccessKey] = useState("");
   const [accessKeyDisabled, setAccessKeyDisabled] = useState(false);
+  const [accessAutoFoundFor, setAccessAutoFoundFor] = useState(null); // original_name when auto-filled
 
   // password
   const [password, setPassword] = useState("");
@@ -66,7 +64,7 @@ export default function UserReg() {
     noName: false,
   });
 
-  // OTP flow (assumes API_BASE_URL OTP endpoints, fallback: disabled)
+  // OTP flow (API_BASE_URL OTP endpoints, fallback: disabled)
   const [otp, setOtp] = useState("");
   const [otpGenerated, setOtpGenerated] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
@@ -74,18 +72,16 @@ export default function UserReg() {
   const otpIntervalRef = useRef(null);
   const [otpMessage, setOtpMessage] = useState("");
   const [otpRequestsCount, setOtpRequestsCount] = useState(0);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [sendOtpLabel, setSendOtpLabel] = useState("Send OTP");
 
   // ---------- Private Key state ----------
   const [privateKey, setPrivateKey] = useState(""); // stores the generated/entered private key
-const [privateKeyGenerated, setPrivateKeyGenerated] = useState(false);
-const [privateKeyVerified, setPrivateKeyVerified] = useState(false);
-const [privateKeyTimer, setPrivateKeyTimer] = useState(0); // optional if you want expiration like OTP
-const privateKeyIntervalRef = useRef(null); // for countdown timer
-const [privateKeyMessage, setPrivateKeyMessage] = useState("");
-
-  // access/private key ban metadata (relies on server ideally)
-  const [accessWrongCount, setAccessWrongCount] = useState(0);
-  const [accessBanExpiry, setAccessBanExpiry] = useState(null);
+  const [privateKeyGenerated, setPrivateKeyGenerated] = useState(false);
+  const [privateKeyVerified, setPrivateKeyVerified] = useState(false);
+  const [privateKeyTimer, setPrivateKeyTimer] = useState(0); // optional if you want expiration like OTP
+  const privateKeyIntervalRef = useRef(null); // for countdown timer
+  const [privateKeyMessage, setPrivateKeyMessage] = useState("");
 
   // submission states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -162,7 +158,6 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
     setUserExistsEmailStatus("checking");
     debounceEmailRef.current = setTimeout(async () => {
       try {
-        // Prefer server endpoint if provided (because only server can use service_role to access auth.users)
         if (API_BASE_URL) {
           const url = new URL(`${API_BASE_URL}/auth/check-user`);
           url.searchParams.set("field", "email");
@@ -172,7 +167,6 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
           const j = await res.json();
           setUserExistsEmailStatus(Boolean(j.exists));
         } else {
-          // Client-side: check profiles table for email (requires that you store email in profiles at signup)
           const { data, error } = await supabase
             .from("profiles")
             .select("id")
@@ -241,6 +235,7 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
     if (!fullName || fullName.trim().length < 2) {
       setAccessKey("");
       setAccessKeyDisabled(false);
+      setAccessAutoFoundFor(null);
       return;
     }
 
@@ -250,35 +245,57 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
       if (!normalized) {
         setAccessKey("");
         setAccessKeyDisabled(false);
+        setAccessAutoFoundFor(null);
         return;
       }
 
       try {
-        // Query student_ids table in Supabase: expects columns normalized_name, id4
-        const { data, error } = await supabase
-          .from("student_ids")
-          .select("id4, original_name")
-          .eq("normalized_name", normalized)
-          .maybeSingle();
-
-        if (error) {
-          console.warn("student id lookup error", error);
-          setAccessKeyDisabled(false);
-          return;
-        }
-
-        if (data && data.id4) {
-          // found -> autofill and disable
-          setAccessKey(String(data.id4));
-          setAccessKeyDisabled(true);
+        // Prefer backend lookup endpoint (service-role) if available
+        if (API_BASE_URL) {
+          const url = new URL(`${API_BASE_URL}/auth/student-id-lookup`);
+          url.searchParams.set("name", fullName.trim());
+          const res = await fetch(url.toString());
+          if (!res.ok) throw new Error("lookup failed");
+          const j = await res.json();
+          if (j && j.found && j.id4) {
+            setAccessKey(String(j.id4));
+            setAccessKeyDisabled(true);
+            setAccessAutoFoundFor(j.original_name || null);
+          } else {
+            // fallback: allow manual entry
+            setAccessKey("");
+            setAccessKeyDisabled(false);
+            setAccessAutoFoundFor(null);
+          }
         } else {
-          // not found -> allow manual entry
-          setAccessKey("");
-          setAccessKeyDisabled(false);
+          // Client-side: check student_ids table in Supabase (public read) if available
+          const { data, error } = await supabase
+            .from("student_ids")
+            .select("id4, original_name")
+            .eq("normalized_name", normalized)
+            .maybeSingle();
+
+          if (error) {
+            console.warn("student id lookup error", error);
+            setAccessKeyDisabled(false);
+            setAccessAutoFoundFor(null);
+            return;
+          }
+
+          if (data && data.id4) {
+            setAccessKey(String(data.id4));
+            setAccessKeyDisabled(true);
+            setAccessAutoFoundFor(data.original_name || null);
+          } else {
+            setAccessKey("");
+            setAccessKeyDisabled(false);
+            setAccessAutoFoundFor(null);
+          }
         }
       } catch (err) {
         console.warn("student lookup err", err);
         setAccessKeyDisabled(false);
+        setAccessAutoFoundFor(null);
       }
     }, 450);
 
@@ -288,8 +305,6 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
   }, [fullName]);
 
   // ---------- PRIVATE KEY REQUEST (Admin) ----------
-  // We implement using a Supabase RPC or insert to admin_key_requests table. The server (or a DB trigger/edge function) must send the email.
-
   async function handleRequestPrivateKeyInput() {
     setPrivateKeyMessage("");
     // require either a valid email or a valid contact number
@@ -392,7 +407,6 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
   }
 
   // ---------- OTP generation & verify (server-backed) ----------
-  // These call API_BASE_URL endpoints. If you prefer, implement an edge-function that talks to SendGrid/Supabase SMTP.
   async function handleGenerateOtp() {
     setOtpMessage("");
     if (!email && !contactNumber) {
@@ -463,7 +477,10 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
       setOtpMessage("Enter OTP");
       return;
     }
-
+  
+    setVerifyingOtp(true);
+    setOtpMessage("Verifying...");
+  
     try {
       if (API_BASE_URL) {
         const res = await fetch(`${API_BASE_URL}/auth/otp/verify`, {
@@ -479,14 +496,20 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
         });
         const j = await res.json();
         if (!res.ok || !j.verified) throw new Error(j.message || "OTP verification failed");
+  
         setOtpVerified(true);
         setOtpMessage("OTP verified");
-        // clear timer
+  
+        // Clear timer
         if (otpIntervalRef.current) {
           clearInterval(otpIntervalRef.current);
           otpIntervalRef.current = null;
         }
         setOtpTimer(0);
+  
+        // Reset OTP button label
+        setSendOtpLabel("Send OTP");
+        setOtpGenerated(false);
       } else {
         throw new Error("No OTP backend configured; cannot verify OTP.");
       }
@@ -494,8 +517,10 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
       console.error("verify otp err", err);
       setOtpMessage(err.message || "OTP verification failed");
       setOtpVerified(false);
+    } finally {
+      setVerifyingOtp(false);
     }
-  }
+  }  
 
   // ---------- Final registration ----------
   async function handleCreateAccount(e) {
@@ -551,6 +576,7 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
             contact: contactNumber ? contactNumber.trim() : null,
             stream: isStudent ? stream.trim() : null,
             year_of_study: isStudent ? yearOfStudy.trim() : null,
+            access_key: isStudent ? (accessKey && accessKey.trim().length ? accessKey.trim() : null) : null,
           },
         },
       };
@@ -560,11 +586,10 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
       if (signErr) throw signErr;
 
       // If your Supabase requires email confirmation, user will have to confirm via email. We create a profiles row if possible.
-      // If `user` object present immediately (depends on settings) we can insert profile now, otherwise create a DB trigger or server function to create profile after confirmation.
       const userId = signData?.user?.id ?? null;
       try {
         if (userId) {
-          // insert into profiles
+          // insert into profiles (best-effort)
           const nowIso = new Date().toISOString();
           const { error: profileErr } = await supabase.from("profiles").upsert(
             [
@@ -577,17 +602,15 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
                 stream: isStudent ? stream.trim() : null,
                 year_of_study: isStudent ? yearOfStudy.trim() : null,
                 last_password_change: nowIso,
-                access_key: isStudent ? accessKey || null : null,
+                access_key: isStudent ? (accessKey || null) : null,
               },
             ],
             { onConflict: "id", returning: "minimal" }
           );
           if (profileErr) {
             console.warn("profiles upsert failed:", profileErr);
-            // not fatal; advise server-side fix
           }
         } else {
-          // userId not available immediately (email confirmation flow). Recommend creating a server-side webhook to create profiles on signup confirmation.
           console.info("User id not returned immediately (email confirm flow). Ensure server-side profile creation on signup confirmation.");
         }
       } catch (err) {
@@ -598,17 +621,12 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
       setSuccessModal(true);
       setTimeout(async () => {
         setSuccessModal(false);
-        // Attempt to sign in automatically (if signData.user exists)
         try {
           if (signData?.user) {
-            // sign in state already set by supabase-js; you can navigate to dashboard
-            // If email confirm required, redirect to a "please confirm your email" page instead
             if (signData.user.email_confirmed_at || true) {
-              // best-effort: fetch session
               navigate(isAdmin ? "/Admin/Dashboard" : "/User/Dashboard", { replace: true });
             }
           } else {
-            // email confirmation required — send user to landing page
             navigate("/", { replace: true });
           }
         } catch (navErr) {
@@ -689,6 +707,7 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
 
                 setAccessKey("");
                 setAccessKeyDisabled(false);
+                setAccessAutoFoundFor(null);
               }}
               required
             >
@@ -784,23 +803,24 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
                       disabled={otpVerified}
                     />
                     <div className={styles.otpButtons}>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.small} ${styles.outline}`}
-                        onClick={handleGenerateOtp}
-                        disabled={ otpVerified || (otpGenerated && otpTimer > 0)}
-                      >
-                        {!otpGenerated ? "Send OTP" : "Resend OTP"}
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.small} ${styles.outline}`}
-                        onClick={handleVerifyOtp}
-                        disabled={!otpGenerated || otpVerified}
-                      >
-                        Verify
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.small} ${styles.outline}`}
+                      onClick={handleGenerateOtp}
+                      disabled={otpVerified || (otpGenerated && otpTimer > 0)}
+                    >
+                      {!otpGenerated ? sendOtpLabel : "Resend OTP"}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.small} ${styles.outline}`}
+                      onClick={handleVerifyOtp}
+                      disabled={!otpGenerated || otpVerified || verifyingOtp}
+                    >
+                      {verifyingOtp ? "Verifying..." : "Verify"}
+                    </button>
+                  </div>
                   </div>
                   <div className={styles.noteRow}>
                     {otpMessage && (
@@ -819,10 +839,17 @@ const [privateKeyMessage, setPrivateKeyMessage] = useState("");
                   <label>Access Key</label>
                   <input
                     value={accessKey}
-                    onChange={(e) => setAccessKey(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    onChange={(e) => {
+                      // allow manual edit only when not auto-disabled
+                      if (accessKeyDisabled) return;
+                      setAccessKey(e.target.value.replace(/\D/g, "").slice(0, 4));
+                    }}
                     placeholder="e.g. NIT/2023/XXXX"
                     disabled={accessKeyDisabled}
                   />
+                  {accessAutoFoundFor && (
+                    <small className={styles.hint}>Auto-filled from student record: {accessAutoFoundFor}</small>
+                  )}
                 </div>
               )}
 
