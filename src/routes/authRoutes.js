@@ -1,3 +1,4 @@
+// authRoutes.js
 import express from "express";
 import {
   generateOtp,
@@ -13,21 +14,21 @@ import { requireAuth } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// OTP
+// OTP endpoints
 router.post("/otp/generate", rateLimitMiddleware, generateOtp);
 router.post("/otp/verify", verifyOtp);
 
-// Private key (admin)
+// Private key (for admin use only)
 router.post("/private-key/generate", rateLimitMiddleware, requestPrivateKey);
 router.post("/private-key/verify", verifyPrivateKey);
 
-// check user existence
+// Check if user exists (by email/contact)
 router.get("/check-user", checkUser);
 
-// Register (create auth user + profile)
+// Register new user (with verified OTP flow)
 router.post("/register", registerUser);
 
-// Password update (requires Authorization: Bearer <access_token>)
+// Update password (requires valid access_token)
 router.post("/password/update", requireAuth, updatePassword);
 
 export default router;

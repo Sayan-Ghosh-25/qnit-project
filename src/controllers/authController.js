@@ -62,6 +62,35 @@ Expires at: ${expiresAt}`;
 }
 
 /**
+ * GET /auth/student-id-lookup?name=Full%20Name
+ * Returns { found: true, id4, original_name } or { found: false }
+ */
+export async function studentIdLookup(req, res) {
+  try {
+    const name = (req.query.name || "").toString().trim();
+    if (!name) return res.status(400).json({ found: false, error: "name required" });
+
+    const normalized = name.toLowerCase().replace(/\s+/g, "");
+    const { data, error } = await supabaseAdmin
+      .from("student_ids")
+      .select("id4, original_name")
+      .eq("normalized_name", normalized)
+      .maybeSingle();
+
+    if (error) {
+      console.error("studentIdLookup: DB error:", error);
+      return res.status(500).json({ found: false, error: "DB error" });
+    }
+    if (!data) return res.json({ found: false });
+
+    return res.json({ found: true, id4: data.id4, original_name: data.original_name });
+  } catch (err) {
+    console.error("studentIdLookup:", err);
+    return res.status(500).json({ found: false, error: "Server error" });
+  }
+}
+
+/**
  * POST /auth/otp/generate
  * body: { email?, contact?, purpose? }
  */
@@ -89,12 +118,11 @@ export async function generateOtp(req, res) {
       expires_at,
       attempts: 0,
       verified: false,
-      email_sent: false,      // audit field (will update after send)
-      email_response: null,   // will store Brevo response
+      email_sent: false,
+      email_response: null,
       message_id: null
     };
 
-    // Insert and return inserted row id
     const { data: insertData, error: insertErr } = await supabaseAdmin
       .from("otp_requests")
       .insert([insertPayload])
@@ -108,7 +136,7 @@ export async function generateOtp(req, res) {
 
     const otpRequestId = insertData?.id ?? null;
 
-    // Build email content
+    // Send email if requested
     let emailSent = false;
     let emailError = null;
     let sendResp = null;
@@ -121,11 +149,9 @@ export async function generateOtp(req, res) {
           fromName: DEFAULT_FROM_NAME
         });
 
-        // log success & mark sent
         console.log("generateOtp: sendEmail response:", sendResp);
         emailSent = true;
 
-        // update DB row with audit info
         await supabaseAdmin.from("otp_requests").update({
           email_sent: true,
           email_response: sendResp,
@@ -135,7 +161,6 @@ export async function generateOtp(req, res) {
         emailError = (e && (e.response || e.message)) || "Unknown email send error";
         console.error("generateOtp: email send failed:", emailError);
 
-        // update DB row to record failure and response if present
         try {
           await supabaseAdmin.from("otp_requests").update({
             email_sent: false,
@@ -147,12 +172,10 @@ export async function generateOtp(req, res) {
       }
     }
 
-    // If email was requested but failed, return explicit error (so frontend won't show OTP as sent)
     if (email && !emailSent) {
       return res.status(502).json({ ok: false, email_sent: false, error: emailError || "Failed to send OTP email" });
     }
 
-    // success path
     return res.json({ ok: true, email_sent: email ? true : false, email_error: emailError || undefined, otp_request_id: otpRequestId });
   } catch (err) {
     console.error("generateOtp:", err);
@@ -195,12 +218,10 @@ export async function verifyOtp(req, res) {
       return res.status(400).json({ verified: false, message: "No OTP request found." });
     }
 
-    // expired?
     if (new Date(row.expires_at) < new Date()) {
       return res.status(400).json({ verified: false, message: "OTP expired." });
     }
 
-    // locked out?
     const attempts = Number(row.attempts || 0);
     if (attempts >= OTP_MAX_ATTEMPTS) {
       return res.status(429).json({ verified: false, message: "Too many failed attempts. Please request a new code." });
@@ -208,12 +229,10 @@ export async function verifyOtp(req, res) {
 
     const ok = await verifyHash(otp, row.otp_salt, row.otp_hash);
     if (!ok) {
-      // increment attempts
       await supabaseAdmin.from("otp_requests").update({ attempts: attempts + 1 }).eq("id", row.id);
       return res.status(400).json({ verified: false, message: "Invalid OTP." });
     }
 
-    // mark verified and reset attempts
     await supabaseAdmin.from("otp_requests").update({ verified: true, attempts: 0 }).eq("id", row.id);
     return res.json({ verified: true });
   } catch (err) {
@@ -225,7 +244,6 @@ export async function verifyOtp(req, res) {
 /**
  * POST /auth/private-key/generate
  * Body: { email?, contact?, purpose? }
- * Behavior: generate a one-time private code, store hashed, email dev (ADMIN_NOTIFY_EMAIL) with code.
  */
 export async function requestPrivateKey(req, res) {
   try {
@@ -237,7 +255,6 @@ export async function requestPrivateKey(req, res) {
       return res.status(400).json({ ok: false, error: "email or contact required" });
     }
 
-    // generate a short alphanumeric code
     const rawCode = Math.random().toString(36).slice(2, 2 + PRIVATE_KEY_LENGTH).toUpperCase();
     const { salt, hash } = await hashString(rawCode);
     const expires_at = nowPlusMinutes(OTP_EXPIRE_MINUTES).toISOString();
@@ -258,7 +275,6 @@ export async function requestPrivateKey(req, res) {
       return res.status(500).json({ ok: false, error: "Failed to generate private key request." });
     }
 
-    // Prepare admin notification content (always send simple HTML/text)
     const applicant = email || contact;
     const adminHtmlObj = buildAdminPrivateKeyEmail({ applicant, rawCode, expiresAt: expires_at });
 
@@ -324,7 +340,6 @@ export async function verifyPrivateKey(req, res) {
     }
     if (!matched) return res.status(400).json({ verified: false, message: "Invalid code" });
 
-    // mark used
     await supabaseAdmin.from("admin_private_keys").update({ used: true, used_at: new Date().toISOString() }).eq("id", matched.id);
     return res.json({ verified: true });
   } catch (err) {
@@ -334,7 +349,7 @@ export async function verifyPrivateKey(req, res) {
 }
 
 /**
- * GET /auth/check-user?field=email&value=abc@...
+ * GET /auth/check-user?field=email&value=...
  */
 export async function checkUser(req, res) {
   try {
@@ -369,8 +384,7 @@ export async function checkUser(req, res) {
  * POST /auth/register
  * body: { email, password, role, full_name, contact, stream, year_of_study, access_key }
  *
- * - This endpoint uses service_role to create a user and profiles row.
- * - Caller must have verified OTP and (if admin) privateKeyVerified using previous endpoints.
+ * Uses service role to create auth user and upsert profiles row.
  */
 export async function registerUser(req, res) {
   try {
@@ -384,8 +398,7 @@ export async function registerUser(req, res) {
     }
     const email = String(rawEmail).trim().toLowerCase();
 
-    // --- Pre-checks to provide friendly errors and avoid DB constraint failures ---
-    // 1) check if email already exists in auth.users (prevents auth duplicate error)
+    // 1) Check auth.users for existing email (friendly error)
     try {
       const { data: existingAuthUser } = await supabaseAdmin
         .from("auth.users")
@@ -397,11 +410,10 @@ export async function registerUser(req, res) {
         return res.status(400).json({ ok: false, error: "Email already registered. Please sign in or use password reset." });
       }
     } catch (e) {
-      // Querying auth.users can fail in some setups; don't block registration, just log.
       console.warn("registerUser: checking auth.users failed (continuing):", e);
     }
 
-    // 2) check contact uniqueness in profiles (if provided)
+    // 2) Check contact uniqueness if provided
     if (contact) {
       try {
         const { data: existingContact } = await supabaseAdmin
@@ -418,16 +430,23 @@ export async function registerUser(req, res) {
     }
 
     // create user in Supabase Auth (service role)
+    // include access_key in user_metadata so DB trigger can read it immediately if provided by frontend
     const createPayload = {
       email,
       password,
-      user_metadata: { role, full_name: String(full_name).trim(), contact, stream, year_of_study }
+      user_metadata: {
+        role,
+        full_name: String(full_name).trim(),
+        contact,
+        stream,
+        year_of_study,
+        access_key: access_key || null
+      }
     };
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser(createPayload);
     if (error) {
       console.warn("registerUser: createUser error:", error);
-      // Provide a clearer message for duplicates and other common errors
       const msg = error?.message || String(error);
       if (/duplicate|already exists/i.test(msg)) {
         return res.status(400).json({ ok: false, error: "Email already registered. Please sign in or reset password." });
@@ -440,8 +459,7 @@ export async function registerUser(req, res) {
       console.warn("registerUser: user created but id missing:", data);
     }
 
-    // The DB trigger (handle_auth_user_created) should create a profiles row automatically.
-    // We will do a best-effort upsert to add any missing fields (access_key, last_password_change).
+    // Best-effort upsert to profiles to ensure stream/year/access_key are set if trigger didn't
     try {
       const now = new Date().toISOString();
       const profileRow = {
@@ -458,7 +476,6 @@ export async function registerUser(req, res) {
 
       const { error: pErr } = await supabaseAdmin.from("profiles").upsert([profileRow], { onConflict: "id", returning: "minimal" });
       if (pErr) {
-        // Do not fail the whole flow for non-critical profile upsert errors.
         console.warn("registerUser: profiles upsert warning:", pErr);
       }
     } catch (err) {
@@ -474,9 +491,6 @@ export async function registerUser(req, res) {
 
 /**
  * POST /auth/password/update
- * Body: { password }
- * - This route uses requireAuth middleware which provides req.user (sub / id).
- * - Enforces 30-day rule.
  */
 export async function updatePassword(req, res) {
   try {
