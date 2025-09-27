@@ -1,3 +1,4 @@
+// src/pages/Authentication/components/UserReg.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
@@ -309,12 +310,12 @@ export default function UserReg() {
     setPrivateKeyMessage("");
     // require either a valid email or a valid contact number
     if (!((email && validateEmail(email)) || (contactNumber && validateContact(contactNumber)))) {
-      setPrivateKeyMessage("Enter a valid email or a valid 10-digit contact to receive private key");
+      setPrivateKeyMessage("Enter your valid email & contact first");
       return;
      }
 
     try {
-      setPrivateKeyMessage("Generating private key...");
+      setPrivateKeyMessage("Requesting for private key...");
       if (API_BASE_URL) {
         const res = await fetch(`${API_BASE_URL}/auth/private-key/generate`, {
           method: "POST",
@@ -335,7 +336,7 @@ export default function UserReg() {
         const data = await res.json();
         setPrivateKeyGenerated(true);
         setPrivateKeyVerified(false);
-        setPrivateKeyMessage("Private key generated!");
+        setPrivateKeyMessage("Request sent! Contact the developer to receive your private key");
 
         setPrivateKeyTimer(PRIVATE_KEY_TIMEOUT_SECONDS);
         if (privateKeyIntervalRef.current) clearInterval(privateKeyIntervalRef.current);
@@ -352,11 +353,11 @@ export default function UserReg() {
 
       } else {
         throw new Error(
-          "No backend configured for private key. Set API_BASE_URL or implement server-side key generation."
+          "Server-side Error"
         );
       }
     } catch (err) {
-      console.error("private key gen err", err);
+      console.error("private key gen error", err);
       setPrivateKeyMessage(err.message || "Failed to generate private key");
     }
   }
@@ -364,16 +365,16 @@ export default function UserReg() {
   async function handleVerifyPrivateKeyInput() {
     setPrivateKeyMessage("");
     if (!privateKeyGenerated) {
-      setPrivateKeyMessage("Generate private key first");
+      setPrivateKeyMessage("Request private key first");
       return;
     }
     if (!privateKey || privateKey.trim().length < 5) {
-      setPrivateKeyMessage("Enter private key");
+      setPrivateKeyMessage("Enter your private key");
       return;
     }
 
     try {
-      if (!API_BASE_URL) throw new Error("No backend configured for private key verification");
+      if (!API_BASE_URL) throw new Error("Server-side Error");
 
       const res = await fetch(`${API_BASE_URL}/auth/private-key/verify`, {
         method: "POST",
@@ -401,7 +402,7 @@ export default function UserReg() {
       } setPrivateKeyTimer(0);      
 
     } catch (err) {
-      console.error("private key verify err", err);
+      console.error("private key verify error", err);
       setPrivateKeyMessage(err.message || "Failed to verify private key");
     }
   }
@@ -410,7 +411,7 @@ export default function UserReg() {
   async function handleGenerateOtp() {
     setOtpMessage("");
     if (!email && !contactNumber) {
-      setOtpMessage("Enter an email or contact to receive OTP");
+      setOtpMessage("Enter an email & contact to receive OTP");
       return;
     }
     if (email && !validateEmail(email)) {
@@ -418,7 +419,7 @@ export default function UserReg() {
       return;
     }
     if (contactNumber && !validateContact(contactNumber)) {
-      setOtpMessage("Enter a valid 10-digit phone number");
+      setOtpMessage("Enter a valid phone number");
       return;
     }
 
@@ -445,7 +446,7 @@ export default function UserReg() {
         setOtpGenerated(true);
         setOtpVerified(false);
         setOtpTimer(OTP_TIMEOUT_SECONDS);
-        setOtpMessage("OTP sent! Check your email / phone");
+        setOtpMessage("OTP sent! Check your email inbox/spam folder");
         setOtpRequestsCount((c) => c + 1);
       }
       
@@ -462,7 +463,7 @@ export default function UserReg() {
         });
       }, 1000);
     } catch (err) {
-      console.error("otp gen err", err);
+      console.error("otp gen error", err);
       setOtpMessage(err.message || "Failed to send OTP");
     }
   }
@@ -474,7 +475,7 @@ export default function UserReg() {
       return;
     }
     if (!otp || otp.trim().length < 3) {
-      setOtpMessage("Enter OTP");
+      setOtpMessage("Enter the OTP");
       return;
     }
   
@@ -498,7 +499,7 @@ export default function UserReg() {
         if (!res.ok || !j.verified) throw new Error(j.message || "OTP verification failed");
   
         setOtpVerified(true);
-        setOtpMessage("OTP verified");
+        setOtpMessage("OTP verified successfully!");
   
         // Clear timer
         if (otpIntervalRef.current) {
@@ -511,7 +512,7 @@ export default function UserReg() {
         setSendOtpLabel("Send OTP");
         setOtpGenerated(false);
       } else {
-        throw new Error("No OTP backend configured; cannot verify OTP.");
+        throw new Error("Server-side Error");
       }
     } catch (err) {
       console.error("verify otp err", err);
@@ -532,38 +533,38 @@ export default function UserReg() {
 
     // minimal validation
     if (!isStudent && !isAdmin) {
-      setFormError("Select a valid user type.");
+      setFormError("Select a valid user type");
       return;
     }
     if (isStudent) {
-      if (!fullName.trim()) { setFormError("Enter full name"); return; }
-      if (!stream.trim()) { setFormError("Enter stream"); return; }
-      if (!yearOfStudy.trim()) { setFormError("Enter academic year"); return; }
-      if (!(email || contactNumber)) { setFormError("Provide email or contact"); return; }
+      if (!fullName.trim()) { setFormError("Enter your full name"); return; }
+      if (!stream.trim()) { setFormError("Enter your stream"); return; }
+      if (!yearOfStudy.trim()) { setFormError("Enter your academic year"); return; }
+      if (!(email || contactNumber)) { setFormError("Provide your email or contact"); return; }
     }
     if (isAdmin) {
-      if (!fullName.trim()) { setFormError("Enter full name"); return; }
+      if (!fullName.trim()) { setFormError("Enter your full name"); return; }
       if (!email) { setFormError("Admin registration requires an email"); return; }
-      if (!privateKeyVerified) { setFormError("Verify private key first or request one."); return; }
+      if (!privateKeyVerified) { setFormError("Verify private key first or request one"); return; }
     }
 
     if (email && !validateEmail(email)) { setFormError("Invalid email"); return; }
     if (contactNumber && !validateContact(contactNumber)) { setFormError("Invalid contact"); return; }
 
     if (!otpVerified) {
-      setFormError("Please verify OTP before submitting.");
+      setFormError("Please verify OTP before submitting");
       return;
     }
 
-    if (!allPasswordChecksPass()) { setFormError("Password does not meet complexity requirements."); return; }
-    if (password !== confirmPassword) { setFormError("Passwords do not match."); return; }
+    if (!allPasswordChecksPass()) { setFormError("Password does not meet complexity requirements"); return; }
+    if (password !== confirmPassword) { setFormError("Passwords do not match"); return; }
 
     setIsSubmitting(true);
 
     try {
       // Use Supabase signUp (email/password). For sign-ups without email, you need a backend flow — here we require email.
       if (!email) {
-        throw new Error("Registration currently requires an email address. Please enter email.");
+        throw new Error("Registration requires an email address! Please your enter email");
       }
 
       const signPayload = {
@@ -585,7 +586,6 @@ export default function UserReg() {
       const { data: signData, error: signErr } = await supabase.auth.signUp(signPayload);
       if (signErr) throw signErr;
 
-      // If your Supabase requires email confirmation, user will have to confirm via email. We create a profiles row if possible.
       const userId = signData?.user?.id ?? null;
       try {
         if (userId) {
@@ -611,13 +611,13 @@ export default function UserReg() {
             console.warn("profiles upsert failed:", profileErr);
           }
         } else {
-          console.info("User id not returned immediately (email confirm flow). Ensure server-side profile creation on signup confirmation.");
+          console.info("User id not returned immediately! Ensure server-side profile creation on signup confirmation");
         }
       } catch (err) {
-        console.warn("profile creation err", err);
+        console.warn("profile creation error", err);
       }
 
-      // show success and optionally sign in automatically if session created
+      // Show success and optionally sign in automatically if session created
       setSuccessModal(true);
       setTimeout(async () => {
         setSuccessModal(false);
@@ -635,8 +635,8 @@ export default function UserReg() {
         }
       }, 1300);
     } catch (err) {
-      console.error("register err", err);
-      setFormError(err?.message || "Registration failed. Try again.");
+      console.error("register error", err);
+      setFormError(err?.message || "Registration failed! Try again...");
     } finally {
       setIsSubmitting(false);
     }
@@ -666,7 +666,7 @@ export default function UserReg() {
       if (!otpVerified) return false;
       if (!allPasswordChecksPass()) return false;
       if (password !== confirmPassword) return false;
-      if (!accessKey || accessKey.trim().length < 1) return false; // may be auto-filled or provided
+      if (!accessKey || accessKey.trim().length < 1) return false;
     }
     if (isAdmin) {
       if (!fullName.trim() || !email.trim()) return false;
@@ -692,7 +692,7 @@ export default function UserReg() {
               value={userType}
               onChange={(e) => {
                 setUserType(e.target.value);
-                // reset OTP & related flags on switching
+                // Reset OTP & related flags on switching
                 setOtpGenerated(false);
                 setOtpVerified(false);
                 setOtpMessage("");
@@ -798,7 +798,7 @@ export default function UserReg() {
                     <input
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
-                      placeholder="Enter OTP"
+                      placeholder="Enter The OTP"
                       readOnly={otpVerified}
                       disabled={otpVerified}
                     />
@@ -818,7 +818,7 @@ export default function UserReg() {
                       onClick={handleVerifyOtp}
                       disabled={!otpGenerated || otpVerified || verifyingOtp}
                     >
-                      {verifyingOtp ? "Verifying..." : "Verify"}
+                      Verify
                     </button>
                   </div>
                   </div>
@@ -844,11 +844,11 @@ export default function UserReg() {
                       if (accessKeyDisabled) return;
                       setAccessKey(e.target.value.replace(/\D/g, "").slice(0, 4));
                     }}
-                    placeholder="e.g. NIT/2023/XXXX"
+                    placeholder="E.g. NIT/2023/XXXX"
                     disabled={accessKeyDisabled}
                   />
                   {accessAutoFoundFor && (
-                    <small className={styles.hint}>Auto-filled from student record: {accessAutoFoundFor}</small>
+                    <small className={styles.hint} style={{color: "#2ecc71"}}>Auto-filled by database</small>
                   )}
                 </div>
               )}
@@ -862,7 +862,7 @@ export default function UserReg() {
                       <input
                         value={privateKey}
                         onChange={(e) => setPrivateKey(e.target.value.trim())}
-                        placeholder="Enter Private Key"
+                        placeholder="Enter The Private Key"
                         disabled={privateKeyVerified}
                       />
                       <div className={styles.keyButtons}>
@@ -927,7 +927,7 @@ export default function UserReg() {
               <div className={styles.field}>
                 <label>Confirm Password</label>
                 <div className={styles.pwdWrap}>
-                  <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value.replace(/\s/g, ""))} placeholder="Enter Your Password" />
+                  <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value.replace(/\s/g, ""))} placeholder="Re-Enter Your Password" />
                   <button type="button" className={styles.eye} onClick={() => setShowConfirmPassword((s) => !s)}>{showConfirmPassword ? "Hide" : "Show"}</button>
                 </div>
                 {confirmPassword && confirmPassword !== password && <small className={`${styles.hint} ${styles.error}`}>Passwords do not match</small>}
@@ -943,7 +943,7 @@ export default function UserReg() {
                       <span className={styles.spinnerInline} aria-hidden="true">
                         <i className="fas fa-hourglass-start"></i>
                       </span>
-                      Waiting...
+                      Processing...
                     </>
                   ) : (
                     "Create Account"

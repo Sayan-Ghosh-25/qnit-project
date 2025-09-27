@@ -62,31 +62,42 @@ const VIEW = {
   FORGOT: "FORGOT",
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
 export default function AuthModal({
   isOpen = true,
   onClose = () => {},
   onNavigate = () => {},
-  onConfirm = () => {}, // optional
+  onConfirm = () => {},
 }) {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const auth = useAuth();
+  // prefer calling auth.login(email, password) (remember removed)
+  const loginFromContext = auth?.login;
 
   const [history, setHistory] = useState([VIEW.WELCOME]);
   const view = history[history.length - 1];
 
-  // States
+  // states
   const [signUserType, setSignUserType] = useState("");
-  const [identifier, setIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState(""); // raw input (we trim ends on change)
   const [password, setPassword] = useState("");
+  // keep checkbox visible but non-functional (UI only)
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState(null); // "success" | "error" | null
   const [showPass, setShowPass] = useState(false);
+
+  // user-exists check states:
+  // false = not registered, "checking" = in flight, true = registered, null = unknown/error
+  const [userExistsEmailStatus, setUserExistsEmailStatus] = useState(null);
+  const checkTimerRef = useRef(null);
+  const checkControllerRef = useRef(null);
 
   const timeoutsRef = useRef([]);
 
-  // Helpers
+  // helpers
   const go = (next) => setHistory((h) => [...h, next]);
   const back = () => {
     setStatus(null);
@@ -105,64 +116,200 @@ export default function AuthModal({
     onClose();
   }
 
-  const fieldsDisabled = !signUserType;
+  // small utility: trim only leading/trailing spaces (keeps inner spaces)
+  function trimEnds(v = "") {
+    return v.replace(/^\s+|\s+$/g, "");
+  }
 
-  /* 🔹 Sign In with Supabase */
+  function validateEmail(em) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
+  }
+
+  // Debounced user-exists check
+  useEffect(() => {
+    const trimmed = trimEnds(identifier);
+
+    // clear any previous pending timer / controller
+    if (checkTimerRef.current) {
+      clearTimeout(checkTimerRef.current);
+      checkTimerRef.current = null;
+    }
+    if (checkControllerRef.current) {
+      try {
+        checkControllerRef.current.abort();
+      } catch {}
+      checkControllerRef.current = null;
+    }
+
+    if (!trimmed) {
+      setUserExistsEmailStatus(null);
+      return;
+    }
+
+    // show checking while we wait for debounce + fetch result
+    setUserExistsEmailStatus("checking");
+
+    // only attempt server check if looks like a valid email to reduce noise
+    if (!validateEmail(trimmed)) {
+      // keep "checking" until user types a valid-looking email
+      return;
+    }
+
+    const controller = new AbortController();
+    checkControllerRef.current = controller;
+
+    checkTimerRef.current = setTimeout(async () => {
+      try {
+        let exists = false;
+
+        if (API_BASE_URL) {
+          const url = new URL(`${API_BASE_URL}/auth/check-user`);
+          url.searchParams.set("field", "email");
+          url.searchParams.set("value", trimmed.toLowerCase());
+          const res = await fetch(url.toString(), { signal: controller.signal });
+          if (res.ok) {
+            const j = await res.json();
+            exists = !!j.exists;
+          } else {
+            // non-ok response -> treat as unknown
+            exists = false;
+          }
+        } else {
+          // fallback: check profiles table (case-insensitive)
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("id")
+            .ilike("email", trimmed.toLowerCase())
+            .maybeSingle();
+          if (error) {
+            console.warn("profiles check error:", error);
+            exists = false;
+          } else {
+            exists = !!data?.id;
+          }
+        }
+
+        setUserExistsEmailStatus(exists);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Check failed:", err);
+          setUserExistsEmailStatus(null);
+        }
+      } finally {
+        checkControllerRef.current = null;
+        checkTimerRef.current = null;
+      }
+    }, 420);
+
+    return () => {
+      if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+      if (checkControllerRef.current) {
+        try {
+          checkControllerRef.current.abort();
+        } catch {}
+      }
+      checkTimerRef.current = null;
+      checkControllerRef.current = null;
+    };
+  }, [identifier]);
+
+  // cleanup timers
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach((t) => clearTimeout(t));
+      timeoutsRef.current = [];
+      if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+      if (checkControllerRef.current) {
+        try {
+          checkControllerRef.current.abort();
+        } catch {}
+      }
+    };
+  }, []);
+
+  // sign-in handler
   async function handleSignIn(e) {
     e?.preventDefault?.();
-    if (!identifier || !password || !signUserType) return;
+
+    const emailTrimmed = trimEnds(identifier).toLowerCase();
+
+    if (!emailTrimmed || !password || !signUserType) {
+      setStatus("error");
+      return;
+    }
+
+    // enforce user-exists check: must be explicitly true
+    if (userExistsEmailStatus !== true) {
+      setStatus("error");
+      return;
+    }
 
     setBusy(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: identifier,
-        password,
-      });
-
-      if (error) throw error;
+      // Call context login (which now accepts only email & password)
+      if (typeof loginFromContext === "function") {
+        try {
+          await loginFromContext(emailTrimmed, password);
+        } catch (ctxErr) {
+          // fallback to direct supabase if context login fails
+          console.warn("context login failed (falling back to supabase):", ctxErr);
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: emailTrimmed,
+            password,
+          });
+          if (error) throw error;
+        }
+      } else {
+        // fallback: direct supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: emailTrimmed,
+          password,
+        });
+        if (error) throw error;
+      }
 
       setStatus("success");
 
-      login({
-        id: data.user.id,
-        role: signUserType,
-        email: data.user.email,
-        remember,
-      });
-
+      // small delay to let success mini-modal show
       const navT = setTimeout(() => {
         if (typeof onNavigate === "function") onNavigate(signUserType);
-
-        if (signUserType === "admin") {
-          navigate("/Admin/Dashboard");
-        } else {
-          navigate("/User/Dashboard");
-        }
-
+        if (signUserType === "admin") navigate("/Admin/Dashboard");
+        else navigate("/User/Dashboard");
         if (typeof onConfirm === "function") onConfirm(signUserType);
         onClose();
-      }, 900);
-
+      }, 700);
       timeoutsRef.current.push(navT);
     } catch (err) {
-      console.error("Sign-in error:", err.message);
+      console.error("Sign-in error:", err);
       setStatus("error");
     } finally {
       setBusy(false);
     }
   }
 
-  /* 🔹 Forgot Password with Supabase Email Link */
+  // whenever status changes, auto clear after 1000ms
+  useEffect(() => {
+    if (status === "success" || status === "error") {
+      const t = setTimeout(() => setStatus(null), 1000);
+      timeoutsRef.current.push(t);
+      return () => clearTimeout(t);
+    }
+  }, [status]);
+
+  // forgot password handler (uses trimmed email)
   async function handleForgot(e) {
     e?.preventDefault?.();
-    if (!identifier || !signUserType) return;
+    const emailTrimmed = trimEnds(identifier).toLowerCase();
+    if (!emailTrimmed || !signUserType) {
+      setStatus("error");
+      return;
+    }
 
     setBusy(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(identifier, {
-        redirectTo: `${window.location.origin}/reset-password`, // Must be whitelisted in Supabase
+      const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, {
+        redirectTo: `${window.location.origin}/reset-password`,
       });
-
       if (error) throw error;
 
       setStatus("success");
@@ -171,45 +318,29 @@ export default function AuthModal({
         if (typeof onConfirm === "function") onConfirm("reset");
         onClose();
       }, 1200);
-
       timeoutsRef.current.push(navT);
     } catch (err) {
-      console.error("Forgot password error:", err.message);
+      console.error("Forgot password error:", err);
       setStatus("error");
     } finally {
       setBusy(false);
     }
   }
 
-  // Auto-remove mini notifications
-  useEffect(() => {
-    if (status === "success" || status === "error") {
-      const t = setTimeout(() => setStatus(null), 1500);
-      timeoutsRef.current.push(t);
-      return () => clearTimeout(t);
-    }
-  }, [status]);
+  // derive enabled states
+  const signValid =
+    !!identifier &&
+    !!password &&
+    !!signUserType &&
+    !busy &&
+    userExistsEmailStatus === true; // enforce user exists
 
-  // Clean timers on unmount
-  useEffect(() => {
-    return () => {
-      timeoutsRef.current.forEach((id) => clearTimeout(id));
-      timeoutsRef.current = [];
-    };
-  }, []);
-
-  const signValid = !!identifier && !!password && !!signUserType && !busy;
   const forgotValid = !!identifier && !!signUserType && !busy;
 
   if (!isOpen) return null;
 
   return (
-    <div
-      className={styles.authOverlay}
-      role="dialog"
-      aria-modal="true"
-      onClick={handleOverlayClick}
-    >
+    <div className={styles.authOverlay} role="dialog" aria-modal="true" onClick={handleOverlayClick}>
       <div className={styles.authModalContainer}>
         {history.length > 1 && (
           <button className={styles.backBtn} onClick={back} aria-label="Go back">
@@ -246,8 +377,7 @@ export default function AuthModal({
             <>
               <h2 className={styles.headline}>Welcome To QNIT</h2>
               <p className={styles.subline}>
-                Get started with QNIT and experience fast, secure access to
-                papers, syllabus and more
+                Get started with QNIT and experience fast, secure access to papers, syllabus and more
               </p>
             </>
           )}
@@ -256,16 +386,12 @@ export default function AuthModal({
         </header>
 
         {/* Welcome */}
-        <section
-          className={`${styles.panel} ${view === VIEW.WELCOME ? styles.show : ""}`}
-          aria-hidden={view !== VIEW.WELCOME}
-        >
+        <section className={`${styles.panel} ${view === VIEW.WELCOME ? styles.show : ""}`} aria-hidden={view !== VIEW.WELCOME}>
           <div className={styles.spacerRows} />
           <button className={`${styles.btn} ${styles.primary}`} onClick={() => go(VIEW.SIGNIN)}>
             Sign In
           </button>
           <div className={styles.gapLines} />
-
           <p className={styles.altLink}>
             Don’t have an account?{" "}
             <span
@@ -291,7 +417,14 @@ export default function AuthModal({
             <label>User Type</label>
             <select
               value={signUserType}
-              onChange={(e) => setSignUserType(e.target.value)}
+              onChange={(e) => {
+                setSignUserType(e.target.value);
+                // reset identifier/user check when user type changes
+                setIdentifier("");
+                setUserExistsEmailStatus(null);
+                setPassword("");
+                setStatus(null);
+              }}
               required
             >
               <option value="" disabled>
@@ -306,12 +439,26 @@ export default function AuthModal({
             <label>Email</label>
             <input
               type="email"
-              placeholder="Registered Email"
+              placeholder="Enter Your Email"
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              // trim leading/trailing spaces only
+              onChange={(e) => setIdentifier(trimEnds(e.target.value))}
               required
-              disabled={fieldsDisabled}
+              disabled={!signUserType}
             />
+            <div>
+              {/* Show guidance based on trimmed identifier and check status */}
+              {!trimEnds(identifier) ? null : userExistsEmailStatus === "checking" ? (
+                <small className={styles.hint}>Checking if user exists</small>
+              ) : userExistsEmailStatus === true ? (
+                <small className={`${styles.hint} ${styles.success}`}>User is registered</small>
+              ) : userExistsEmailStatus === false ? (
+                <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
+              ) : (
+                // null indicates ambiguous state (check error or not attempted)
+                <small className={styles.hint}>Unable to check the email</small>
+              )}
+            </div>
           </div>
 
           <div className={styles.field}>
@@ -323,14 +470,14 @@ export default function AuthModal({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={fieldsDisabled}
+                disabled={!signUserType}
               />
               <button
                 type="button"
                 className={`${styles.eye} ${styles.passwordToggle}`}
                 onClick={() => setShowPass((s) => !s)}
                 aria-label={showPass ? "Hide password" : "Show password"}
-                disabled={fieldsDisabled}
+                disabled={!signUserType}
               >
                 {showPass ? <EyeSlashIcon /> : <EyeIcon />}
               </button>
@@ -343,18 +490,23 @@ export default function AuthModal({
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
-                disabled={fieldsDisabled}
+                disabled={!signUserType}
               />
               Remember me
             </label>
           </div>
 
-          <button
-            className={`${styles.btn} ${styles.primary} ${styles.block}`}
-            type="submit"
-            disabled={!signValid}
-          >
-            {busy ? "Processing..." : "Sign In"}
+          <button className={`${styles.btn} ${styles.primary} ${styles.block}`} type="submit" disabled={!signValid}>
+            {busy ? (
+              <>
+                <span className={styles.spinnerInline} aria-hidden="true">
+                  <i className="fas fa-hourglass-start"></i>
+                </span>
+                Processing...
+              </>
+            ) : (
+              "Sign In"
+            )}
           </button>
 
           <div className={styles.altLink} style={{ marginTop: "1rem" }}>
@@ -373,7 +525,12 @@ export default function AuthModal({
             <label>User Type</label>
             <select
               value={signUserType}
-              onChange={(e) => setSignUserType(e.target.value)}
+              onChange={(e) => {
+                setSignUserType(e.target.value);
+                setIdentifier("");
+                setUserExistsEmailStatus(null);
+                setStatus(null);
+              }}
               required
             >
               <option value="" disabled>
@@ -388,20 +545,36 @@ export default function AuthModal({
             <label>Email</label>
             <input
               type="email"
-              placeholder="Enter your Registered Email"
+              placeholder="Enter Your Registered Email"
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              onChange={(e) => setIdentifier(trimEnds(e.target.value))}
               required
-              disabled={fieldsDisabled}
+              disabled={!signUserType}
             />
+            <div>
+              {!trimEnds(identifier) ? null : !validateEmail(trimEnds(identifier)) ? (
+                <small className={`${styles.hint} ${styles.error}`}>Invalid email format</small>
+              ) : userExistsEmailStatus === true ? (
+                <small className={`${styles.hint} ${styles.success}`}>User is registered</small>
+              ) : userExistsEmailStatus === false ? (
+                <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
+              ) : (
+                <small className={styles.hint}>Unable to check the email</small>
+              )}
+            </div>
           </div>
 
-          <button
-            className={`${styles.btn} ${styles.primary} ${styles.block}`}
-            type="submit"
-            disabled={!forgotValid}
-          >
-            {busy ? "Processing..." : "Send Recovery Link"}
+          <button className={`${styles.btn} ${styles.primary} ${styles.block}`} type="submit" disabled={!forgotValid}>
+            {busy ? (
+              <>
+                <span className={styles.spinnerInline} aria-hidden="true">
+                  <i className="fas fa-hourglass-start"></i>
+                </span>
+                Processing...
+              </>
+            ) : (
+              "Send Recovery Link"
+            )}
           </button>
         </form>
       </div>

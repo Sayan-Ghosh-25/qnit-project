@@ -160,6 +160,7 @@
   color: var(--muted);
   display: block;
   margin-left: 0.4rem;
+  margin-top: 0.4rem;
   transition: var(--transition);
 }
 
@@ -517,7 +518,7 @@
   
   .otpControls input,
   .keyControls input {
-    width: 100%;
+    width: 100% !important;
   }
   
   .otpField .otpButtons,
@@ -610,4 +611,19 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+/* Prevents Autofilling Service From Changing Input Field Background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px rgba(0,0,0,0.2) inset !important;
+    -webkit-text-fill-color: var(--text-primary) !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+input:-moz-autofill {
+    box-shadow: 0 0 0 1000px rgba(0,0,0,0.2) inset !important;
+    -moz-text-fill-color: var(--text-primary) !important;
 }

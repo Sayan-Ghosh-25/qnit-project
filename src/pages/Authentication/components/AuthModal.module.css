@@ -1,8 +1,9 @@
 /* ===== Enhanced AuthModal Styles ===== */
 :root {
     --ink: #eaf0ff;
-    --muted: #effffe;
-    --green: #19c37d;
+    --muted: rgba(255, 255, 255, 0.65);
+    --error: #ff6b6b;
+    --success: #2ecc71;
     --red: #e5484d;
     --orange: #f8aa2c;
   }
@@ -150,21 +151,20 @@
     position: relative;
   }
   
-  .inputTag {
-    position: absolute;
-    top: 50%;
-    left: 0.4rem;
-    transform: translateY(-50%);
-    font-size: 0.8rem;
-    background: rgba(255,255,255,.14);
-    color: var(--ink);
-    padding: 0.15rem 0.4rem;
-    border-radius: 0.5rem;
-    pointer-events: none;
+  .hint {
+    font-size: 0.9rem;
+    color: var(--muted);
+    display: block;
+    margin-left: 0.4rem;
+    transition: var(--transition);
   }
   
-  .inputWithTag input {
-    padding-left: 3.6rem;
+  .hint.error {
+    color: var(--error);
+  }
+  
+  .hint.success {
+    color: var(--success);
   }
   
   .inputWithEye {
@@ -395,3 +395,18 @@
       height: 32px;
     }
   }
+
+  /* Prevents Autofilling Service From Changing Input Field Background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px rgba(0,0,0,0.2) inset !important;
+    -webkit-text-fill-color: var(--text-primary) !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+input:-moz-autofill {
+    box-shadow: 0 0 0 1000px rgba(0,0,0,0.2) inset !important;
+    -moz-text-fill-color: var(--text-primary) !important;
+}
