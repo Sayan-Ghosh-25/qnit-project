@@ -104,11 +104,12 @@ export async function generateOtp(req, res) {
       return res.status(400).json({ ok: false, error: "Either email or contact is required." });
     }
 
-    // Generate OTP and hashed version
+    // Generate OTP
     const otp = genNumericOTP(OTP_LENGTH);
     const { salt, hash } = await hashString(otp);
     const expires_at = nowPlusMinutes(OTP_EXPIRE_MINUTES).toISOString();
 
+    // Insert OTP request into DB
     const insertPayload = {
       email: email || null,
       contact: contact || null,
@@ -136,47 +137,48 @@ export async function generateOtp(req, res) {
 
     const otpRequestId = insertData?.id ?? null;
 
-    // Send email if requested
+    // Initialize email sending status
     let emailSent = false;
     let emailError = null;
-    let sendResp = null;
 
+    // Send email if email is provided
     if (email) {
       try {
         const { html, text } = buildOtpEmailContent({ otp, expiresMinutes: OTP_EXPIRE_MINUTES });
-        sendResp = await sendEmail(email, "Your QNIT verification code", html, {
+        const sendResp = await sendEmail(email, "Your QNIT verification code", html, {
           text,
           fromName: DEFAULT_FROM_NAME
         });
 
-        console.log("generateOtp: sendEmail response:", sendResp);
         emailSent = true;
 
+        // Update DB with email status
         await supabaseAdmin.from("otp_requests").update({
           email_sent: true,
           email_response: sendResp,
-          message_id: (sendResp && sendResp.messageId) ? sendResp.messageId : null
+          message_id: sendResp?.messageId || null
         }).eq("id", otpRequestId);
+
+        console.log("generateOtp: OTP email sent:", sendResp);
       } catch (e) {
-        emailError = (e && (e.response || e.message)) || "Unknown email send error";
+        emailError = (e?.response || e?.message) || String(e) || "Unknown email error";
         console.error("generateOtp: email send failed:", emailError);
 
+        // Update DB with failed email attempt
         try {
           await supabaseAdmin.from("otp_requests").update({
             email_sent: false,
-            email_response: e.response || e.message || String(e)
+            email_response: emailError
           }).eq("id", otpRequestId);
         } catch (updErr) {
           console.error("generateOtp: failed to update otp_requests with email failure:", updErr);
         }
+
+        return res.status(502).json({ ok: false, email_sent: false, error: emailError });
       }
     }
 
-    if (email && !emailSent) {
-      return res.status(502).json({ ok: false, email_sent: false, error: emailError || "Failed to send OTP email" });
-    }
-
-    return res.json({ ok: true, email_sent: email ? true : false, email_error: emailError || undefined, otp_request_id: otpRequestId });
+    return res.json({ ok: true, email_sent: email ? emailSent : false, otp_request_id: otpRequestId });
   } catch (err) {
     console.error("generateOtp:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
