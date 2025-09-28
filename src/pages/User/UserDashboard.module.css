@@ -36,13 +36,15 @@ html {
   scroll-behavior: smooth;
 }
 body {
-  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial,
-    sans-serif;
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   background: var(--bg-color);
   line-height: 1.5;
   min-height: 100dvh;
   transition: background 0.4s, color 0.4s;
   overflow-x: hidden;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 body.modal-open {
   overflow: hidden;

@@ -39,8 +39,7 @@ html {
   scroll-behavior: smooth;
 }
 body {
-  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial,
-    sans-serif;
+  font-family: inherit;
   background: var(--bg-color);
   color: var(--text-color);
   line-height: 1.5;
@@ -48,7 +47,9 @@ body {
   transition: background 0.4s, color 0.4s;
   overflow-x: hidden;
 }
-
+h1, h2, h3, h4, h5, h6 {
+  font-family: inherit;
+}
 /* =========================
   Layout Containers
   ========================= */
@@ -73,7 +74,7 @@ body {
   color: #fff;
   letter-spacing: 0.125rem;
   text-transform: uppercase;
-  font-size: clamp(1.125rem, 2.2vw, 1.5625rem);
+  font-size: clamp(1.125rem, 2.8vw, 1.5625rem);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -113,11 +114,13 @@ body {
   max-width: 40ch;
 }
 .image-text-section h2 {
+  font-style: italic;
   font-size: clamp(1.45rem, 3vw, 2rem);
   margin-bottom: 0.5rem;
   color: #fffb00;
-  font-weight: 700;
+  font-weight: 600;
 }
+
 .intro-buttons {
   margin-top: 1.25rem;
   display: flex;
@@ -130,7 +133,7 @@ body {
   background: #0035bbdf;
   color: #fff;
   text-decoration: none;
-  transition: background 0.3s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -182,7 +185,7 @@ body {
   Features Grid
   ========================= */
 .features-section {
-  padding: clamp(1.25rem, 4vw, 3.75rem) 2.5rem;
+  padding: clamp(0.8rem, 4vw, 3.75rem) 2.5rem;
   background: linear-gradient(90deg, #002d5b, #004563, #002d5b);
   border-radius: var(--radius);
   box-shadow: var(--shadow-med);
@@ -212,6 +215,7 @@ body {
 
 /* Feature Blurb Box */
 .feature-box {
+  height: 15rem;
   background: linear-gradient(180deg, #ddffff, #ffffff);
   padding: 1.25rem;
   border: 1px solid #007bb0;
@@ -230,7 +234,7 @@ body {
   margin-bottom: 1rem;
 }
 .feature-box h3 {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   color: #000;
   margin-bottom: 0.75rem;
   font-weight: 700;
@@ -259,13 +263,14 @@ body {
   margin-bottom: 1rem;
 }
 .faq-question {
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   cursor: pointer;
   padding: 1rem 1.25rem;
   background: #002443;
   border-radius: 0.5rem;
   border: 0.5px solid #00ccff;
   font-size: 1.1rem;
-  font-weight: 500;
+  font-weight: 300;
   color: #fff;
   display: flex;
   justify-content: space-between;
@@ -304,7 +309,7 @@ body {
 }
 .faq-answer p {
   margin: 1rem 0;
-  font-size: 1.0625rem;
+  font-size: 1rem;
   color: #fff;
   line-height: 1.6;
   transition: var(--transition-med);
@@ -383,7 +388,8 @@ body {
   text-align: left;
 }
 .modal-content li {
-  color: #fff;
+  color: #ddd;
+  line-height: 1.6rem;
 }
 
 /* =========================
@@ -402,6 +408,21 @@ body {
 
 /* Tablets / Small Laptops ≥ 768px */
 @media (min-width: 48rem) {
+  .image-text-section .text {
+    max-width: 65ch;
+  }
+  .features-section p {
+    font-size: 1.1rem;
+  }
+  .feature-box {
+    height: auto;
+  }
+  .feature-box h3 {
+    font-size: 1.15rem;
+  }
+  .feature-box p {
+    font-size: 1rem;
+  }
   .features-container {
     gap: 1.25rem;
   }
@@ -422,8 +443,14 @@ body {
     background: linear-gradient(225deg, #001f2e, #00258338);
   }
 
+  .image-text-section {
+    margin: 0.8rem 0.5rem;
+  }
+  .image-text-section p {
+    font-size: 0.975rem;
+  }
   .features-section {
-    padding: 0.8rem;
+    padding: 1.25rem 0.9rem 1.25rem 0.9rem;
   }
   .features-container {
     grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
@@ -434,24 +461,27 @@ body {
   .features-section p {
     font-size: 1.05rem;
   }
+  .feature-box {
+    height: auto;
+  }
   .feature-box img {
-    height: 1.5rem;
+    height: 1.65rem;
     margin-bottom: 0.5rem;
   }
   .feature-box h3 {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
   }
   .feature-box p {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
   .faq-section {
-    padding: 0.7rem;
+    padding: 1.25rem 0.7rem 1.25rem 0.7rem;
   }
   .faq-section h2 {
     font-size: 1.25rem;
   }
   .faq-question {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
   .faq-question::after {
     font-size: 0.5rem;

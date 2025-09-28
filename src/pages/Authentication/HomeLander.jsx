@@ -18,32 +18,32 @@ function FAQ() {
     {
       q: "How can I preview and download study materials?",
       a:
-        'After logging in, browse the available question papers, syllabus, or notes. Click "Preview" to view the document, or "Download" to save it to your device.',
+        'After logging in, browse the available question papers or syllabus. Click on the preview to view the document, and then download or save it to your device',
     },
     {
       q: "Can I share materials with others?",
       a:
-        'Yes! Use the "Share" button to send Google Drive links to classmates or friends directly from the platform.',
-    },
-    {
-      q: "How often is the database updated?",
-      a:
-        "We update our database regularly with the latest question papers, syllabus, and notes to ensure you always have access to current materials.",
+        'Yes! Use the "Share" button to send pdf file links to classmates or friends directly from the platform',
     },
     {
       q: "Is my personal data safe?",
       a:
-        "Absolutely! We use advanced security measures and encryption to keep your account and personal information safe.",
+        "Absolutely! We use advanced security measures and encryption to keep user account and personal information safe",
     },
     {
-      q: "Can I access the platform on my mobile device?",
+      q: "How often is the database updated?",
       a:
-        "Yes, our platform is fully responsive and works smoothly on smartphones and tablets.",
+        "We update our database regularly with the latest question papers, syllabus, and other accessories to ensure you always have access to current materials",
     },
     {
-      q: "Who can I contact for support or feedback?",
+      q: "Can I access this platform on my mobile phone?",
       a:
-        'Use the "Support & Feedback" section to reach out to our team. We\'re here to help!',
+        "Yes, our platform is fully responsive and works smoothly on smartphones, tablets or desktops",
+    },
+    {
+      q: "Who can I contact for any queries or support?",
+      a:
+        'Use the in-App Feedback section to share your experience or reach out to our team through the contact shared',
     },
   ];
 
@@ -163,11 +163,7 @@ export default function HomeLander() {
               <div className={cx("text")}>
                 <h2>About The System</h2>
                 <p>
-                  Welcome to Study Management System! This platform empowers
-                  students to easily access previous year question papers,
-                  syllabus, and other accessories in PDF format. With secure
-                  user accounts, you can preview, download, and share study
-                  materials directly from frequently updated database
+                QNIT is a comprehensive study management platform designed to make learning simple and accessible. Students can instantly explore semester-wise study materials. With options to preview, download, and share resources anytime, anywhere, QNIT ensures seamless access to the right materials at the right time
                 </p>
                 <div className={cx("intro-buttons")}>
                   <button
@@ -199,7 +195,7 @@ export default function HomeLander() {
             <section className={cx("features-section")} aria-label="Key Features">
               <h2>Key Features</h2>
               <p>
-                A comprehensive online resource management software embedded
+                Experience a feature riched software embedded
                 with exceptional features required to deliver an extraordinary
                 learning experience
               </p>
@@ -215,8 +211,8 @@ export default function HomeLander() {
                   />
                   <h3>Instant PDF Access</h3>
                   <p>
-                    View and download previous year question papers, syllabus,
-                    and other documents in PDF format with just a click
+                    View or Download previous year questions, syllabus,
+                    and other documents in PDF format
                   </p>
                 </div>
 
@@ -228,7 +224,7 @@ export default function HomeLander() {
                   <h3>Easy Sharing</h3>
                   <p>
                     Share study materials with friends and classmates directly
-                    from the platform
+                    from the platform with embedded links
                   </p>
                 </div>
 
@@ -239,7 +235,7 @@ export default function HomeLander() {
                   />
                   <h3>Mobile Friendly</h3>
                   <p>
-                    Access all features from any device - Desktop, Table or
+                    Access all the features of our platfrom from any device - Desktop, Tablet or
                     Smartphone
                   </p>
                 </div>
@@ -264,7 +260,7 @@ export default function HomeLander() {
                   <h3>Frequently Updated Database</h3>
                   <p>
                     The resource library is actively updated with the latest
-                    question papers, syllabus, and notes
+                    question papers, syllabus, and others
                   </p>
                 </div>
 
@@ -286,13 +282,14 @@ export default function HomeLander() {
             <FAQ />
 
             <p className={cx("text-muted")}>
-              <i className="far fa-copyright"></i>{" "}
+              <i className="far fa-copyright" style={{marginRight: "0.15rem"}}></i>{" "}
               {new Date().getFullYear()} QNIT. All Rights Reserved.
               <br />
               <span className={cx("divider")}>
-                <i className="fas fa-lock"></i> Secured Data
+                <i className="fas fa-lock" style={{marginRight: "0.15rem"}}></i> Secured Data
               </span>
-              <i className="fas fa-wrench"></i> Made in India
+              <i className="fas fa-wrench" style={{marginRight: "0.15rem"}}></i> Made in India <br />
+              <i className="fas fa-envelope" style={{marginRight: "0.15rem"}}></i> Contact - devtruster@gmail.com
             </p>
           </div>
         </div>
@@ -301,7 +298,7 @@ export default function HomeLander() {
       {/* Learn More Modal (React controlled) */}
       <div
         id="learnMoreModal"
-        className={`${cx("learnMoreModal")} ${showLearnMore ? "show" : ""}`}
+        className={cx("learnMoreModal", showLearnMore && "show")}
         role="dialog"
         aria-modal="true"
         aria-labelledby="learnMoreModalTitle"
