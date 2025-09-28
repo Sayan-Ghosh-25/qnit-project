@@ -1,5 +1,5 @@
 // src/services/authService.js
-import { supabaseAdmin } from "../config/supabaseClient.js";
+import { supabase } from "../config/supabaseClient.js";
 
 export const signInUser = async (email, password) => {
   const trimmedEmail = email?.trim().toLowerCase();
@@ -7,7 +7,7 @@ export const signInUser = async (email, password) => {
     throw new Error("Email and password are required");
   }
 
-  const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: trimmedEmail,
     password,
   });

@@ -1,5 +1,5 @@
 // src/middlewares/requireAuth.js
-import { supabaseAdmin } from "../config/supabaseClient.js";
+import { supabase } from "../config/supabaseClient.js";
 
 export async function requireAuth(req, res, next) {
   try {
@@ -10,7 +10,7 @@ export async function requireAuth(req, res, next) {
     }
 
     const token = m[1];
-    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    const { data, error } = await supabase.auth.getUser(token);
 
     if (error) {
       console.error("Supabase token check error:", error);
