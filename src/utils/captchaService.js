@@ -15,7 +15,7 @@ export const verifyCaptcha = async (token) => {
     );
 
     const data = await response.json();
-    return data.success === true && data.score >= 0.5;
+    return data.success === true;
   } catch (err) {
     console.error("Captcha verification failed:", err);
     return false;
