@@ -1,4 +1,4 @@
-// authRoutes.js
+// src/routes/authRoutes.js
 import express from "express";
 import {
   generateOtp,
@@ -8,7 +8,8 @@ import {
   checkUser,
   registerUser,
   updatePassword,
-  studentIdLookup
+  studentIdLookup,
+  signIn
 } from "../controllers/authController.js";
 import { rateLimitMiddleware } from "../middlewares/rateLimit.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
@@ -17,6 +18,9 @@ const router = express.Router();
 
 // Student ID lookup (used by frontend auto-fill)
 router.get("/student-id-lookup", studentIdLookup);
+
+// Apply rate limiting to prevent brute-force
+router.post("/signin", rateLimitMiddleware, signIn);
 
 // OTP
 router.post("/otp/generate", rateLimitMiddleware, generateOtp);

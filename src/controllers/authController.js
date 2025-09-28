@@ -1,6 +1,8 @@
-// authController.js
+// src/controllers/authController.js
 import { supabaseAdmin } from "../config/supabaseClient.js";
 import { sendEmail } from "../utils/emailService.js";
+import { signInUser } from "../services/authService.js";
+import { verifyCaptcha } from "../utils/captchaService.js";
 import { genNumericOTP, hashString, verifyHash } from "../utils/crypto.js";
 import { nowPlusMinutes } from "../utils/otpService.js";
 
@@ -89,6 +91,35 @@ export async function studentIdLookup(req, res) {
     return res.status(500).json({ found: false, error: "Server error" });
   }
 }
+
+/* sign in operation handler */
+export const signIn = async (req, res) => {
+  try {
+    const { email, password, captchaToken } = req.body;
+
+    if (!email || !password || !captchaToken) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Verify captcha first
+    const isHuman = await verifyCaptcha(captchaToken);
+    if (!isHuman) {
+      return res.status(403).json({ error: "Captcha verification failed" });
+    }
+
+    const user = await signInUser(email, password);
+
+    return res.status(200).json({
+      message: "Sign in Successful",
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    });
+  } catch (err) {
+    return res.status(401).json({ error: err.message });
+  }
+};
 
 /**
  * POST /auth/otp/generate
