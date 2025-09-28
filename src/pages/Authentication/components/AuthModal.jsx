@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./AuthModal.module.css";
+import ReCAPTCHA from "react-google-recaptcha";
 
 /* Tick & Cross SVG used for success & failure mini-modal */
 const TICK_SVG = (
@@ -21,7 +22,7 @@ const CROSS_SVG = (
   </svg>
 );
 
-/* Small Eye Icon */
+/* Small Eye Icon components */
 function EyeIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
@@ -63,6 +64,7 @@ const VIEW = {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 
 export default function AuthModal({
   isOpen = true,
@@ -72,7 +74,7 @@ export default function AuthModal({
 }) {
   const navigate = useNavigate();
   const auth = useAuth();
-  // prefer calling auth.login(email, password) (remember removed)
+  // fallback login if backend doesn't return session
   const loginFromContext = auth?.login;
 
   const [history, setHistory] = useState([VIEW.WELCOME]);
@@ -80,10 +82,8 @@ export default function AuthModal({
 
   // states
   const [signUserType, setSignUserType] = useState("");
-  const [identifier, setIdentifier] = useState(""); // raw input (we trim ends on change)
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  // keep checkbox visible but non-functional (UI only)
-  const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [status, setStatus] = useState(null); // "success" | "error" | null
@@ -93,9 +93,11 @@ export default function AuthModal({
   // false = not registered, "checking" = in flight, true = registered, null = unknown/error
   const [userExistsEmailStatus, setUserExistsEmailStatus] = useState(null);
   const checkTimerRef = useRef(null);
-  const checkControllerRef = useRef(null);
+  const checkAbortFlagRef = useRef({ aborted: false, currentKey: null });
 
   const timeoutsRef = useRef([]);
+  const recaptchaRef = useRef(null);
+  const [captchaToken, setCaptchaToken] = useState(null);
 
   // helpers
   const go = (next) => setHistory((h) => [...h, next]);
@@ -116,6 +118,12 @@ export default function AuthModal({
     onClose();
   }
 
+  // ReCAPTCHA handler
+  const handleCaptcha = (value) => {
+    // value is a token string or null
+    setCaptchaToken(value);
+  };
+
   // small utility: trim only leading/trailing spaces (keeps inner spaces)
   function trimEnds(v = "") {
     return v.replace(/^\s+|\s+$/g, "");
@@ -125,112 +133,131 @@ export default function AuthModal({
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
   }
 
-  // Debounced user-exists check
+  /* Secure, fast "does this email exist?" check
+   * Strategy:
+   *  1) Debounce input
+   *  2) Try RPC check_email_exists(p_email) that returns boolean (recommended)
+   *  3) If RPC fails or not available, fallback to minimal select("id").eq("email", trimmed)
+   *  4) Always only request minimal data (id or boolean)
+   */
   useEffect(() => {
     const trimmed = trimEnds(identifier);
-
-    // clear any previous pending timer / controller
+    // clear previous timers/abort signals
     if (checkTimerRef.current) {
       clearTimeout(checkTimerRef.current);
       checkTimerRef.current = null;
     }
-    if (checkControllerRef.current) {
-      try {
-        checkControllerRef.current.abort();
-      } catch {}
-      checkControllerRef.current = null;
-    }
+    checkAbortFlagRef.current.aborted = true; // mark previous call aborted
+    checkAbortFlagRef.current.currentKey = null;
 
     if (!trimmed) {
       setUserExistsEmailStatus(null);
       return;
     }
 
-    // show checking while we wait for debounce + fetch result
     setUserExistsEmailStatus("checking");
 
-    // only attempt server check if looks like a valid email to reduce noise
     if (!validateEmail(trimmed)) {
-      // keep "checking" until user types a valid-looking email
+      // wait until looks valid
       return;
     }
 
-    const controller = new AbortController();
-    checkControllerRef.current = controller;
+    const key = trimmed.toLowerCase();
+    const abortFlag = { aborted: false, currentKey: key };
+    checkAbortFlagRef.current = abortFlag;
 
     checkTimerRef.current = setTimeout(async () => {
       try {
         let exists = false;
 
-        if (API_BASE_URL) {
-          const url = new URL(`${API_BASE_URL}/auth/check-user`);
-          url.searchParams.set("field", "email");
-          url.searchParams.set("value", trimmed.toLowerCase());
-          const res = await fetch(url.toString(), { signal: controller.signal });
-          if (res.ok) {
-            const j = await res.json();
-            exists = !!j.exists;
-          } else {
-            // non-ok response -> treat as unknown
-            exists = false;
+        // Try RPC first (recommended). RPC should return a boolean.
+        try {
+          const { data: rpcData, error: rpcErr } = await supabase.rpc("check_email_exists", { p_email: key });
+          // guard: if this call was aborted meanwhile, ignore result
+          if (abortFlag.aborted || checkAbortFlagRef.current.currentKey !== key) {
+            return;
           }
-        } else {
-          // fallback: check profiles table (case-insensitive)
+          if (!rpcErr && typeof rpcData === "boolean") {
+            exists = rpcData === true;
+            setUserExistsEmailStatus(exists);
+            return;
+          }
+          // Some deployments may return [{ exists: true }] or { exists: true }
+          if (!rpcErr && rpcData != null) {
+            // handle possible shapes
+            if (Array.isArray(rpcData) && rpcData.length > 0 && typeof rpcData[0] === "object") {
+              exists = Boolean(Object.values(rpcData[0])[0]);
+              setUserExistsEmailStatus(exists);
+              return;
+            }
+            if (typeof rpcData === "object" && "exists" in rpcData) {
+              exists = Boolean(rpcData.exists);
+              setUserExistsEmailStatus(exists);
+              return;
+            }
+          }
+          // otherwise fall through to minimal select
+        } catch (e) {
+          // ignore RPC errors -> fallback to select
+          // console.warn('RPC check failed, falling back to select:', e);
+        }
+
+        // Fallback: minimal select on profiles table (only id).
+        // This uses .eq on normalized email so an index helps (ensure lowercased storage / index).
+        try {
           const { data, error } = await supabase
             .from("profiles")
-            .select("id")
-            .ilike("email", trimmed.toLowerCase())
+            .select("id", { count: null, head: false })
+            .eq("email", key)
             .maybeSingle();
+
+          if (abortFlag.aborted || checkAbortFlagRef.current.currentKey !== key) {
+            return;
+          }
+
           if (error) {
             console.warn("profiles check error:", error);
-            exists = false;
-          } else {
-            exists = !!data?.id;
+            setUserExistsEmailStatus(null);
+            return;
           }
+          exists = Boolean(data?.id);
+        } catch (selErr) {
+          console.error("profiles select fallback failed:", selErr);
+          exists = false;
         }
 
         setUserExistsEmailStatus(exists);
       } catch (err) {
-        if (err.name !== "AbortError") {
+        if (err?.name !== "AbortError") {
           console.error("Check failed:", err);
           setUserExistsEmailStatus(null);
         }
       } finally {
-        checkControllerRef.current = null;
-        checkTimerRef.current = null;
+        // noop
       }
     }, 420);
 
     return () => {
       if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
-      if (checkControllerRef.current) {
-        try {
-          checkControllerRef.current.abort();
-        } catch {}
-      }
       checkTimerRef.current = null;
-      checkControllerRef.current = null;
+      abortFlag.aborted = true;
+      checkAbortFlagRef.current = abortFlag;
     };
   }, [identifier]);
 
-  // cleanup timers
+  // cleanup timers on unmount
   useEffect(() => {
     return () => {
       timeoutsRef.current.forEach((t) => clearTimeout(t));
       timeoutsRef.current = [];
       if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
-      if (checkControllerRef.current) {
-        try {
-          checkControllerRef.current.abort();
-        } catch {}
-      }
+      checkAbortFlagRef.current.aborted = true;
     };
   }, []);
 
-  // sign-in handler
+  // sign-in handler: call backend /auth/signin which verifies captcha then signs-in via server (recommended)
   async function handleSignIn(e) {
     e?.preventDefault?.();
-
     const emailTrimmed = trimEnds(identifier).toLowerCase();
 
     if (!emailTrimmed || !password || !signUserType) {
@@ -238,50 +265,161 @@ export default function AuthModal({
       return;
     }
 
-    // enforce user-exists check: must be explicitly true
+    // enforce user-exists check
     if (userExistsEmailStatus !== true) {
+      setStatus("error");
+      return;
+    }
+
+    if (!captchaToken) {
+      // Try execute captcha once more (in case token expired)
+      if (recaptchaRef.current) recaptchaRef.current.reset();
+      setStatus("error");
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      // Prefer backend signin for captcha enforcement + logging + rate-limit
+      if (API_BASE_URL) {
+        const res = await fetch(`${API_BASE_URL}/auth/signin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: emailTrimmed,
+            password,
+            captchaToken,
+            role: signUserType,
+          }),
+        });
+
+        const payload = await res.json();
+
+        if (!res.ok) {
+          throw new Error(payload?.error || "Sign in failed");
+        }
+
+        // If backend returned a session object (access_token/refresh_token) set it in client.
+        // Newer supabase client: auth.setSession({ access_token, refresh_token })
+        if (payload?.session?.access_token) {
+          try {
+            // prefer supabase.auth.setSession (if available)
+            if (supabase.auth?.setSession) {
+              await supabase.auth.setSession({
+                access_token: payload.session.access_token,
+                refresh_token: payload.session.refresh_token,
+              });
+            } else if (supabase.auth?.setAuth) {
+              // older clients may use setAuth
+              supabase.auth.setAuth(payload.session.access_token);
+            }
+          } catch (sessErr) {
+            console.warn("Failed to set session on client:", sessErr);
+          }
+        } else if (payload?.user && typeof loginFromContext === "function") {
+          // fallback to client-side login (less ideal but workable)
+          try {
+            await loginFromContext(emailTrimmed, password);
+          } catch (ctxErr) {
+            console.warn("fallback auth.login failed:", ctxErr);
+            // continue — user likely still signed in via server session
+          }
+        }
+
+        setStatus("success");
+        const navT = setTimeout(() => {
+          if (typeof onNavigate === "function") onNavigate(signUserType);
+          if (signUserType === "admin") navigate("/Admin/Dashboard");
+          else navigate("/User/Dashboard");
+          if (typeof onConfirm === "function") onConfirm(signUserType);
+          onClose();
+        }, 700);
+        timeoutsRef.current.push(navT);
+      } else {
+        // No API base: fall back to direct supabase sign-in (you lose server-side captcha enforcement)
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: emailTrimmed,
+          password,
+        });
+        if (error) throw error;
+
+        setStatus("success");
+        const navT = setTimeout(() => {
+          if (typeof onNavigate === "function") onNavigate(signUserType);
+          if (signUserType === "admin") navigate("/Admin/Dashboard");
+          else navigate("/User/Dashboard");
+          if (typeof onConfirm === "function") onConfirm(signUserType);
+          onClose();
+        }, 700);
+        timeoutsRef.current.push(navT);
+      }
+    } catch (err) {
+      console.error("Sign-in error:", err);
+      setStatus("error");
+      // reset captcha so user must re-verify
+      if (recaptchaRef.current) recaptchaRef.current.reset();
+      setCaptchaToken(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // forgot password handler: call backend to verify captcha then trigger reset email
+  async function handleForgot(e) {
+    e?.preventDefault?.();
+    const emailTrimmed = trimEnds(identifier).toLowerCase();
+    if (!emailTrimmed || !signUserType) {
+      setStatus("error");
+      return;
+    }
+
+    if (!captchaToken) {
+      if (recaptchaRef.current) recaptchaRef.current.reset();
       setStatus("error");
       return;
     }
 
     setBusy(true);
     try {
-      // Call context login (which now accepts only email & password)
-      if (typeof loginFromContext === "function") {
-        try {
-          await loginFromContext(emailTrimmed, password);
-        } catch (ctxErr) {
-          // fallback to direct supabase if context login fails
-          console.warn("context login failed (falling back to supabase):", ctxErr);
-          const { data, error } = await supabase.auth.signInWithPassword({
+      if (API_BASE_URL) {
+        const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             email: emailTrimmed,
-            password,
-          });
-          if (error) throw error;
-        }
+            captchaToken,
+          }),
+        });
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload?.error || "Reset failed");
+
+        setStatus("success");
+        const navT = setTimeout(() => {
+          if (typeof onNavigate === "function") onNavigate("reset");
+          if (typeof onConfirm === "function") onConfirm("reset");
+          onClose();
+        }, 1200);
+        timeoutsRef.current.push(navT);
       } else {
-        // fallback: direct supabase
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: emailTrimmed,
-          password,
+        // fallback: direct supabase call (no server-side captcha)
+        const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, {
+          redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
+        setStatus("success");
+        const navT = setTimeout(() => {
+          if (typeof onNavigate === "function") onNavigate("reset");
+          if (typeof onConfirm === "function") onConfirm("reset");
+          onClose();
+        }, 1200);
+        timeoutsRef.current.push(navT);
       }
-
-      setStatus("success");
-
-      // small delay to let success mini-modal show
-      const navT = setTimeout(() => {
-        if (typeof onNavigate === "function") onNavigate(signUserType);
-        if (signUserType === "admin") navigate("/Admin/Dashboard");
-        else navigate("/User/Dashboard");
-        if (typeof onConfirm === "function") onConfirm(signUserType);
-        onClose();
-      }, 700);
-      timeoutsRef.current.push(navT);
     } catch (err) {
-      console.error("Sign-in error:", err);
+      console.error("Forgot password error:", err);
       setStatus("error");
+      if (recaptchaRef.current) recaptchaRef.current.reset();
+      setCaptchaToken(null);
     } finally {
       setBusy(false);
     }
@@ -296,46 +434,10 @@ export default function AuthModal({
     }
   }, [status]);
 
-  // forgot password handler (uses trimmed email)
-  async function handleForgot(e) {
-    e?.preventDefault?.();
-    const emailTrimmed = trimEnds(identifier).toLowerCase();
-    if (!emailTrimmed || !signUserType) {
-      setStatus("error");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-
-      setStatus("success");
-      const navT = setTimeout(() => {
-        if (typeof onNavigate === "function") onNavigate("reset");
-        if (typeof onConfirm === "function") onConfirm("reset");
-        onClose();
-      }, 1200);
-      timeoutsRef.current.push(navT);
-    } catch (err) {
-      console.error("Forgot password error:", err);
-      setStatus("error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   // derive enabled states
   const signValid =
-    !!identifier &&
-    !!password &&
-    !!signUserType &&
-    !busy &&
-    userExistsEmailStatus === true; // enforce user exists
-
-  const forgotValid = !!identifier && !!signUserType && !busy;
+    !!identifier && !!password && !!signUserType && !busy && captchaToken && userExistsEmailStatus === true;
+  const forgotValid = !!identifier && !!signUserType && !busy && captchaToken;
 
   if (!isOpen) return null;
 
@@ -424,6 +526,8 @@ export default function AuthModal({
                 setUserExistsEmailStatus(null);
                 setPassword("");
                 setStatus(null);
+                if (recaptchaRef.current) recaptchaRef.current.reset();
+                setCaptchaToken(null);
               }}
               required
             >
@@ -441,13 +545,11 @@ export default function AuthModal({
               type="email"
               placeholder="Enter Your Email"
               value={identifier}
-              // trim leading/trailing spaces only
               onChange={(e) => setIdentifier(trimEnds(e.target.value))}
               required
               disabled={!signUserType}
             />
             <div>
-              {/* Show guidance based on trimmed identifier and check status */}
               {!trimEnds(identifier) ? null : userExistsEmailStatus === "checking" ? (
                 <small className={styles.hint}>Checking if user exists</small>
               ) : userExistsEmailStatus === true ? (
@@ -455,7 +557,6 @@ export default function AuthModal({
               ) : userExistsEmailStatus === false ? (
                 <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
               ) : (
-                // null indicates ambiguous state (check error or not attempted)
                 <small className={styles.hint}>Unable to check the email</small>
               )}
             </div>
@@ -485,14 +586,17 @@ export default function AuthModal({
           </div>
 
           <div className={styles.rowBetween}>
-            <label className={styles.remember}>
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                disabled={!signUserType}
-              />
-              Remember me
+            <label className={styles.remember} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              {/* ReCAPTCHA: only show if site key present */}
+              {RECAPTCHA_SITE_KEY ? (
+                <ReCAPTCHA
+                  sitekey={RECAPTCHA_SITE_KEY}
+                  onChange={handleCaptcha}
+                  ref={recaptchaRef}
+                />
+              ) : (
+                <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small>
+              )}
             </label>
           </div>
 
@@ -530,6 +634,8 @@ export default function AuthModal({
                 setIdentifier("");
                 setUserExistsEmailStatus(null);
                 setStatus(null);
+                if (recaptchaRef.current) recaptchaRef.current.reset();
+                setCaptchaToken(null);
               }}
               required
             >
@@ -562,6 +668,14 @@ export default function AuthModal({
                 <small className={styles.hint}>Unable to check the email</small>
               )}
             </div>
+          </div>
+
+          <div style={{ marginTop: "0.6rem" }}>
+            {RECAPTCHA_SITE_KEY ? (
+              <ReCAPTCHA sitekey={RECAPTCHA_SITE_KEY} onChange={handleCaptcha} ref={recaptchaRef} />
+            ) : (
+              <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small>
+            )}
           </div>
 
           <button className={`${styles.btn} ${styles.primary} ${styles.block}`} type="submit" disabled={!forgotValid}>
