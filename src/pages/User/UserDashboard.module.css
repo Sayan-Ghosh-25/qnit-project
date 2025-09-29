@@ -137,13 +137,12 @@ nav.collapsed li {
   transition: var(--transition-med);
 }
 .logo img {
-  width: 3rem;
-  height: 3rem;
-  min-width: 3rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  min-width: 2.2rem;
   border-radius: 50%;
   object-fit: cover;
   transition: var(--transition-med);
-  animation: pulse 1s infinite;
 }
 .logo h1 {
   text-transform: uppercase;
@@ -170,6 +169,7 @@ nav li {
 nav li a {
   font-size: 1rem;
   color: #fff;
+  text-transform: uppercase;
   text-decoration: none;
   transition: color 0.2s ease, transform 0.1s ease;
   display: flex;
@@ -183,7 +183,7 @@ nav li a.active {
   color: #fffb00;
   font-weight: 500;
   font-size: 1.2rem;
-  animation: pulse 1s;
+  transform: none !important;
 }
 
 @keyframes pulse {
@@ -567,10 +567,7 @@ nav li a.active {
 :global(.light-theme) .main-top {
   opacity: 1;
 }
-:global(.light-theme) .logo img {
-  background: #000;
-  animation: none;
-}
+
 :global(.light-theme) .image-text-section h2,
 :global(.light-theme) .features-section h2,
 :global(.light-theme) .faq-section h2 {
@@ -670,43 +667,89 @@ nav li a.active {
     background: none;
   }
 
+  .logo, .logo img, .logo h1 {
+    display: none;
+  }
+
   nav {
-    height: 101vh;
-    position: fixed;
-    z-index: 200;
-    background: linear-gradient(135deg, #00000cf9, #003066f3);
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: calc(3.75rem + env(safe-area-inset-bottom)) !important;
+    padding: 0 env(safe-area-inset-left) env(safe-area-inset-bottom) env(safe-area-inset-right) !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    background: #00000077 !important;
+    color: #fff !important;
+    z-index: 9999 !important;
+    top: auto !important;
+    overflow: hidden !important;
+    border-radius: 0.65rem !important;
+    transform: translateY(0);
+    transition: transform 0.3s ease-out;
+    will-change: transform;
   }
-  :global(.light-theme) nav {
-    background: linear-gradient(135deg, #00c2bce6, #0037c2e6);
+  nav .navbar {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-around !important;
+    gap: 0 !important;
+    padding: 0.25rem 0 !important;
+    width: 100% !important;
+    height: 100% !important;
   }
-  nav li a:hover {
-    transform: none;
+  nav.hide-navbar {
+    transform: translateY(100%) !important;
+    transition: transform 0.3s ease-out;
   }
-  nav.collapsed {
-    width: 3rem;
-    min-width: 1rem;
-    position: sticky;
-    background: linear-gradient(270deg, #001731, #000a1fd4);
+  nav ul {
+    flex-direction: row !important;
+    justify-content: space-around !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  :global(.light-theme) nav.collapsed {
-    background: linear-gradient(135deg, #00c2bce6, #0037c2e6);
+  nav li {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
-  nav.collapsed .navbar {
-    padding: 0;
+  nav li a {
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.65rem !important;
+    gap: 0.25rem !important;
+    width: 100% !important;
+    height: 100% !important;
+    text-decoration: none !important;
+    color: #fff !important;
   }
-  nav.collapsed .logo {
-    margin: 0;
-    padding-top: 0.4rem;
-    padding-bottom: 7rem;
+  nav i {
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
   }
-  nav.collapsed .logo img {
-    width: 2.5rem;
-    min-width: 1rem;
-    height: 2.5rem;
+  nav .nav-item {
+    display: block !important;
+    opacity: 1 !important;
+    font-size: 0.65rem !important;
+    margin: 0 !important;
+  }
+  nav li a.active {
+    color: #fffb00  !important;
+    animation: none !important;
   }
 
   .home-toggler {
-    bottom: 0.8rem;
+    bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important;
     right: 0.8rem;
     height: 3rem;
     width: 3rem;

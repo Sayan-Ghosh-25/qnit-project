@@ -2,7 +2,7 @@ import styles from './SettingsSection.module.css'
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/context/ThemeContext";
 
-export default function SettingsSection({ onAccountDelete, openOverlay }) {
+export default function SettingsSection({ onAccountDelete, openOverlay, openLogoutModal  }) {
   const { lightMode, toggle: toggleTheme } = useTheme();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const modalRef = useRef(null);
@@ -112,23 +112,11 @@ export default function SettingsSection({ onAccountDelete, openOverlay }) {
           </div>
         </div>
   
-        {/* Account Settings - Delete Account */}
         <div className={styles.settingsContainer} aria-labelledby="account-heading">
           <h4 id="account-heading">Manage Account</h4>
-          <div className={styles.compartment}>
-            <label htmlFor="deleteAccount">Delete My Account</label>
-            <button
-              id="deleteAccount"
-              aria-haspopup="dialog"
-              aria-controls="delete-modal"
-              onClick={() => setDeleteModalOpen(true)}
-            >
-              <i className="fas fa-trash" aria-hidden="true" />
-            </button>
-          </div>
           
           {/* Account Settings - Change Password */}
-          <div className={styles.compartment} style={{ marginTop: '1rem', borderTop: '0.5px solid #57caff56', paddingTop: '0.9rem' }}>
+          <div className={styles.compartment}>
             <label htmlFor="changePassword">Change Password</label>
             <button
               id="changePassword"
@@ -141,6 +129,36 @@ export default function SettingsSection({ onAccountDelete, openOverlay }) {
                 }}}
             >
               <i className="fas fa-pen" aria-hidden="true" style={{color: '#00e6b0ff'}}/>
+            </button>
+          </div>
+          
+          {/* Account Settings - Delete Account */}
+          <div className={styles.compartment} style={{ marginTop: '1rem', borderTop: '0.5px solid #57caff56', paddingTop: '0.9rem' }}>
+            <label htmlFor="deleteAccount" style={{color: '#f44336ed'}}>Delete My Account</label>
+            <button
+              id="deleteAccount"
+              aria-haspopup="dialog"
+              aria-controls="delete-modal"
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              <i className="fas fa-trash" aria-hidden="true" />
+            </button>
+          </div>
+
+          {/* Account Settings - Log Out */}
+          <div className={styles.compartment} style={{ marginTop: '1rem', borderTop: '0.5px solid #57caff56', paddingTop: '0.9rem' }}>
+            <label htmlFor="logoutBtn" style={{color: '#f44336ed'}}>Log Out</label>
+            <button
+              id="logoutBtn"
+              aria-haspopup="dialog"
+              aria-controls="logout-modal"
+              onClick={(e) => {e.preventDefault();
+                if (typeof openLogoutModal === "function") {
+                  openLogoutModal();
+                } else {
+                  console.warn("openLogoutModal not provided");
+                }}}>
+              <i className="fas fa-sign-out-alt" aria-hidden="true" />
             </button>
           </div>
         </div>

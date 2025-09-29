@@ -166,13 +166,16 @@ export default function UserDashboard() {
   const [spinnerVisible, setSpinnerVisible] = useState(false); // show spinner only during lazy loads
   const [activeSection, setActiveSection] = useState("home"); // 'home' or 'ProfileSection', etc.
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const openLogoutModal = useCallback(() => setShowLogoutModal(true), []);
   const [showLearnMore, setShowLearnMore] = useState(false);
   const [quoteText, setQuoteText] = useState(""); // motivational quote
   const [greetingText, setGreetingText] = useState("");
   const [togglerVisible, setTogglerVisible] = useState(false); // home toggler visibility due to inactivity
   const { lightMode } = useTheme();
-  const [overlay, setOverlay] = useState(null); // e.g. "ChangePassword"
+  const [overlay, setOverlay] = useState(null); // for "ChangePassword"
   const [overlayProps, setOverlayProps] = useState({});
+  const [hideNavbar, setHideNavbar] = useState(false);
+  const [lastScroll, setLastScroll] = useState(0);
 
   /* -----------------------
      Compute greeting (kept behavior)
@@ -361,38 +364,81 @@ export default function UserDashboard() {
   }, [closeOverlay]);
 
   /* -----------------------
-     Sidebar collapse / logo click behavior
+     Sidebar collapse / Logo click behavior
      ----------------------- */
-  useEffect(() => {
-    const navOuter = navRef.current;
-    const logoImg = navRef.current ? navRef.current.querySelector(`.${styles.logo} img`) : null;
-
-    function logoClickHandler() {
-      if (navOuter) navOuter.classList.toggle(styles.collapsed);
-    }
-
-    if ((logoImg && navOuter) || window.innerWidth < 768) {
-      if (logoImg) logoImg.addEventListener("click", logoClickHandler);
-    }
-
-    function handleSidebarCollapse() {
+     useEffect(() => {
+      const navOuter = navRef.current;
       if (!navOuter) return;
-      if (window.innerWidth < 768) {
-        navOuter.classList.add(styles.collapsed);
-      } else {
-        navOuter.classList.remove(styles.collapsed);
-      }
-    }
+    
+      const collapsedClass = styles?.collapsed ?? "collapsed";
+      const logoImg = document.getElementById("logoImg");
+      const mobileMql = window.matchMedia("(max-width: 30rem)");
+      const collapseRangeMql = window.matchMedia(
+        "(min-width: 30.0625rem) and (max-width: 48rem)"
+      );
+    
+      const applyState = () => {
+        if (mobileMql.matches) {
+          navOuter.classList.remove(collapsedClass);
+        } else if (collapseRangeMql.matches) {
+          navOuter.classList.add(collapsedClass);
+        } else {
+          navOuter.classList.remove(collapsedClass);
+        }
+      };
+    
+      applyState();
+    
+      const mqHandler = () => applyState();
+      mobileMql.addEventListener("change", mqHandler);
+      collapseRangeMql.addEventListener("change", mqHandler);
+    
+      const logoClickHandler = () => {
+        if (mobileMql.matches) return;
+        navOuter.classList.toggle(collapsedClass);
+      };
+    
+      if (logoImg) logoImg.addEventListener("click", logoClickHandler);
+    
+      return () => {
+        mobileMql.removeEventListener("change", mqHandler);
+        collapseRangeMql.removeEventListener("change", mqHandler);
+        if (logoImg) logoImg.removeEventListener("click", logoClickHandler);
+      };
+    }, []);
 
-    handleSidebarCollapse();
-    window.addEventListener("resize", handleSidebarCollapse);
-
-    return () => {
-      if (logoImg) logoImg.removeEventListener("click", logoClickHandler);
-      window.removeEventListener("resize", handleSidebarCollapse);
-    };
-  }, []);
-
+    /* -----------------------
+    Navbar auto-hide while scrolling down
+    ----------------------- */
+    useEffect(() => {
+      const handleScroll = () => {
+        const currentScroll = window.scrollY;
+  
+        if (currentScroll > lastScroll) {
+          setHideNavbar(true);
+        } else {
+          setHideNavbar(false);
+        }
+        setLastScroll(currentScroll);
+      };
+  
+      // Throttle scroll for performance
+      let ticking = false;
+      const throttledScroll = () => {
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            handleScroll();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      };
+  
+      window.addEventListener("scroll", throttledScroll);
+  
+      return () => window.removeEventListener("scroll", throttledScroll);
+    }, [lastScroll]);
+    
   /* -----------------------
      Global key handler for Escape (close modals)
      ----------------------- */
@@ -518,34 +564,20 @@ export default function UserDashboard() {
       <SpinnerOverlay visible={spinnerVisible} />
 
       {/* Sidebar / Navigation */}
-      <nav aria-label="Main navigation" className={cx("sidebar-nav")} id="sidebarNav" ref={navRef}>
+      <nav aria-label="Main navigation" className={cx("nav", hideNavbar ? "hide-navbar" : "")}
+      id="nav" ref={navRef}>
         <div className={cx("navbar")}>
           <div className={cx("logo")} id="logoImg">
-            <img src="/Logo.png" alt="Logo" />
+            <img src="/Menu.png" alt="Menu" />
             <h1>MENU</h1>
           </div>
           <ul className={cx("nav-links")}>
-            <NavLink compName="ProfileSection" label="PROFILE" iconClass="fas fa-user" />
+            <NavLink compName="ProfileSection" label="Profile" iconClass="fas fa-user" />
             <NavLink compName="QuestionSection" label="PYQs" iconClass="fas fa-chart-bar" />
-            <NavLink compName="SyllabusSection" label="SYLLABUS" iconClass="fas fa-tasks" />
-            <NavLink compName="OthersSection" label="OTHERS" iconClass="fas fa-briefcase" />
-            <NavLink compName="SettingsSection" label="SETTINGS" iconClass="fas fa-cog" />
-            <NavLink compName="FeedbackSection" label="FEEDBACK" iconClass="fas fa-comment" />
-            <li data-section="LogoutModal.html">
-              <a
-                href="#"
-                id="logoutBtn"
-                data-section="LogoutModal.html"
-                className={cx("logout")}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowLogoutModal(true);
-                }}
-              >
-                <i className="fas fa-sign-out-alt" aria-hidden="true" />
-                <span className={cx("nav-item")}>LOG OUT</span>
-              </a>
-            </li>
+            <NavLink compName="SyllabusSection" label="Syllabus" iconClass="fas fa-tasks" />
+            <NavLink compName="OthersSection" label="Others" iconClass="fas fa-briefcase" />
+            <NavLink compName="FeedbackSection" label="Feedback" iconClass="fas fa-comment" />
+            <NavLink compName="SettingsSection" label="Settings" iconClass="fas fa-cog" />
           </ul>
         </div>
       </nav>
@@ -654,7 +686,7 @@ export default function UserDashboard() {
           ref={homeTogglerRef}
           title="Return Home"
         >
-          <span className="material-symbols-outlined">HOME</span>
+          <span className="material-symbols-outlined">home</span>
         </button>
 
         {/* Dynamic Section Loading Area (lazy loaded React components) */}
@@ -674,7 +706,8 @@ export default function UserDashboard() {
                     /* Render overlay over settings when requested */
                     <ActiveOverlayComponent onCancel={closeOverlay} onClose={closeOverlay} {...overlayProps} />
                   ) : (
-                    <Component openOverlay={openOverlay} closeOverlay={closeOverlay} />
+                    <Component openOverlay={openOverlay} closeOverlay={closeOverlay}
+                    openLogoutModal={openLogoutModal}/>
                   )
                 ) : (
                   <Component />

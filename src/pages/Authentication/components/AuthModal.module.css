@@ -411,3 +411,9 @@ input:-moz-autofill {
     box-shadow: 0 0 0 1000px rgba(0,0,0,0.2) inset !important;
     -moz-text-fill-color: var(--text-primary) !important;
 }
+
+@media (max-width: 30rem) {
+  .captchaContainer {
+    margin: 0;
+  }
+}
