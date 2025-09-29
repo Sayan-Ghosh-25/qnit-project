@@ -540,26 +540,26 @@ export default function AuthModal({
           </div>
 
           <div className={styles.field}>
-            <label>Email</label>
-            <input
-              type="email"
-              placeholder="Enter Your Email"
-              value={identifier}
-              onChange={(e) => setIdentifier(trimEnds(e.target.value))}
-              required
-              disabled={!signUserType}
-            />
-            <div>
-              {!trimEnds(identifier) ? null : userExistsEmailStatus === "checking" ? (
-                <small className={styles.hint}>Checking if user exists</small>
-              ) : userExistsEmailStatus === true ? (
-                <small className={`${styles.hint} ${styles.success}`}>User is registered</small>
-              ) : userExistsEmailStatus === false ? (
-                <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
-              ) : (
-                <small className={styles.hint}>Unable to check the email</small>
-              )}
-            </div>
+            <label>User ID</label>
+              <input
+                type="email"
+                placeholder="Enter Your Email"
+                value={identifier}
+                onChange={(e) => setIdentifier(trimEnds(e.target.value))}
+                required
+                disabled={!signUserType}
+              />
+              <div>
+                {!trimEnds(identifier) ? null : !validateEmail(trimEnds(identifier)) ? (
+                  <small className={`${styles.hint} ${styles.error}`}>Invalid email format</small>
+                ) : userExistsEmailStatus === true ? (
+                  <small className={`${styles.hint} ${styles.success}`}>User is registered</small>
+                ) : userExistsEmailStatus === false ? (
+                  <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
+                ) : (
+                  <small className={styles.hint}>Checking if user exists</small>
+                )}
+              </div>
           </div>
 
           <div className={styles.field}>
@@ -586,18 +586,18 @@ export default function AuthModal({
           </div>
 
           <div className={styles.rowBetween}>
-            <label className={styles.remember} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div className={styles.captchaContainer}>
               {/* ReCAPTCHA: only show if site key present */}
               {RECAPTCHA_SITE_KEY ? (
                 <ReCAPTCHA
                   sitekey={RECAPTCHA_SITE_KEY}
                   onChange={handleCaptcha}
-                  ref={recaptchaRef}
+                  ref={recaptchaRef} key ="dark" theme="dark"
                 />
               ) : (
                 <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small>
               )}
-            </label>
+            </div>
           </div>
 
           <button className={`${styles.btn} ${styles.primary} ${styles.block}`} type="submit" disabled={!signValid}>
@@ -648,7 +648,7 @@ export default function AuthModal({
           </div>
 
           <div className={styles.field}>
-            <label>Email</label>
+            <label>User ID</label>
             <input
               type="email"
               placeholder="Enter Your Registered Email"
@@ -665,18 +665,25 @@ export default function AuthModal({
               ) : userExistsEmailStatus === false ? (
                 <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
               ) : (
-                <small className={styles.hint}>Unable to check the email</small>
+                <small className={styles.hint}>Checking if user exists</small>
               )}
             </div>
           </div>
 
-          <div style={{ marginTop: "0.6rem" }}>
+        <div className={styles.rowBetween}>
+          <div className={styles.captchaContainer}>
+            {/* ReCAPTCHA: only show if site key present */}
             {RECAPTCHA_SITE_KEY ? (
-              <ReCAPTCHA sitekey={RECAPTCHA_SITE_KEY} onChange={handleCaptcha} ref={recaptchaRef} />
+              <ReCAPTCHA
+                sitekey={RECAPTCHA_SITE_KEY}
+                onChange={handleCaptcha}
+                ref={recaptchaRef} key ="dark" theme ="dark"
+              />
             ) : (
               <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small>
             )}
           </div>
+        </div>
 
           <button className={`${styles.btn} ${styles.primary} ${styles.block}`} type="submit" disabled={!forgotValid}>
             {busy ? (
