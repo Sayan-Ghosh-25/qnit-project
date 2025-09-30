@@ -4,7 +4,6 @@ import HomeLander from "../pages/Authentication/HomeLander";
 import AuthModal from "../pages/Authentication/components/AuthModal";
 import UserReg from "../pages/Authentication/components/UserReg";
 import PasswordCreation from "../pages/Authentication/components/NewPassword";
-import PasswordUpdate from "@/common/ChangePassword"
 import UserDashboard from "../pages/User/UserDashboard";
 import AdminDashboard from "../pages/Admin/AdminDashboard";
 import PrivateRoute from "./PrivateRoute";
@@ -22,7 +21,6 @@ export default function AppRoutes() {
       {/* Private/User Routes */}
       <Route element={<PrivateRoute />}>
         <Route path="/User/*" element={<UserDashboard />} />
-        <Route path="/ChangePassword" element={<PasswordUpdate />} />
       </Route>
 
       {/* Admin Routes */}
