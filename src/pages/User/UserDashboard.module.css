@@ -556,6 +556,38 @@ nav li a.active {
   pointer-events: none;
 }
 
+  .loading-spinner {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+    background: none;
+    z-index: 9999;
+  }
+
+  .loading-spinner.show {
+    display: flex;
+  }
+
+  .loading-spinner .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #ddd;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
 /* =========================
   Light Theme
   ========================= */
@@ -730,6 +762,7 @@ nav li a.active {
     gap: 0.25rem !important;
     width: 100% !important;
     height: 100% !important;
+    text-transform: none !important;
     text-decoration: none !important;
     color: #fff !important;
   }
@@ -812,35 +845,6 @@ nav li a.active {
   .learnMoreModal .modal-content button {
     top: -5px;
     right: 0.8rem;
-  }
-
-  .loading-spinner {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    justify-content: center;
-    align-items: center;
-    background: none;
-    z-index: 9999;
-  }
-  .loading-spinner.show {
-    display: flex;
-  }
-  .loading-spinner .spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #ddd;
-    border-top: 4px solid #007bff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 }
 
