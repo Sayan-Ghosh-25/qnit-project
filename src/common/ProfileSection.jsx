@@ -3,10 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./ProfileSection.module.css";
 import { supabase } from "@/lib/supabaseClient";
 
-const NON_EDITABLE = new Set(["username", "email", "phone"]);
+const PROFILE_UPDATED_EVENT = "qnit:profile-updated";
+
 export default function ProfileSection() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   const [profile, setProfile] = useState({
     full_name: "",
     stream: "",
@@ -55,7 +58,6 @@ export default function ProfileSection() {
       try {
         const token = await getAccessToken();
         if (!token) {
-          // user not logged in: keep empty/default
           if (!cancelled) setLoading(false);
           return;
         }
@@ -74,7 +76,6 @@ export default function ProfileSection() {
         }
         const payload = await res.json();
         const p = payload?.profile || {};
-        // normalize
         const normalized = {
           full_name: p.full_name || "",
           stream: p.stream || "",
@@ -103,8 +104,29 @@ export default function ProfileSection() {
       }
     }
     fetchProfile();
+
+    // listen for external profile updates and sync in-memory state
+    const listener = (e) => {
+      const newProfile = e?.detail;
+      if (newProfile && typeof newProfile === "object") {
+        setProfile((prev) => ({ ...prev, ...newProfile }));
+        setFormData((prev) => ({
+          ...prev,
+          stream: newProfile.stream ?? prev.stream,
+          year_of_study: newProfile.year_of_study ?? prev.year_of_study,
+          semester: newProfile.semester ?? prev.semester,
+          dob: newProfile.dob ?? prev.dob,
+        }));
+      } else if (newProfile === null) {
+        // allow clearing with null (defensive)
+        // no-op
+      }
+    };
+    window.addEventListener(PROFILE_UPDATED_EVENT, listener);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(PROFILE_UPDATED_EVENT, listener);
     };
   }, []);
 
@@ -192,24 +214,19 @@ export default function ProfileSection() {
 
     // dob
     const prevDob = profile.dob ? profile.dob.toString() : "";
-    const curDob = (formData.dob || "").toString().trim(); // expect YYYY-MM-DD from date input
-    // if trying to clear a previously non-empty dob -> disallow
+    const curDob = (formData.dob || "").toString().trim();
     if ((curDob === "" || curDob === null) && prevDob) {
       window.alert("Date of Birth cannot be cleared once set!");
       const el = document.getElementById("dob");
       if (el) el.focus();
       return { ok: false };
     }
-    // basic date validity check if provided
     if (curDob) {
-      // allow formats like YYYY-MM-DD (normal) or DD-MM-YYYY (some browsers/locale)
       let normalized = curDob;
       if (/^\d{2}-\d{2}-\d{4}$/.test(curDob)) {
-        // dd-mm-yyyy -> convert
         const [d, m, y] = curDob.split("-");
         normalized = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
       }
-      // verify
       const dateObj = new Date(normalized);
       if (Number.isNaN(dateObj.getTime())) {
         window.alert("Invalid Date of Birth.");
@@ -228,7 +245,6 @@ export default function ProfileSection() {
       return { ok: false, noChanges: true };
     }
 
-    // build payload mapping to DB column names
     const payload = {
       stream: next.stream || null,
       year_of_study: next.year_of_study || null,
@@ -236,10 +252,10 @@ export default function ProfileSection() {
       dob: next.dob || null,
     };
 
-    return { ok: true, payload };
+    return { ok: true, payload, optimisticProfile: next };
   }
 
-  // Submit update to backend
+  // Submit update to backend (optimistic update & rollback on failure)
   const updateProfile = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!isEditing) {
@@ -264,10 +280,36 @@ export default function ProfileSection() {
       return;
     }
 
+    const { payload, optimisticProfile } = res;
+    const prevProfile = { ...profile };
+
+    // Optimistically update UI immediately
+    setProfile((p) => ({ ...p, ...optimisticProfile }));
+    setFormData((f) => ({
+      ...f,
+      stream: optimisticProfile.stream,
+      year_of_study: optimisticProfile.year_of_study,
+      semester: optimisticProfile.semester,
+      dob: optimisticProfile.dob || "",
+    }));
+    setUpdating(true);
+
     try {
       const token = await getAccessToken();
       if (!token) {
-        window.alert("You are not signed in.");
+        window.alert("You are not signed in");
+        // rollback
+        setProfile(prevProfile);
+        setFormData({
+          full_name: prevProfile.full_name,
+          stream: prevProfile.stream,
+          year_of_study: prevProfile.year_of_study,
+          semester: prevProfile.semester,
+          email: prevProfile.email,
+          contact: prevProfile.contact,
+          dob: prevProfile.dob || "",
+        });
+        setUpdating(false);
         return;
       }
       const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
@@ -279,44 +321,78 @@ export default function ProfileSection() {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify(res.payload),
+        body: JSON.stringify(payload),
       });
 
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}));
         const errMsg = body?.error || `Update failed (${resp.status})`;
+        // rollback and show error
+        setProfile(prevProfile);
+        setFormData({
+          full_name: prevProfile.full_name,
+          stream: prevProfile.stream,
+          year_of_study: prevProfile.year_of_study,
+          semester: prevProfile.semester,
+          email: prevProfile.email,
+          contact: prevProfile.contact,
+          dob: prevProfile.dob || "",
+        });
         window.alert(errMsg);
+        setUpdating(false);
         return;
       }
 
-      const payload = await resp.json();
-      const updated = payload?.profile || {};
+      // server should return authoritative profile
+      const payloadResp = await resp.json();
+      const updated = payloadResp?.profile || {};
 
-      setProfile({
-        full_name: updated.full_name || profile.full_name,
-        stream: updated.stream || "",
-        year_of_study: updated.year_of_study || "",
-        semester: updated.semester || "",
-        email: updated.email || profile.email,
-        contact: updated.contact || profile.contact,
-        dob: updated.dob || "",
-      });
+      const normalizedUpdated = {
+        full_name: updated.full_name || prevProfile.full_name,
+        stream: updated.stream ?? (prevProfile.stream || ""),
+        year_of_study: updated.year_of_study ?? (prevProfile.year_of_study || ""),
+        semester: updated.semester ?? (prevProfile.semester || ""),
+        email: updated.email ?? prevProfile.email,
+        contact: updated.contact ?? prevProfile.contact,
+        dob: updated.dob ?? prevProfile.dob ?? "",
+      };
 
+      setProfile(normalizedUpdated);
       setFormData({
-        full_name: updated.full_name || profile.full_name,
-        stream: updated.stream || "",
-        year_of_study: updated.year_of_study || "",
-        semester: updated.semester || "",
-        email: updated.email || profile.email,
-        contact: updated.contact || profile.contact,
-        dob: updated.dob || "",
+        full_name: normalizedUpdated.full_name,
+        stream: normalizedUpdated.stream,
+        year_of_study: normalizedUpdated.year_of_study,
+        semester: normalizedUpdated.semester,
+        email: normalizedUpdated.email,
+        contact: normalizedUpdated.contact,
+        dob: normalizedUpdated.dob || "",
       });
+
+      // dispatch global event so other components (like dashboard greeting) can react
+      try {
+        window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT, { detail: normalizedUpdated }));
+      } catch (e) {
+        // ignore
+      }
 
       window.alert("Profile Updated Successfully!");
       disableEditing();
     } catch (err) {
       console.error("Failed to update profile:", err);
+      // rollback
+      setProfile(prevProfile);
+      setFormData({
+        full_name: prevProfile.full_name,
+        stream: prevProfile.stream,
+        year_of_study: prevProfile.year_of_study,
+        semester: prevProfile.semester,
+        email: prevProfile.email,
+        contact: prevProfile.contact,
+        dob: prevProfile.dob || "",
+      });
       window.alert("Failed to update profile! Please try again");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -331,7 +407,7 @@ export default function ProfileSection() {
           className={styles.editButton}
           aria-label="Edit Profile"
           onClick={enableEditing}
-          disabled={loading}
+          disabled={loading || updating}
         >
           <i className="fas fa-pen" />
         </button>
@@ -370,7 +446,7 @@ export default function ProfileSection() {
                     id="stream"
                     name="Stream"
                     maxLength={100}
-                    disabled={!isEditing}
+                    disabled={!isEditing || updating}
                     value={formData.stream || ""}
                     onChange={handleChange}
                     ref={(el) => {
@@ -390,10 +466,9 @@ export default function ProfileSection() {
                     id="academicYear"
                     name="Academic Year"
                     maxLength={10}
-                    disabled={!isEditing}
+                    disabled={!isEditing || updating}
                     value={formData.year_of_study || ""}
                     onChange={(e) => {
-                      // map academicYear -> year_of_study
                       setFormData((prev) => ({ ...prev, year_of_study: e.target.value }));
                     }}
                   />
@@ -410,7 +485,7 @@ export default function ProfileSection() {
                     id="semester"
                     name="Semester"
                     maxLength={6}
-                    disabled={!isEditing}
+                    disabled={!isEditing || updating}
                     value={formData.semester || ""}
                     onChange={handleChange}
                   />
@@ -460,7 +535,7 @@ export default function ProfileSection() {
                     type="date"
                     id="dob"
                     name="DOB"
-                    disabled={!isEditing}
+                    disabled={!isEditing || updating}
                     value={formData.dob || ""}
                     onChange={handleChange}
                   />
@@ -475,9 +550,9 @@ export default function ProfileSection() {
               id="updateBtn"
               className={styles.updateButton}
               onClick={updateProfile}
-              disabled={!isEditing}
+              disabled={!isEditing || updating}
             >
-              Update
+              {updating ? "Updating..." : "Update"}
             </button>
 
             <button
@@ -485,7 +560,7 @@ export default function ProfileSection() {
               id="cancelBtn"
               className={styles.cancelButton}
               onClick={cancelChanges}
-              disabled={!isEditing}
+              disabled={!isEditing || updating}
             >
               Cancel
             </button>
