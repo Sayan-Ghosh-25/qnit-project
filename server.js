@@ -1,3 +1,4 @@
+// server.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -6,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import authRoutes from "./src/routes/authRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 
 dotenv.config();
 
@@ -44,6 +46,7 @@ app.use(cors({
 // Routes
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
+app.use("/user", feedbackRoutes);
 
 // Health check
 app.get("/", (req, res) => res.json({ ok: true }));
