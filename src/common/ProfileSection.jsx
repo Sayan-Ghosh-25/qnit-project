@@ -2,23 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./ProfileSection.module.css";
 import { supabase } from "@/lib/supabaseClient";
-
-const PROFILE_UPDATED_EVENT = "qnit:profile-updated";
+import { useProfile } from "@/context/ProfileContext";
 
 export default function ProfileSection() {
-  const [loading, setLoading] = useState(true);
+  const { profile, setProfile, loading: profileLoading } = useProfile();
+  const [loading, setLoading] = useState(profileLoading);
   const [isEditing, setIsEditing] = useState(false);
   const [updating, setUpdating] = useState(false);
-
-  const [profile, setProfile] = useState({
-    full_name: "",
-    stream: "",
-    year_of_study: "",
-    semester: "",
-    email: "",
-    contact: "",
-    dob: null,
-  });
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -31,6 +21,20 @@ export default function ProfileSection() {
   });
 
   const firstEditableRef = useRef(null);
+
+  // sync local formData when context profile changes
+  useEffect(() => {
+    setFormData({
+      full_name: profile.full_name || "",
+      stream: profile.stream || "",
+      year_of_study: profile.year_of_study || "",
+      semester: profile.semester || "",
+      email: profile.email || "",
+      contact: profile.contact || "",
+      dob: profile.dob || "",
+    });
+    setLoading(profileLoading);
+  }, [profile, profileLoading]);
 
   // helper to get client JWT access token
   async function getAccessToken() {
@@ -50,87 +54,26 @@ export default function ProfileSection() {
     }
   }
 
-  // fetch profile from backend
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchProfile() {
-      setLoading(true);
-      try {
-        const token = await getAccessToken();
-        if (!token) {
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
-        const url = `${API_BASE}/user/me/profile`;
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
-        if (!res.ok) {
-          console.warn("Failed to fetch profile:", res.status);
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        const payload = await res.json();
-        const p = payload?.profile || {};
-        const normalized = {
-          full_name: p.full_name || "",
-          stream: p.stream || "",
-          year_of_study: p.year_of_study || "",
-          semester: p.semester || "",
-          email: p.email || "",
-          contact: p.contact || "",
-          dob: p.dob ? (typeof p.dob === "string" ? p.dob : p.dob) : "",
-        };
-        if (!cancelled) {
-          setProfile(normalized);
-          setFormData({
-            full_name: normalized.full_name,
-            stream: normalized.stream,
-            year_of_study: normalized.year_of_study,
-            semester: normalized.semester,
-            email: normalized.email,
-            contact: normalized.contact,
-            dob: normalized.dob || "",
-          });
-        }
-      } catch (err) {
-        console.error("Error fetching profile:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  // Normalize DOB helper
+  function normalizeDobInput(input) {
+    if (!input) return null;
+    const s = String(input).trim();
+    if (s === "") return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+      const [d, m, y] = s.split("-");
+      return `${y}-${m}-${d}`;
     }
-    fetchProfile();
+    const parsed = new Date(s);
+    if (!Number.isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const mm = `${parsed.getMonth() + 1}`.padStart(2, "0");
+      const dd = `${parsed.getDate()}`.padStart(2, "0");
+      return `${y}-${mm}-${dd}`;
+    }
+    return null;
+  }
 
-    // listen for external profile updates and sync in-memory state
-    const listener = (e) => {
-      const newProfile = e?.detail;
-      if (newProfile && typeof newProfile === "object") {
-        setProfile((prev) => ({ ...prev, ...newProfile }));
-        setFormData((prev) => ({
-          ...prev,
-          stream: newProfile.stream ?? prev.stream,
-          year_of_study: newProfile.year_of_study ?? prev.year_of_study,
-          semester: newProfile.semester ?? prev.semester,
-          dob: newProfile.dob ?? prev.dob,
-        }));
-      } else if (newProfile === null) {
-        // allow clearing with null (defensive)
-        // no-op
-      }
-    };
-    window.addEventListener(PROFILE_UPDATED_EVENT, listener);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(PROFILE_UPDATED_EVENT, listener);
-    };
-  }, []);
-
-  // controlled inputs
   const handleChange = (e) => {
     const { id, value } = e.target;
     if (!id) return;
@@ -160,7 +103,7 @@ export default function ProfileSection() {
     disableEditing();
   };
 
-  // Validation + prepare update object
+  // Build payload & validate
   function validateAndBuildUpdate() {
     const next = { ...profile };
     let changed = false;
@@ -175,11 +118,9 @@ export default function ProfileSection() {
       return { ok: false };
     }
     next.stream = streamCur;
-    if (streamPrev.localeCompare(streamCur, undefined, { sensitivity: "accent" }) !== 0) {
-      changed = true;
-    }
+    if (streamPrev.localeCompare(streamCur, undefined, { sensitivity: "accent" }) !== 0) changed = true;
 
-    // academic year === year_of_study
+    // year_of_study
     const prevYear = (profile.year_of_study || "").toString().trim();
     const curYear = (formData.year_of_study || "").toString().trim();
     if (curYear === "" && prevYear !== "") {
@@ -214,21 +155,16 @@ export default function ProfileSection() {
 
     // dob
     const prevDob = profile.dob ? profile.dob.toString() : "";
-    const curDob = (formData.dob || "").toString().trim();
-    if ((curDob === "" || curDob === null) && prevDob) {
+    const curDobRaw = (formData.dob || "").toString().trim();
+    if ((curDobRaw === "" || curDobRaw === null) && prevDob) {
       window.alert("Date of Birth cannot be cleared once set!");
       const el = document.getElementById("dob");
       if (el) el.focus();
       return { ok: false };
     }
-    if (curDob) {
-      let normalized = curDob;
-      if (/^\d{2}-\d{2}-\d{4}$/.test(curDob)) {
-        const [d, m, y] = curDob.split("-");
-        normalized = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-      }
-      const dateObj = new Date(normalized);
-      if (Number.isNaN(dateObj.getTime())) {
+    if (curDobRaw) {
+      const normalized = normalizeDobInput(curDobRaw);
+      if (!normalized) {
         window.alert("Invalid Date of Birth.");
         const el = document.getElementById("dob");
         if (el) el.focus();
@@ -255,7 +191,6 @@ export default function ProfileSection() {
     return { ok: true, payload, optimisticProfile: next };
   }
 
-  // Submit update to backend (optimistic update & rollback on failure)
   const updateProfile = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!isEditing) {
@@ -283,7 +218,7 @@ export default function ProfileSection() {
     const { payload, optimisticProfile } = res;
     const prevProfile = { ...profile };
 
-    // Optimistically update UI immediately
+    // optimistic update in shared context (so other components update immediately)
     setProfile((p) => ({ ...p, ...optimisticProfile }));
     setFormData((f) => ({
       ...f,
@@ -312,6 +247,7 @@ export default function ProfileSection() {
         setUpdating(false);
         return;
       }
+
       const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
       const url = `${API_BASE}/user/me/profile`;
       const resp = await fetch(url, {
@@ -343,20 +279,21 @@ export default function ProfileSection() {
         return;
       }
 
-      // server should return authoritative profile
+      // server response (authoritative)
       const payloadResp = await resp.json();
       const updated = payloadResp?.profile || {};
 
       const normalizedUpdated = {
         full_name: updated.full_name || prevProfile.full_name,
-        stream: updated.stream ?? (prevProfile.stream || ""),
-        year_of_study: updated.year_of_study ?? (prevProfile.year_of_study || ""),
-        semester: updated.semester ?? (prevProfile.semester || ""),
-        email: updated.email ?? prevProfile.email,
-        contact: updated.contact ?? prevProfile.contact,
+        stream: updated.stream ?? prevProfile.stream ?? "",
+        year_of_study: updated.year_of_study ?? prevProfile.year_of_study ?? "",
+        semester: updated.semester ?? prevProfile.semester ?? "",
+        email: updated.email ?? prevProfile.email ?? "",
+        contact: updated.contact ?? prevProfile.contact ?? "",
         dob: updated.dob ?? prevProfile.dob ?? "",
       };
 
+      // set authoritative profile in context
       setProfile(normalizedUpdated);
       setFormData({
         full_name: normalizedUpdated.full_name,
@@ -368,13 +305,7 @@ export default function ProfileSection() {
         dob: normalizedUpdated.dob || "",
       });
 
-      // dispatch global event so other components (like dashboard greeting) can react
-      try {
-        window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT, { detail: normalizedUpdated }));
-      } catch (e) {
-        // ignore
-      }
-
+      // other components can listen to the context change
       window.alert("Profile Updated Successfully!");
       disableEditing();
     } catch (err) {

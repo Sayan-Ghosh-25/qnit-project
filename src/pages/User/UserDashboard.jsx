@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import styles from "./UserDashboard.module.css";
 import TrendingNews from "./components/TrendingNews";
 import MindGame from "./components/MindGame";
+import { useProfile } from "@/context/ProfileContext";
 
 /* -----------------------
    Static import helper map
@@ -85,6 +86,7 @@ export default function UserDashboard() {
   const navigate = useNavigate();
   const auth = useAuth();
   const { logout } = auth || {};
+  const { profile } = useProfile();
 
   // UI state
   const [spinnerVisible, setSpinnerVisible] = useState(false);
@@ -107,16 +109,21 @@ export default function UserDashboard() {
   /* -----------------------
      Compute greeting (uses fetched userFirstName)
      ----------------------- */
-  useEffect(() => {
-    const hour = new Date().getHours();
-    let greeting = "Hello";
-    if (hour >= 5 && hour < 12) greeting = "Good Morning";
-    else if (hour >= 12 && hour < 17) greeting = "Good Afternoon";
-    else if (hour >= 17 && hour <= 23) greeting = "Good Evening";
-
-    const namePart = userFirstName ? userFirstName : "User";
-    setGreetingText(`${greeting} ${namePart}`);
-  }, [userFirstName]);
+     useEffect(() => {
+      const hour = new Date().getHours();
+      let greeting = "Hello";
+      if (hour >= 5 && hour < 12) greeting = "Good Morning";
+      else if (hour >= 12 && hour < 17) greeting = "Good Afternoon";
+      else if (hour >= 17 && hour <= 23) greeting = "Good Evening";
+    
+      let namePart = "User";
+      if (profile?.full_name) {
+        namePart = profile.full_name.toString().trim().split(/\s+/)[0] || "User";
+      } else if (auth?.user?.email) {
+        namePart = (auth.user.email || "").split("@")[0] || "User";
+      }
+      setGreetingText(`${greeting} ${namePart}`);
+    }, [profile?.full_name, auth?.user?.email]);
 
   /* -----------------------
      Load user first name from Database / Profiles
