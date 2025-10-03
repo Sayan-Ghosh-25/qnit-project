@@ -119,103 +119,76 @@ export default function UserDashboard() {
   }, [userFirstName]);
 
   /* -----------------------
-     Load user first name from Supabase / profiles
+     Load user first name from Database / Profiles
      ----------------------- */
      useEffect(() => {
-      let cancelled = false;
-    
-      async function loadUserFirstName() {
-        try {
-          // Try to get user from auth context first, then fall back to supabase client methods
-          let user = auth?.user || null;
-    
-          if (!user && typeof supabase.auth?.getUser === "function") {
-            try {
-              const res = await supabase.auth.getUser();
-              user = res?.data?.user || null;
-            } catch (e) {
-              // ignore and continue
-            }
-          }
-    
-          if (!user && typeof supabase.auth?.user === "function") {
-            try {
-              user = supabase.auth.user();
-            } catch (e) {
-              // ignore
-            }
-          }
-    
-          // No User -> Bail (Keep greeting fallback to "User")
-          if (!user) {
-            if (!cancelled) setUserFirstName("");
-            return;
-          }
-    
-          const userId = user?.id;
-          const email = (user?.email || "").toLowerCase();
-          let firstName = "";
-    
-          try {
-            // Only select columns that exist in your schema
-            const selectCols = "full_name,email";
-            let query = supabase.from("profiles").select(selectCols).limit(1);
-    
-            if (userId) {
-              query = query.eq("id", userId);
-            } else if (email) {
-              query = query.eq("email", email);
-            }
-    
-            const { data: profileData, error: profileErr } = await query.maybeSingle();
-    
-            if (!profileErr && profileData) {
-              const raw = profileData.full_name || profileData.email || "";
-              if (raw) {
-                // If raw came from email, use local-part; otherwise use first token of full_name
-                firstName =
-                  raw === profileData.email
-                    ? raw.split("@")[0]
-                    : raw.toString().trim().split(/\s+/)[0];
-              }
-            }
-          } catch (e) {
-            console.warn("profiles lookup failed:", e);
-          }
-    
-          // Fallback: look into user metadata or email if no profile name found
-          if (!firstName) {
-            const meta = user?.user_metadata || {};
-            const rawMeta =
-              meta?.full_name ||
-              meta?.name ||
-              meta?.first_name ||
-              meta?.preferred_username ||
-              user?.email || "";
-    
-            if (rawMeta) {
-              // if it's an email, take local part; else first token
-              firstName =
-                (rawMeta && rawMeta.includes("@"))
-                  ? rawMeta.split("@")[0].toString().trim().split(/\s+/)[0]
-                  : rawMeta.toString().trim().split(/\s+/)[0] || "";
-            }
-          }
-    
-          if (!cancelled) setUserFirstName(firstName || "");
-        } catch (err) {
-          console.error("Failed to load user first name:", err);
-          if (!cancelled) setUserFirstName("");
-        }
-      }
-        loadUserFirstName();
-      return () => {
-        cancelled = true;
-      };
-    // Intentionally run on mount and when auth identity changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [auth?.user?.id, auth?.user?.email]);
-    
+       let cancelled = false;
+     
+       async function fetchFirstNameViaBackend() {
+         try {
+           // Get client session token (v2 supabase-js)
+           let token = null;
+           if (supabase?.auth?.getSession) {
+             try {
+               const { data: sessionData } = await supabase.auth.getSession();
+               token = sessionData?.session?.access_token || null;
+             } catch (e) {
+               // ignore and fallback
+             }
+           }
+           // older clients: supabase.auth.session()
+           if (!token && typeof supabase.auth?.session === "function") {
+             try {
+               const s = supabase.auth.session();
+               token = s?.access_token || s?.accessToken || null;
+             } catch (e) {}
+           }
+     
+           // Also try auth context if available (some contexts expose access token)
+           if (!token && auth?.session?.access_token) {
+             token = auth.session.access_token;
+           }
+     
+           // If we still don't have a token, bail — user not logged in
+           if (!token) {
+             if (!cancelled) setUserFirstName("");
+             return;
+           }
+     
+           // Build backend URL — use VITE_API_BASE_URL if set, otherwise same origin
+           const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+           const url = `${API_BASE}/user/me/firstname`;
+     
+           const res = await fetch(url, {
+             method: "GET",
+             headers: {
+               "Authorization": `Bearer ${token}`,
+               "Accept": "application/json",
+             },
+           });
+     
+           if (!res.ok) {
+             // if unauthorized or other error, clear name gracefully
+             console.warn("Could not fetch first name from backend:", res.status);
+             if (!cancelled) setUserFirstName("");
+             return;
+           }
+     
+           const payload = await res.json();
+           if (!cancelled) setUserFirstName(payload?.firstName || "");
+         } catch (err) {
+           console.error("Error fetching first name via backend:", err);
+           if (!cancelled) setUserFirstName("");
+         }
+       }
+
+       fetchFirstNameViaBackend();
+     
+       return () => {
+         cancelled = true;
+       };
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+     }, [auth?.user?.id, auth?.user?.email]);    
 
   // Preload LogoutModal immediately
   useEffect(() => {
