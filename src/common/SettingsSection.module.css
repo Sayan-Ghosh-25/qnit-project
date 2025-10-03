@@ -30,7 +30,7 @@
   font-weight: 700;
   margin: 0.5rem 0 1.5rem;
   text-align: center;
-  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
   color: var(--white);
   transition: var(--transition-med);
   position: relative;
@@ -328,8 +328,11 @@
   }
   
   .settingsSection h2 {
-    font-size: 1.3rem;
     margin-bottom: 1.25rem;
+  }
+
+  .settingsSection h2::after {
+    width: 120px;
   }
 
   .settingsContainer {

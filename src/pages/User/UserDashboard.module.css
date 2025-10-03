@@ -281,134 +281,14 @@ nav li a.active {
 }
 
 /* =========================
-  Features Grid
+  News ection
   ========================= */
-.features-section {
-  padding: clamp(1.25rem, 4vw, 3.75rem) 2.5rem;
+.newsSection {
+  color: #fff;
+  padding: 2.5rem;
   background: linear-gradient(90deg, #002d5b, #004563, #002d5b);
   border-radius: var(--radius);
   box-shadow: var(--shadow-med);
-  transition: var(--transition-med);
-}
-.features-section h2 {
-  font-weight: 700;
-  margin-bottom: 1rem;
-  text-align: center;
-  font-size: clamp(1.25rem, 3vw, 1.75rem);
-  color: #fffb00;
-  transition: var(--transition-med);
-}
-.features-section p {
-  font-size: 1.125rem;
-  color: #fff;
-  margin-bottom: 2rem;
-  text-align: center;
-  transition: var(--transition-med);
-}
-.features-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 1rem;
-  align-items: stretch;
-}
-
-/* Feature Blurb Box */
-.feature-box {
-  background: linear-gradient(180deg, #ddffff, #ffffff);
-  padding: 1.5rem;
-  border: 1px solid #007bb0;
-  border-radius: 0.625rem;
-  box-shadow: var(--shadow-med);
-  text-align: center;
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-  box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.feature-box:hover {
-  transform: translateY(-0.25rem);
-  box-shadow: 0 12px 32px rgb(0 98 230 / 70%), 0 2px 8px rgb(0 98 230 / 70%);
-}
-.feature-box img {
-  height: 2.5rem;
-  margin-bottom: 1rem;
-}
-.feature-box h3 {
-  font-size: 1.125rem;
-  color: #000;
-  margin-bottom: 0.75rem;
-  font-weight: 700;
-}
-.feature-box p {
-  font-size: 1rem;
-  color: #222;
-}
-
-/* =========================
-  FAQ Section
-  ========================= */
-.faq-section {
-  padding: clamp(1.25rem, 4vw, 3.75rem) 1rem;
-  margin-top: 1.5rem;
-  background: linear-gradient(90deg, #002d5b, #00364e, #002d5b);
-  border-radius: 0.625rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
-  transition: var(--transition-med);
-}
-.faq-section h2 {
-  font-size: clamp(1.25rem, 3vw, 1.75rem);
-  text-align: center;
-  color: #fffb00;
-  font-weight: 700;
-  margin-bottom: 1rem;
-}
-.faq-question {
-  cursor: pointer;
-  padding: 1rem 1.25rem;
-  background: #002443;
-  border-radius: 0.5rem;
-  border: 0.5px solid #00ccff;
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: #fff;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.75rem;
-  transition: var(--transition-med);
-}
-.faq-question:hover {
-  transform: translateY(-2px);
-  background: #001f3a;
-  box-shadow: 0 4px 20px rgba(255, 205, 60, 0.3);
-}
-.faq-question.active {
-  background: #001f3a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(255, 205, 60, 0.3);
-}
-.faq-question::after {
-  content: "\25BC";
-  font-size: 0.65rem;
-  transition: transform 0.4s;
-}
-.faq-question.active::after {
-  transform: rotate(180deg);
-}
-.faq-answer {
-  height: 0;
-  overflow: hidden;
-  transition: height 0.35s ease;
-  background: #003060;
-  border-left: 3px solid #007bff;
-  border-right: 3px solid #007bff;
-  padding: 0 1.25rem;
-  border-radius: 0 0 0.5rem 0.5rem;
-  will-change: height;
-}
-.faq-answer p {
-  margin: 1rem 0;
-  font-size: 1.0625rem;
-  color: #fff;
-  line-height: 1.6;
   transition: var(--transition-med);
 }
 
@@ -601,38 +481,15 @@ nav li a.active {
 }
 
 :global(.light-theme) .image-text-section h2,
-:global(.light-theme) .features-section h2,
-:global(.light-theme) .faq-section h2 {
+:global(.light-theme) .newsSection h2 {
   color: #111;
 }
 :global(.light-theme) .image-text-section .text {
   color: #333;
   font-weight: 500;
 }
-:global(.light-theme) .features-section {
+:global(.light-theme) .newsSection {
   background: rgba(0, 225, 255, 0.226);
-}
-:global(.light-theme) .features-section p {
-  color: #222;
-}
-:global(.light-theme) .feature-box {
-  background: #fff;
-  border: none;
-}
-:global(.light-theme) .faq-section {
-  background: #b0fff6;
-}
-:global(.light-theme) .faq-question {
-  background: #fff;
-  color: #0059b9;
-  box-shadow: 0 2px 8px rgba(0, 153, 255, 0.449);
-  border: none;
-}
-:global(.light-theme) .faq-answer {
-  background: #fff;
-}
-:global(.light-theme) .faq-answer p {
-  color: #222;
 }
 :global(.light-theme) .text-muted {
   font-weight: 600;
@@ -661,9 +518,6 @@ nav li a.active {
   li {
     padding-bottom: 2rem;
   }
-  .features-container {
-    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  }
   .image-text-section .text {
     max-width: 48ch;
   }
@@ -674,13 +528,6 @@ nav li a.active {
   nav {
     width: clamp(12rem, 22vw, 16rem);
     min-width: clamp(12rem, 22vw, 16rem);
-  }
-
-  .features-container {
-    gap: 1.25rem;
-  }
-  .faq-section {
-    padding: 3rem 1.25rem;
   }
 }
 
@@ -804,44 +651,6 @@ nav li a.active {
     font-weight: 500;
   }
 
-  .features-section {
-    padding: 0.8rem;
-  }
-  .features-container {
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  }
-  .features-section h2 {
-    font-size: 1.35rem;
-  }
-  .features-section p {
-    font-size: 1rem;
-  }
-  .feature-box img {
-    height: 1.5rem;
-    margin-bottom: 0.5rem;
-  }
-  .feature-box h3 {
-    font-size: 1.1rem;
-  }
-  .feature-box p {
-    font-size: 0.95rem;
-  }
-  .faq-section {
-    padding: 0.7rem;
-  }
-  .faq-section h2 {
-    font-size: 1.25rem;
-  }
-  .faq-question {
-    padding: 0.9rem;
-    font-size: 0.95rem;
-  }
-  .faq-question::after {
-    font-size: 0.5rem;
-  }
-  .faq-answer p {
-    font-size: 0.9rem;
-  }
   .learnMoreModal .modal-content button {
     top: -5px;
     right: 0.8rem;
@@ -857,9 +666,6 @@ nav li a.active {
   .main-content {
     padding: 1.5rem;
   }
-  .features-container {
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-  }
   .image-text-section {
     flex-wrap: nowrap;
   }
@@ -868,12 +674,5 @@ nav li a.active {
   }
   .image-text-section .text {
     max-width: 46%;
-  }
-}
-
-/* Large desktops ≥ 1440px */
-@media (min-width: 90rem) {
-  .features-container {
-    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
   }
 }

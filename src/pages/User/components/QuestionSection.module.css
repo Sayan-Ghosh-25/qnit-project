@@ -1,37 +1,37 @@
-/* ===== Enhanced UI For Syllabus Section ===== */
+/* ===== Enhanced UI For Questions Section ===== */
 :root {
   /* Colors */
   --navy: #001436;
-  --dark-slate: #495670;
-  --light-slate: #a8b2d1;
+  --darkSlate: #495670;
+  --lightSlate: #a8b2d1;
   --accent: #64ffda;
-  --accent-tint: rgba(100, 255, 218, 0.1);
+  --accentTint: rgba(100, 255, 218, 0.1);
   --white: #e6f1ff;
   --pink: #f57dff;
   --blue: #57cbff;
   
   /* Sizes & Transitions */
-  --border-radius: 0.5rem;
+  --borderRadius: 0.5rem;
   --transition: all 0.25s cubic-bezier(0.645, 0.045, 0.355, 1);
-  --transition-slow: all 0.5s cubic-bezier(0.645, 0.045, 0.355, 1);
+  --transitionSlow: all 0.5s cubic-bezier(0.645, 0.045, 0.355, 1);
   --shadow: 0 10px 30px -15px rgba(2, 12, 27, 0.7);
-  --shadow-med: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
-  --shadow-hover: 0 20px 30px -15px rgba(2, 12, 27, 0.7);
+  --shadowMed: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  --shadowHover: 0 20px 30px -15px rgba(2, 12, 27, 0.7);
   --easing: cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
-.syllabus-section {
+.questionsSection {
   padding: clamp(1.5rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
   background: #001436;
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-med);
-  transition: var(--transition-slow);
+  border-radius: var(--borderRadius);
+  box-shadow: var(--shadowMed);
+  transition: var(--transitionSlow);
   margin: 1rem;
   position: relative;
   overflow: hidden;
 }
 
-.syllabus-section h2 {
+.questionsSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
   text-align: left;
@@ -40,7 +40,7 @@
   position: relative;
 }
 
-.syllabus-container {
+.questionContainer {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, max-content));
   justify-content: start;
@@ -48,7 +48,7 @@
   align-items: stretch;
 }
 
-.sy-latest-tag {
+.quLatestTag {
   background: linear-gradient(45deg, var(--pink), var(--blue));
   color: var(--white);
   font-size: 0.7rem;
@@ -63,7 +63,7 @@
   animation-delay: 0.05s;
 }
 
-.sy-latest-tag:hover {
+.quLatestTag:hover {
   box-shadow: 0 0 30px rgba(245, 125, 255, 0.5);
 }
 
@@ -82,20 +82,20 @@
   100% { transform: scale(1); }
 }
 
-.sy-archive-section {
+.quArchiveSection {
   padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 2rem);
   margin-top: 2rem;
   background: var(--navy);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-med);
-  transition: var(--transition-slow);
+  border-radius: var(--borderRadius);
+  box-shadow: var(--shadowMed);
+  transition: var(--transitionSlow);
   border: 1px solid var(--navy);
   margin: 1rem;
   position: relative;
   overflow: hidden;
 }
 
-.sy-archive-section h2 {
+.quArchiveSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
   text-align: center;
@@ -104,12 +104,12 @@
   position: relative;
 }
 
-.sy-archive-question {
+.quArchiveQuestion {
   cursor: pointer;
   padding: 1.2rem 1.5rem;
   background: #001232;
-  border-radius: var(--border-radius);
-  border: 1px solid var(--dark-slate);
+  border-radius: var(--borderRadius);
+  border: 1px solid var(--darkSlate);
   font-size: 1.1rem;
   font-weight: 500;
   color: var(--white);
@@ -122,53 +122,53 @@
   overflow: hidden;
 }
 
-.sy-archive-question:hover { 
+.quArchiveQuestion:hover { 
   transform: translateX(-5px); 
   background: var(--navy); 
-  box-shadow: var(--shadow-med);
+  box-shadow: var(--shadowMed);
 }
 
-.sy-archive-question.active { 
+.quArchiveQuestion.active { 
   transform: scale(1.01); 
   background: var(--navy);
-  box-shadow: var(--shadow-med);
+  box-shadow: var(--shadowMed);
   border-color: var(--accent);
 }
 
-.sy-archive-question::after { 
+.quArchiveQuestion::after { 
   content: '\25BC'; 
   font-size: 0.65rem; 
   transition: transform 0.4s var(--easing); 
 }
 
-.sy-archive-question.active::after {
+.quArchiveQuestion.active::after {
   transform: rotate(180deg); 
 }
 
-.sy-archive-answer {
+.quArchiveAnswer {
   overflow: hidden;
   transition: height 0.4s var(--easing);
   background: rgba(10, 25, 47, 0.5);
   border-left: 1px solid var(--accent);
   border-right: 1px solid var(--accent);
-  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  border-radius: 0 0 var(--borderRadius) var(--borderRadius);
   will-change: height;
   will-change: padding;
 }
 
-.sy-archive-answer-container {
+.quArchiveAnswerContainer {
   padding: 1.5rem;
 }
 
-.sy-archive-answer-container h2 {
+.quArchiveAnswerContainer h2 {
   margin-top: 1.5rem;
 }
 
-.sy-pdf-feature-box {
+.quPdfFeatureBox {
   position: relative;
-  padding: 1.2rem;
-  border: 1px solid var(--dark-slate);
-  border-radius: var(--border-radius);
+  padding: 1.2rem 1.2rem 0.9rem;
+  border: 1px solid var(--darkSlate);
+  border-radius: var(--borderRadius);
   background: var(--navy);
   cursor: pointer;
   box-shadow: 0 0 10px rgba(0, 157, 255, 0.5);
@@ -176,16 +176,16 @@
   overflow: hidden;
 }
 
-.sy-pdf-feature-box:hover {
+.quPdfFeatureBox:hover {
   transform: translateY(-5px);
-  box-shadow: var(--shadow-hover);
+  box-shadow: var(--shadowHover);
   box-shadow: 0 0 15px rgba(0, 157, 255, 0.6);
 }
 
-.sy-pdf-card {
+.quPdfCard {
   width: clamp(14rem, 38vw, 16rem);
-  border: 1px solid var(--dark-slate);
-  border-radius: var(--border-radius);
+  border: 1px solid var(--darkSlate);
+  border-radius: var(--borderRadius);
   padding: 1rem;
   margin: 0.75rem;
   display: inline-block;
@@ -196,7 +196,7 @@
   box-shadow: var(--shadow);
 }
 
-.sy-pdf-title { 
+.quPdfTitle { 
   text-align: center; 
   margin-top: 0.75rem; 
   font-weight: 600; 
@@ -204,23 +204,23 @@
   color: var(--white);
 }
 
-.sy-pdf-canvas { 
+.quPdfCanvas { 
   display: flex; 
   flex-direction: column; 
   align-items: center; 
   overflow: hidden; 
-  border-radius: var(--border-radius);
+  border-radius: var(--borderRadius);
 }
 
-.sy-pdf-canvas canvas { 
+.quPdfCanvas canvas { 
   width: 100%; 
-  height: 20rem; 
-  border: 1px solid var(--dark-slate); 
+  height: 20rem !important; 
+  border: 1px solid var(--darkSlate); 
   display: block; 
-  border-radius: var(--border-radius);
+  border-radius: var(--borderRadius);
 }
 
-.sy-pdf-canvas figcaption { 
+.quPdfCanvas figcaption { 
   margin-top: 0.75rem; 
   font-size: 0.9rem; 
   text-align: center; 
@@ -228,30 +228,30 @@
   font-weight: 600; 
 }
 
-.sy-menu-btn {
+.quMenuBtn {
   position: absolute;
-  bottom: 1.1rem;
+  bottom: 0.85rem;
   right: 0.45rem;
   padding: 0.5rem;
   background: transparent;
   border: none;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   cursor: pointer;
   z-index: 50;
   transition: var(--transition);
-  color: var(--light-slate);
+  color: var(--lightSlate);
   border-radius: 50%;
   width: 32px;
   height: 32px;
   display: flex;
 }
 
-.sy-menu-btn:hover { 
-  transform: scale(1.1); 
+.quMenuBtn:hover { 
+  transform: none !important; 
   color: var(--accent);
 }
 
-.sy-menu-options {
+.quMenuOptions {
   display: none;
   position: absolute;
   bottom: 2.8rem;
@@ -265,7 +265,7 @@
   animation: fadeIn 0.3s ease forwards;
 }
 
-.sy-menu-options a {
+.quMenuOptions a {
   display:block;
   padding:0.5rem 0.625rem;
   font-size:1rem;
@@ -275,7 +275,7 @@
   transition: all 0.2s ease;
 }
 
-.sy-menu-options a:hover {
+.quMenuOptions a:hover {
   border-radius:0.5rem;
   transform: translateX(3px); 
 }
@@ -285,7 +285,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.sy-pdfModal {
+.quPdfModal {
   display: flex;
   position: fixed;
   inset: 0;
@@ -295,20 +295,20 @@
   backdrop-filter: blur(5px);
 }
 
-.sy-pdfModal-inner {
+.quPdfModalInner {
   display: block;
   margin: auto;
   width: min(92vw, 80rem);
-  height: min(88vh, 60rem);
+  height: min(95vh, 85rem);
   background: #111;
-  border-radius: var(--border-radius);
+  border-radius: var(--borderRadius);
   animation: scaleIn 0.5s var(--easing) forwards;
-  border: 1px solid var(--dark-slate);
-  box-shadow: var(--shadow-hover);
+  border: 1px solid var(--darkSlate);
+  box-shadow: var(--shadowHover);
   margin-top: 1rem;
 }
 
-.sy-close {
+.quClose {
   all: unset;
   position: absolute;
   right: 1.5rem;
@@ -327,9 +327,9 @@
   border-radius: 50%;
 }
 
-.sy-close:hover {
+.quClose:hover {
   color: #f44336; transform: rotate(90deg);
-  background: var(--accent-tint);
+  background: var(--accentTint);
 }
 
 @keyframes scaleIn {
@@ -337,13 +337,13 @@
   to { transform: scale(1); opacity: 1; }
 }
 
-.sy-toast {
+.quToast {
   visibility: hidden;
   min-width: 12.5rem;
   background: var(--navy);
   color: var(--white);
   text-align: center;
-  border-radius: var(--border-radius);
+  border-radius: var(--borderRadius);
   padding: 0.875rem 1.25rem;
   position: fixed;
   bottom: 1.5rem;
@@ -352,11 +352,11 @@
   z-index: 9999;
   opacity: 0;
   transition: opacity 0.3s ease, visibility 0.3s ease;
-  box-shadow: var(--shadow-hover);
+  box-shadow: var(--shadowHover);
   backdrop-filter: blur(10px);
 }
 
-.sy-toast.show {
+.quToast.show {
   visibility: visible;
   opacity: 1;
   animation: slideUp 0.4s var(--easing) forwards;
@@ -374,7 +374,7 @@
 }
 
 /* ===== Empty State Styling ===== */
-.sy-empty-state {
+.quEmptyState {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -385,13 +385,13 @@
   max-width: 500px;
 }
 
-.sy-empty-state img {
+.quEmptyState img {
   width: 5rem;
   height: 5rem;
   margin-bottom: 1rem;
 }
 
-.sy-empty-state p {
+.quEmptyState p {
   font-size: 1.2rem;
   color: var(--white);
 }
@@ -399,53 +399,53 @@
 /* =========================
   Light Theme
   ========================= */
-.light-theme .syllabus-section {
+:global(.light-theme) .questionsSection {
   background: rgba(0, 217, 255, 0.216);
 }
-.light-theme .syllabus-section h2 {
+:global(.light-theme) .questionsSection h2 {
   color: #000;
 }
-.light-theme .sy-archive-section {
+:global(.light-theme) .quArchiveSection {
   background: rgba(0, 217, 255, 0.216);
   border: none;
 }
-.light-theme .sy-archive-section h2 {
+:global(.light-theme) .quArchiveSection h2 {
   color: #000;
 }
-.light-theme .sy-archive-question {
+:global(.light-theme) .quArchiveQuestion {
   background: rgb(238, 252, 255);
   color: #111;
   border: 1.5px solid var(--blue);
 }
-.light-theme .sy-archive-answer {
+:global(.light-theme) .quArchiveAnswer {
   background: rgb(209, 249, 255);
   border-left: 1px solid var(--blue);
   border-right: 1px solid var(--blue);
 }
-.light-theme .sy-pdf-feature-box {
+:global(.light-theme) .quPdfFeatureBox {
   background: rgb(229, 251, 255);
   border: 0.5px solid var(--blue);
 }
-.light-theme .sy-pdf-canvas canvas {
+:global(.light-theme) .quPdfCanvas canvas {
   border: 0.5px solid var(--blue);
 }
-.light-theme .sy-pdf-canvas figcaption {
+:global(.light-theme) .quPdfCanvas figcaption {
   color: #111;
 }
-.light-theme .sy-menu-btn {
+:global(.light-theme) .quMenuBtn {
   color: #444;
 }
-.light-theme .sy-menu-options {
+:global(.light-theme) .quMenuOptions {
   background: #c1ebff;
 }
-.light-theme .sy-latest-tag {
+:global(.light-theme) .quLatestTag {
   background: #e60f00;
   animation: none;
 }
-.light-theme .sy-empty-state p {
+:global(.light-theme) .quEmptyState p {
   color: #333;
 }
-.light-theme .sy-toast {
+:global(.light-theme) .quToast {
   background:#fff;
   color: #000
 }
@@ -453,119 +453,128 @@
       
 /* ===== Enhanced Responsiveness ===== */
 @media (max-width: 768px) {
-  .syllabus-container {
+  .questionContainer {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
   }
   
-  .syllabus-box {
+  .questionBox {
     padding: 1.75rem 1.25rem;
   }
   
-  .sy-archive-question {
+  .quArchiveQuestion {
     padding: 1rem 1.25rem;
     font-size: 1rem;
   }
   
-  .sy-pdf-card {
+  .quPdfCard {
     width: calc(50% - 1.5rem);
     margin: 0.75rem;
   }
 }
 
 @media (max-width: 480px) {
-  .syllabus-section {
+  .questionsSection {
     padding: 1.75rem 1rem;
     margin: 0.5rem;
     margin-bottom: 1rem;
-    border-radius: calc(var(--border-radius) - 2px);
+    border-radius: calc(var(--borderRadius) - 2px);
   }
   
-  .syllabus-section h2 {
-    font-size: 1.5rem;
+  .questionsSection h2 {
+    font-size: 1.4rem;
     margin-bottom: 1.25rem;
   }
   
-  .syllabus-container {
+  .questionContainer {
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
   
-  .sy-latest-tag {
+  .quLatestTag {
     font-size: 0.65rem;
     padding: 0.15rem 0.6rem;
   }
   
-  .sy-archive-section {
+  .quArchiveSection {
     padding: 1.75rem 1rem;
     margin: 0.5rem;
-    border-radius: calc(var(--border-radius) - 2px);
+    border-radius: calc(var(--borderRadius) - 2px);
   }
   
-  .sy-archive-section h2 {
-    font-size: 1.5rem;
+  .quArchiveSection h2 {
+    font-size: 1.4rem;
     margin-bottom: 1.5rem;
   }
   
-  .sy-archive-question {
+  .quArchiveQuestion {
     padding: 1rem;
     font-size: 0.95rem;
     margin-top: 0.75rem;
   }
-
-  .sy-archive-question:hover { 
+  
+  .quArchiveQuestion:hover { 
     transform: none;
   }
 
-  .sy-archive-answer {
+  .quArchiveAnswer {
     padding: 0;
   }
   
-  .sy-archive-answer-container {
+  .quArchiveAnswerContainer {
     padding: 0.4rem;
   }
 
-  .sy-archive-answer-container h2 {
+  .quArchiveAnswerContainer h2 {
     margin-top: 1.25rem;
   }
   
-  .sy-pdf-feature-box {
-    padding: 1rem;
+  .quPdfFeatureBox {
+    padding: 1.2rem 0 0.8rem;
     margin: 0.5rem;
   }
   
-  .sy-pdf-card {
+  .quPdfCard {
     width: 100%;
     margin: 0.5rem 0;
   }
   
-  .sy-pdf-canvas canvas {
-    height: 18rem;
+  .questionsSection .quPdfCanvas canvas {
+    height: 19rem !important;
+    width: 16.5rem !important;
+  }
+
+  .quArchiveSection .quPdfCanvas canvas {
+    height: 18rem !important;
+    width: 15.5rem !important;
   }
   
-  .sy-menu-btn {
-    bottom: 0.9rem;
-    right: 0.1rem;
-    font-size: 1.1rem;
+  .quMenuBtn {
+    bottom: 1.35rem !important;
+    right: 0.35rem !important;
+    font-size: 1.35rem;
     width: 30px;
     height: 30px;
   }
 
-  .sy-menu-btn:hover { 
+  .quMenuBtn:hover { 
     background: none;
   }
   
-  .sy-menu-btn {
-    bottom: 1.25rem;
-    right: 0.25rem;
+  .quMenuOptions {
+    bottom: 2.5rem;
   }
   
-  .sy-menu-options a {
-    padding: 0.5rem 0.75rem;
+  .quMenuOptions a {
+    padding: 0.5rem 0.7rem;
     font-size: 0.9rem;
   }
   
-  .sy-close {
+  .quPdfModalInner {
+    height: min(88vh, 85rem);
+  }
+
+  .quClose {
     right: 1.5rem;
     top: 1.7rem;
     font-size: 2rem;
@@ -573,7 +582,7 @@
     height: 35px;
   }
   
-  .sy-toast {
+  .quToast {
     min-width: 10rem;
     padding: 0.75rem 1rem;
     font-size: 0.9rem;
@@ -584,16 +593,16 @@
     max-width: 300px;
   }
 
-  .sy-empty-state {
+  .quEmptyState {
     margin-top: 15rem;
   }
   
-  .sy-empty-state img {
+  .quEmptyState img {
     width: 3rem;
     height: 3rem;
   }
   
-  .sy-empty-state p {
+  .quEmptyState p {
     font-size: 0.9rem;
   }
 }

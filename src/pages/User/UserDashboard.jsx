@@ -3,18 +3,21 @@ import { useCallback, useEffect, useRef, useState, Suspense, lazy } from "react"
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "./UserDashboard.module.css";
+import TrendingNews from "./components/TrendingNews";
+import MindGame from "./components/MindGame";
 
 /* -----------------------
    Static import helper map
    ----------------------- */
 const importers = {
-  ProfileSection: () => import("./components/ProfileSection.jsx"),
+  ProfileSection: () => import("@/common/ProfileSection.jsx"),
   QuestionSection: () => import("./components/QuestionSection.jsx"),
   SyllabusSection: () => import("./components/SyllabusSection.jsx"),
   OthersSection: () => import("./components/OthersSection.jsx"),
   SettingsSection: () => import("@/common/SettingsSection.jsx"),
-  FeedbackSection: () => import("./components/FeedbackSection.jsx"),
+  FeedbackSection: () => import("@/common/FeedbackSection.jsx"),
 };
 
 /* Lazy components created from the importers map */
@@ -61,90 +64,10 @@ function NotFoundSection({ name }) {
     <div style={{ padding: 24, color: "#fff" }}>
       <h3>Section not found</h3>
       <p>
-        No component found for <strong>{name}</strong>. Create <code>{name}.jsx</code> in <code>src/components</code>.
+        No component found for <strong>{name}</strong>. Create <code>{name}.jsx</code> in{" "}
+        <code>src/components</code>.
       </p>
     </div>
-  );
-}
-
-/* The FAQ content — React-driven (kept behavior, accessible accordions) */
-function FAQ() {
-  const items = [
-    {
-      q: "How can I preview and download study materials?",
-      a:
-        'After logging in, browse the available question papers, syllabus, or notes. Click "Preview" to view the document, or "Download" to save it to your device',
-    },
-    {
-      q: "Can I share materials with others?",
-      a:
-        'Yes! Use the "Share" button to send Google Drive links to classmates or friends directly from the platform',
-    },
-    {
-      q: "How often is the database updated?",
-      a:
-        "We update our database regularly with the latest question papers, syllabus, and notes to ensure you always have access to current materials",
-    },
-    {
-      q: "Is my personal data safe?",
-      a:
-        "Absolutely! We use advanced security measures and encryption to keep your account and personal information safe",
-    },
-    {
-      q: "Does this platform support cross device compatibility?",
-      a: "Yes, our platform is fully responsive and works smoothly on any type of device",
-    },
-    {
-      q: "Who can I contact for support or feedback?",
-      a: 'Use the "Support & Feedback" section to reach out to our team.\'re here to help!',
-    },
-  ];
-
-  const [openIndex, setOpenIndex] = useState(null);
-  const answerRefs = useRef([]);
-
-  useEffect(() => {
-    items.forEach((_, i) => {
-      const el = answerRefs.current[i];
-      if (!el) return;
-      if (openIndex === i) {
-        el.style.height = el.scrollHeight + "px";
-      } else {
-        el.style.height = "0";
-      }
-    });
-  }, [openIndex, items]);
-
-  function toggle(i) {
-    setOpenIndex((prev) => (prev === i ? null : i));
-  }
-
-  return (
-    <section className={cx("faq-section")} aria-label="FAQ">
-      <h2>Frequently Asked Questions (FAQ)</h2>
-      <div className={cx("faq-container")}>
-        {items.map((it, i) => (
-          <div className={cx("faq-item")} key={i}>
-            <h3
-              className={cx("faq-question", openIndex === i && "active")}
-              tabIndex={0}
-              onClick={() => toggle(i)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggle(i);
-                }
-              }}
-            >
-              {it.q}
-            </h3>
-            <div className={cx("faq-answer")} ref={(el) => (answerRefs.current[i] = el)}>
-              <p>{it.a}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -160,35 +83,136 @@ export default function UserDashboard() {
   const homeTogglerRef = useRef(null);
 
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const auth = useAuth();
+  const { logout } = auth || {};
 
   // UI state
-  const [spinnerVisible, setSpinnerVisible] = useState(false); // show spinner only during lazy loads
-  const [activeSection, setActiveSection] = useState("home"); // 'home' or 'ProfileSection', etc.
+  const [spinnerVisible, setSpinnerVisible] = useState(false);
+  const [activeSection, setActiveSection] = useState("home");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const openLogoutModal = useCallback(() => setShowLogoutModal(true), []);
   const [showLearnMore, setShowLearnMore] = useState(false);
   const [quoteText, setQuoteText] = useState(""); // motivational quote
   const [greetingText, setGreetingText] = useState("");
-  const [togglerVisible, setTogglerVisible] = useState(false); // home toggler visibility due to inactivity
+  const [togglerVisible, setTogglerVisible] = useState(false);
   const { lightMode } = useTheme();
-  const [overlay, setOverlay] = useState(null); // for "ChangePassword"
+  const [overlay, setOverlay] = useState(null);
   const [overlayProps, setOverlayProps] = useState({});
   const [hideNavbar, setHideNavbar] = useState(false);
   const [lastScroll, setLastScroll] = useState(0);
 
+  // New: store resolved user first name
+  const [userFirstName, setUserFirstName] = useState("");
+
   /* -----------------------
-     Compute greeting (kept behavior)
+     Compute greeting (uses fetched userFirstName)
      ----------------------- */
   useEffect(() => {
-    const userName = "Sayan"; // keep this behavior; replace with real user data when available
     const hour = new Date().getHours();
     let greeting = "Hello";
     if (hour >= 5 && hour < 12) greeting = "Good Morning";
     else if (hour >= 12 && hour < 17) greeting = "Good Afternoon";
     else if (hour >= 17 && hour <= 23) greeting = "Good Evening";
-    setGreetingText(`${greeting} ${userName}`);
-  }, []);
+
+    const namePart = userFirstName ? userFirstName : "User";
+    setGreetingText(`${greeting} ${namePart}`);
+  }, [userFirstName]);
+
+  /* -----------------------
+     Load user first name from Supabase / profiles
+     ----------------------- */
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUserFirstName() {
+      try {
+        let user = auth?.user || null;
+
+        // If not present, try supabase client methods (v2 or older fallbacks)
+        if (!user) {
+          if (typeof supabase.auth?.getUser === "function") {
+            try {
+              const result = await supabase.auth.getUser();
+              user = result?.data?.user || null;
+            } catch (e) {
+              // ignore and continue to other fallbacks
+            }
+          }
+
+          // older clients sometimes expose supabase.auth.user()
+          if (!user && typeof supabase.auth?.user === "function") {
+            try {
+              user = supabase.auth.user();
+            } catch (e) {
+              // ignore
+            }
+          }
+        }
+
+        // No User -> Bail (Keep greeting fallback to "User")
+        if (!user) {
+          if (!cancelled) setUserFirstName("");
+          return;
+        }
+
+        const userId = user?.id;
+        const email = (user?.email || "").toLowerCase();
+        let firstName = "";
+
+        try {
+          // Build basic select list we want to check
+          const selectCols = "first_name,full_name,name,display_name,email";
+          let query = supabase.from("profiles").select(selectCols).limit(1);
+
+          if (userId) {
+            query = query.eq("id", userId);
+          } else if (email) {
+            query = query.eq("email", email);
+          }
+
+          const { data: profileData, error: profileErr } = await query.maybeSingle();
+
+          if (!profileErr && profileData) {
+            // pick the best available candidate
+            const raw =
+              profileData.full_name ||
+              profileData.email || "";
+
+            firstName = (raw || "").toString().trim().split(/\s+/)[0] || "";
+          }
+        } catch (e) {
+          // ignore and try metadata fallback
+          console.warn("profiles lookup failed:", e);
+        }
+
+        // If still not found, look into user metadata
+        if (!firstName) {
+          const meta = user?.user_metadata || {};
+          const rawMeta =
+            meta?.first_name ||
+            meta?.full_name ||
+            meta?.name ||
+            meta?.preferred_username ||
+            user?.email || "";
+            
+          firstName = (rawMeta || "").toString().trim().split(/\s+/)[0] || "";
+        }
+
+        if (!cancelled) setUserFirstName(firstName || "");
+      } catch (err) {
+        console.error("Failed to load user first name:", err);
+        if (!cancelled) setUserFirstName("");
+      }
+    }
+
+    loadUserFirstName();
+
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally run on mount and when auth identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.user?.id, auth?.user?.email]);
 
   // Preload LogoutModal immediately
   useEffect(() => {
@@ -366,79 +390,79 @@ export default function UserDashboard() {
   /* -----------------------
      Sidebar collapse / Logo click behavior
      ----------------------- */
-     useEffect(() => {
-      const navOuter = navRef.current;
-      if (!navOuter) return;
-    
-      const collapsedClass = styles?.collapsed ?? "collapsed";
-      const logoImg = document.getElementById("logoImg");
-      const mobileMql = window.matchMedia("(max-width: 30rem)");
-      const collapseRangeMql = window.matchMedia(
-        "(min-width: 30.0625rem) and (max-width: 48rem)"
-      );
-    
-      const applyState = () => {
-        if (mobileMql.matches) {
-          navOuter.classList.remove(collapsedClass);
-        } else if (collapseRangeMql.matches) {
-          navOuter.classList.add(collapsedClass);
-        } else {
-          navOuter.classList.remove(collapsedClass);
-        }
-      };
-    
-      applyState();
-    
-      const mqHandler = () => applyState();
-      mobileMql.addEventListener("change", mqHandler);
-      collapseRangeMql.addEventListener("change", mqHandler);
-    
-      const logoClickHandler = () => {
-        if (mobileMql.matches) return;
-        navOuter.classList.toggle(collapsedClass);
-      };
-    
-      if (logoImg) logoImg.addEventListener("click", logoClickHandler);
-    
-      return () => {
-        mobileMql.removeEventListener("change", mqHandler);
-        collapseRangeMql.removeEventListener("change", mqHandler);
-        if (logoImg) logoImg.removeEventListener("click", logoClickHandler);
-      };
-    }, []);
+  useEffect(() => {
+    const navOuter = navRef.current;
+    if (!navOuter) return;
 
-    /* -----------------------
+    const collapsedClass = styles?.collapsed ?? "collapsed";
+    const logoImg = document.getElementById("logoImg");
+    const mobileMql = window.matchMedia("(max-width: 30rem)");
+    const collapseRangeMql = window.matchMedia(
+      "(min-width: 30.0625rem) and (max-width: 48rem)"
+    );
+
+    const applyState = () => {
+      if (mobileMql.matches) {
+        navOuter.classList.remove(collapsedClass);
+      } else if (collapseRangeMql.matches) {
+        navOuter.classList.add(collapsedClass);
+      } else {
+        navOuter.classList.remove(collapsedClass);
+      }
+    };
+
+    applyState();
+
+    const mqHandler = () => applyState();
+    mobileMql.addEventListener("change", mqHandler);
+    collapseRangeMql.addEventListener("change", mqHandler);
+
+    const logoClickHandler = () => {
+      if (mobileMql.matches) return;
+      navOuter.classList.toggle(collapsedClass);
+    };
+
+    if (logoImg) logoImg.addEventListener("click", logoClickHandler);
+
+    return () => {
+      mobileMql.removeEventListener("change", mqHandler);
+      collapseRangeMql.removeEventListener("change", mqHandler);
+      if (logoImg) logoImg.removeEventListener("click", logoClickHandler);
+    };
+  }, []);
+
+  /* -----------------------
     Navbar auto-hide while scrolling down
     ----------------------- */
-    useEffect(() => {
-      const handleScroll = () => {
-        const currentScroll = window.scrollY;
-  
-        if (currentScroll > lastScroll) {
-          setHideNavbar(true);
-        } else {
-          setHideNavbar(false);
-        }
-        setLastScroll(currentScroll);
-      };
-  
-      // Throttle scroll for performance
-      let ticking = false;
-      const throttledScroll = () => {
-        if (!ticking) {
-          window.requestAnimationFrame(() => {
-            handleScroll();
-            ticking = false;
-          });
-          ticking = true;
-        }
-      };
-  
-      window.addEventListener("scroll", throttledScroll);
-  
-      return () => window.removeEventListener("scroll", throttledScroll);
-    }, [lastScroll]);
-    
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScroll = window.scrollY;
+
+      if (currentScroll > lastScroll) {
+        setHideNavbar(true);
+      } else {
+        setHideNavbar(false);
+      }
+      setLastScroll(currentScroll);
+    };
+
+    // Throttle scroll for performance
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", throttledScroll);
+
+    return () => window.removeEventListener("scroll", throttledScroll);
+  }, [lastScroll]);
+
   /* -----------------------
      Global key handler for Escape (close modals)
      ----------------------- */
@@ -613,66 +637,26 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              {/* Features */}
-              <section className={cx("features-section")} aria-label="Key Features">
-                <h2>Key Features</h2>
-                <p>
-                  A comprehensive online resource management software embedded
-                  with exceptional features required to deliver an extraordinary
-                  learning experience
-                </p>
-
-                <div className={cx("features-container")} id="features-container-dashboard">
-                  <div className={cx("feature-box")}>
-                    <img src="/Pdf.png" alt="PDF Access" />
-                    <h3>Instant PDF Access</h3>
-                    <p>
-                      View and download previous year question papers, syllabus,
-                      and other documents in PDF format with just a click
-                    </p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Share.png" alt="Share" />
-                    <h3>Easy Sharing</h3>
-                    <p>Share study materials with friends and classmates directly from the platform</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Smartphone.png" alt="Mobile Friendly" />
-                    <h3>Mobile Friendly</h3>
-                    <p>Access all features from any device - Desktop, Table or Smartphone</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Security.png" alt="Security" />
-                    <h3>Advanced Security</h3>
-                    <p>Your account and personal data are protected with robust security measures and encryption</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Database.png" alt="Frequent Updates" />
-                    <h3>Frequently Updated Database</h3>
-                    <p>The resource library is actively updated with the latest question papers, syllabus, and notes</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Support.png" alt="Support" />
-                    <h3>Support & Feedback</h3>
-                    <p>Reach out for help or share feedback to help in improving user experience</p>
-                  </div>
-                </div>
+              {/* News Section */}
+              <section className={cx("newsSection")} aria-label="Trending News">
+                <TrendingNews />
               </section>
 
-              {/* FAQ (React-based) */}
-              <FAQ />
+              {/* Game Section */}
+              <section className={cx("gameSection")} aria-label="Game">
+              <MindGame />
+              </section>
 
-              <p className={cx("text-muted")}>
-                <i className="far fa-copyright" /> {new Date().getFullYear()} QNIT. All Rights Reserved.
-                <br />
-                <span className={cx("divider")}><i className="fas fa-lock" /> Secured Data</span>
-                <i className="fas fa-wrench" /> Made in India
-              </p>
+            <p className={cx("text-muted")}>
+            <i className="far fa-copyright" style={{marginRight: "0.15rem"}}></i>{" "}
+            {new Date().getFullYear()} QNIT. All Rights Reserved.
+            <br />
+            <span className={cx("divider")}>
+              <i className="fas fa-lock" style={{marginRight: "0.15rem"}}></i> Secured Data
+            </span>
+            <i className="fas fa-wrench" style={{marginRight: "0.15rem"}}></i> Made in India <br />
+            <i className="fas fa-envelope" style={{marginRight: "0.15rem"}}></i> Contact - devtruster@gmail.com
+          </p>
             </div>
           </div>
         )}

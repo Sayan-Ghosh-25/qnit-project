@@ -30,7 +30,7 @@
   font-weight: 700;
   margin: 0.5rem 0 1.5rem;
   text-align: center;
-  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
   color: var(--white);
   transition: var(--transition-med);
   position: relative;
@@ -66,7 +66,7 @@
 .profileSection th {
   background: #001539;
   color: var(--white);
-  font-weight: 600;
+  font-weight: 500;
   border-bottom: 0.8px solid var(--blue);
   width: 35%;
 }
@@ -117,12 +117,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .profileSectionButtons button {
-  padding: 0.85rem 2rem;
+  height: 2.9rem;
   color: var(--white);
   border-radius: var(--radius);
   cursor: pointer;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 500;
   transition: var(--transition-med);
   box-shadow: var(--shadow-soft);
@@ -269,10 +269,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     min-width: 150px;
   }
 
-  .profileSection h2 {
-    font-size: 1.4rem;
-  }
-
   .profileSection input {
     font-size: 0.95rem;
     padding: 0.45rem 0.6rem;
@@ -308,17 +304,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .profileSection th,
   .profileSection td {
     padding: 0.4rem 0.55rem;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     min-width: auto;
   }
 
   .profileSection h2 {
-    font-size: 1.25rem;
     margin-bottom: 1rem;
   }
 
+  .profileSection h2::after {
+    width: 150px;
+  }
+
   .profileSection input {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     padding: 0.4rem 0.55rem;
   }
 

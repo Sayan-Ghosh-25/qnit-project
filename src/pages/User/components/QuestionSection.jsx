@@ -1,6 +1,6 @@
 // src/components/QuestionSection.jsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import "./QuestionSection.css";
+import styles from "./QuestionSection.module.css";
 import { createPortal } from "react-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.min?url";
@@ -15,12 +15,12 @@ const questionSectionData = [
     heading: "Previous Year Questions for 3rd Semester",
     isLatest: true,
     pdfs: [
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT301-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT302-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT301-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT302-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT301-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT302-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT401-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT402-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "IT401-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "IT402-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "IT403-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "IT404-2023" },
     ],
   },
   {
@@ -30,12 +30,12 @@ const questionSectionData = [
       {
         year: 2024,
         pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "Exam Paper 2024" },
         ],
       },
       {
@@ -144,7 +144,7 @@ class ThumbnailErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="qu-thumbnail-error" role="img" aria-label="Preview unavailable">
+        <div className={styles.quThumbnailError} role="img" aria-label="Preview unavailable">
           ⚠️ Preview unavailable
         </div>
       );
@@ -357,7 +357,7 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
     };
   }, [url, id, placeholderText]);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="qu-pdf-thumbnail-canvas" />;
+  return <canvas ref={canvasRef} aria-hidden="true" className={styles.quPdfThumbnailCanvas} />;
 });
 
 PdfThumbnail.displayName = "PdfThumbnail";
@@ -385,33 +385,31 @@ function PdfModal({ open, url, onClose }) {
 
   return createPortal(
     <div
-      className="qu-pdfModal"
+      className={styles.quPdfModal}
       role="dialog"
       aria-modal="true"
       aria-label="PDF viewer"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}>
-      <div className="qu-pdfModal-inner" onClick={(e) => e.stopPropagation()}>
+      <div className={styles.quPdfModalInner} onClick={(e) => e.stopPropagation()}>
         {/* Use object which gives the browser-inline PDF viewer; also provide an "Open in new tab" link */}
         {safeUrl ? (
           <>
-            <object
-              data={safeUrl}
-              type="application/pdf"
-              width="100%"
-              height="100%"
-              aria-label="PDF preview">
-              <p>
-                This browser cannot display the PDF file. You can <a href={safeUrl} target="_blank" rel="noopener noreferrer">open it in a new tab</a> or <a href={safeUrl} download>download</a> it.
-              </p>
-            </object>
+          <iframe
+            src={safeUrl}
+            width="100%"
+            height="100%"
+            style={{ border: "none" }}
+            title="PDF Viewer"
+          >
+          </iframe>
           </>
         ) : (
-          <div className="qu-pdfModal-error">No preview available</div>
+          <div className={styles.quPdfModalError}>No preview available</div>
         )}
       </div>
-      <button className="qu-close" aria-label="Close PDF" onClick={onClose}>&times;</button>
+      <button className={styles.quClose} aria-label="Close PDF" onClick={onClose}>&times;</button>
     </div>,
     typeof document !== "undefined" ? document.body : null
   );
@@ -449,7 +447,7 @@ export default function QuestionSection() {
       try {
         if (
           e.target.closest &&
-          (e.target.closest(".qu-menu-btn") || e.target.closest(".qu-menu-options"))
+          (e.target.closest(`.${styles.quMenuBtn}`) || e.target.closest(`.${styles.quMenuOptions}`))
         ) {
           return;
         }
@@ -512,7 +510,6 @@ export default function QuestionSection() {
           textarea.style.left = "-9999px";
           document.body.appendChild(textarea);
           textarea.select();
-          document.execCommand("copy");
           document.body.removeChild(textarea);
           pushToast("Link copied to Clipboard");
         } catch (e) {
@@ -530,10 +527,10 @@ export default function QuestionSection() {
 
   // Render Helper (Pdf Card)
   const renderPdfBox = (pdf, id) => (
-    <div key={id} className="qu-pdf-feature-box">
+    <div key={id} className={styles.quPdfFeatureBox}>
       <button
         type="button"
-        className="qu-menu-btn"
+        className={styles.quMenuBtn}
         aria-haspopup="true"
         aria-expanded={openMenuId === id ? "true" : "false"}
         onClick={(e) => {
@@ -543,12 +540,12 @@ export default function QuestionSection() {
         }}>&#x22EE;</button>
 
       <div
-        className="qu-menu-options"
+        className={styles.quMenuOptions}
         role="menu"
         style={{ display: openMenuId === id ? "block" : "none" }}>
         <a
           href="#"
-          className="qu-menu-item"
+          className={styles.quMenuItem}
           onClick={(e) => {
             e.preventDefault();
             handleShare(pdf.url);
@@ -560,7 +557,7 @@ export default function QuestionSection() {
       </div>
 
       <figure
-        className="qu-pdf-canvas"
+        className={styles.quPdfCanvas}
         tabIndex={0}
         role="button"
         aria-label={`Open ${pdf.caption}`}
@@ -576,7 +573,7 @@ export default function QuestionSection() {
           <PdfThumbnail url={pdf.url} id={id} />
         </ThumbnailErrorBoundary>
 
-        <figcaption>{pdf.caption}</figcaption>
+        <figcaption className={styles.quPdfTitle}>{pdf.caption}</figcaption>
       </figure>
     </div>
   );
@@ -588,12 +585,12 @@ export default function QuestionSection() {
       {questionSectionData
         .filter((sec) => sec.sectionType === "pyq")
         .map((sec, sIdx) => (
-          <section className="questions-section" key={`pyq-${sIdx}`}>
+          <section className={styles.questionsSection} key={`pyq-${sIdx}`}>
             <h2>
               {sec.heading}
-              {sec.isLatest ? <span className="qu-latest-tag">LATEST</span> : null}
+              {sec.isLatest ? <span className={styles.quLatestTag}>LATEST</span> : null}
             </h2>
-            <div className="question-container">
+            <div className={styles.questionContainer}>
               {sec.pdfs.map((pdf, pIdx) => {
                 const id = `pyq-${sIdx}-p${pIdx}`;
                 return renderPdfBox(pdf, id);
@@ -604,15 +601,15 @@ export default function QuestionSection() {
 
       {/* Render Archive Section */}
       {questionSectionData.some((sec) => sec.sectionType === "archive") && (
-        <section className="qu-archive-section">
+        <section className={styles.quArchiveSection}>
           <h2>Archives</h2>
-          <div className="qu-archive-container">
+          <div className={styles.quArchiveContainer}>
             {questionSectionData
               .filter((sec) => sec.sectionType === "archive")
               .map((sec, sIdx) => (
                 <React.Fragment key={`archive-frag-${sIdx}`}>
                   <h3
-                    className={`qu-archive-question ${openArchiveKey === `archive-${sIdx}` ? "active" : ""}`}
+                    className={`${styles.quArchiveQuestion} ${openArchiveKey === `archive-${sIdx}` ? styles.active : ""}`}
                     tabIndex={0}
                     onClick={() => handleToggleArchive(`archive-${sIdx}`)}
                     onKeyDown={(e) => {
@@ -625,18 +622,18 @@ export default function QuestionSection() {
                   </h3>
 
                   <div
-                    className="qu-archive-answer"
+                    className={styles.quArchiveAnswer}
                     ref={(el) => {
                       if (el) archiveAnswerRefs.current[`archive-${sIdx}`] = el;
                       else delete archiveAnswerRefs.current[`archive-${sIdx}`];
                     }}>
 
-                    <div className="qu-archive-answer-container">
+                    <div className={styles.quArchiveAnswerContainer}>
                       {sec.pdfsByYear &&
                         sec.pdfsByYear.map((yearGroup, yIdx) => (
-                          <div key={`archive-${sIdx}-y-${yIdx}`} className="qu-year-group">
+                          <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.quYearGroup}>
                             <h2>Year {yearGroup.year}</h2>
-                            <div className="question-container">
+                            <div className={styles.questionContainer}>
                               {yearGroup.pdfs.map((pdf, pIdx) => {
                                 const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
                                 return renderPdfBox(pdf, id);
@@ -656,9 +653,9 @@ export default function QuestionSection() {
       <PdfModal open={modalOpen} url={modalUrl} onClose={handleCloseModal} />
 
       {/* Toasts */}
-      <div className="qu-toast-container" aria-live="polite" aria-atomic="true">
+      <div className={styles.quToastContainer} aria-live="polite" aria-atomic="true">
         {toasts.map((t) => (
-          <div key={t.id} className="qu-toast show">
+          <div key={t.id} className={`${styles.quToast} ${styles.show}`}>
             {t.text}
           </div>
         ))}

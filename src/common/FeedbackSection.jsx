@@ -155,12 +155,12 @@ export default function FeedbackSection() {
       </div>
 
       <form className={styles.feedbackForm} autoComplete="off" onSubmit={(e) => e.preventDefault()}>
-        <label htmlFor="feedback">Click on the stars to give ratings</label>
+        <label htmlFor="feedback">Click On The Stars To Give Ratings</label>
         <textarea
           id="feedback"
           name="feedback"
-          placeholder="Type your feedback here..."
-          maxLength={1000}
+          placeholder="Start typing your feedback"
+          maxLength={1500}
           value={text}
           onChange={(e) => setText(e.target.value)}
           ref={textareaRef}
@@ -168,7 +168,9 @@ export default function FeedbackSection() {
           className={saved && !editing ? styles.dimmed : ""}
         />
 
-        <p id="wordCount">{wordCount} / 200 words</p>
+        {text.trim() && (
+          <p id="wordCount">Word Count: {wordCount}</p>
+        )}
 
         {/* Small note shows immediately after submit */}
         <small className={styles.editNote} style={{ display: saved ? "block" : "none" }}>

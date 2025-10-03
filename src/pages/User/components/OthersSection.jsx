@@ -1,13 +1,13 @@
 // src/components/OthersSection.jsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import "./OthersSection.css";
+import styles from "./OthersSection.module.css";
 import { createPortal } from "react-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.min?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 // ----------------------
-// Admin-controlled Dataset (unchanged)
+// Admin-controlled Dataset
 // ----------------------
 const othersSectionData = [
   {
@@ -15,12 +15,12 @@ const othersSectionData = [
     heading: "Previous Year Questions for 5th Semester",
     isLatest: true,
     pdfs: [
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT501-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT502-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT501-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT502-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT501-2023" },
-      { url: "/ECG-NET Research Paper.pdf", caption: "IT502-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT401-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT402-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "IT401-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "IT402-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "IT403-2023" },
+      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "IT404-2023" },
     ],
   },
   {
@@ -30,12 +30,12 @@ const othersSectionData = [
       {
         year: 2024,
         pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "Exam Paper 2024" },
+          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "Exam Paper 2024" },
         ],
       },
       {
@@ -144,7 +144,7 @@ class ThumbnailErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="ot-thumbnail-error" role="img" aria-label="Preview unavailable">
+        <div className={styles.otThumbnailError} role="img" aria-label="Preview unavailable">
           ⚠️ Preview unavailable
         </div>
       );
@@ -357,7 +357,7 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
     };
   }, [url, id, placeholderText]);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="ot-pdf-thumbnail-canvas" />;
+  return <canvas ref={canvasRef} aria-hidden="true" className={styles.otPdfThumbnailCanvas} />;
 });
 
 PdfThumbnail.displayName = "PdfThumbnail";
@@ -385,33 +385,31 @@ function PdfModal({ open, url, onClose }) {
 
   return createPortal(
     <div
-      className="ot-pdfModal"
+      className={styles.otPdfModal}
       role="dialog"
       aria-modal="true"
       aria-label="PDF viewer"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}>
-      <div className="ot-pdfModal-inner" onClick={(e) => e.stopPropagation()}>
+      <div className={styles.otPdfModalInner} onClick={(e) => e.stopPropagation()}>
         {/* Use object which gives the browser-inline PDF viewer; also provide an "Open in new tab" link */}
         {safeUrl ? (
           <>
-            <object
-              data={safeUrl}
-              type="application/pdf"
-              width="100%"
-              height="100%"
-              aria-label="PDF preview">
-              <p>
-                This browser cannot display the PDF file. You can <a href={safeUrl} target="_blank" rel="noopener noreferrer">open it in a new tab</a> or <a href={safeUrl} download>download</a> it.
-              </p>
-            </object>
+          <iframe
+            src={safeUrl}
+            width="100%"
+            height="100%"
+            style={{ border: "none" }}
+            title="PDF Viewer"
+          >
+          </iframe>
           </>
         ) : (
-          <div className="ot-pdfModal-error">No preview available</div>
+          <div className={styles.otPdfModalError}>No preview available</div>
         )}
       </div>
-      <button className="ot-close" aria-label="Close PDF" onClick={onClose}>&times;</button>
+      <button className={styles.otClose} aria-label="Close PDF" onClick={onClose}>&times;</button>
     </div>,
     typeof document !== "undefined" ? document.body : null
   );
@@ -449,7 +447,7 @@ export default function OthersSection() {
       try {
         if (
           e.target.closest &&
-          (e.target.closest(".ot-menu-btn") || e.target.closest(".ot-menu-options"))
+          (e.target.closest(`.${styles.otMenuBtn}`) || e.target.closest(`.${styles.otMenuOptions}`))
         ) {
           return;
         }
@@ -512,7 +510,6 @@ export default function OthersSection() {
           textarea.style.left = "-9999px";
           document.body.appendChild(textarea);
           textarea.select();
-          document.execCommand("copy");
           document.body.removeChild(textarea);
           pushToast("Link copied to Clipboard");
         } catch (e) {
@@ -530,10 +527,10 @@ export default function OthersSection() {
 
   // Render Helper (Pdf Card)
   const renderPdfBox = (pdf, id) => (
-    <div key={id} className="ot-pdf-feature-box">
+    <div key={id} className={styles.otPdfFeatureBox}>
       <button
         type="button"
-        className="ot-menu-btn"
+        className={styles.otMenuBtn}
         aria-haspopup="true"
         aria-expanded={openMenuId === id ? "true" : "false"}
         onClick={(e) => {
@@ -543,12 +540,12 @@ export default function OthersSection() {
         }}>&#x22EE;</button>
 
       <div
-        className="ot-menu-options"
+        className={styles.otMenuOptions}
         role="menu"
         style={{ display: openMenuId === id ? "block" : "none" }}>
         <a
           href="#"
-          className="ot-menu-item"
+          className={styles.otMenuItem}
           onClick={(e) => {
             e.preventDefault();
             handleShare(pdf.url);
@@ -560,7 +557,7 @@ export default function OthersSection() {
       </div>
 
       <figure
-        className="ot-pdf-canvas"
+        className={styles.otPdfCanvas}
         tabIndex={0}
         role="button"
         aria-label={`Open ${pdf.caption}`}
@@ -588,12 +585,12 @@ export default function OthersSection() {
       {othersSectionData
         .filter((sec) => sec.sectionType === "pyq")
         .map((sec, sIdx) => (
-          <section className="others-section" key={`pyq-${sIdx}`}>
+          <section className={styles.othersSection} key={`pyq-${sIdx}`}>
             <h2>
               {sec.heading}
-              {sec.isLatest ? <span className="ot-latest-tag">LATEST</span> : null}
+              {sec.isLatest ? <span className={styles.otLatestTag}>LATEST</span> : null}
             </h2>
-            <div className="other-container">
+            <div className={styles.otherContainer}>
               {sec.pdfs.map((pdf, pIdx) => {
                 const id = `pyq-${sIdx}-p${pIdx}`;
                 return renderPdfBox(pdf, id);
@@ -604,15 +601,15 @@ export default function OthersSection() {
 
       {/* Render Archive Section */}
       {othersSectionData.some((sec) => sec.sectionType === "archive") && (
-        <section className="ot-archive-section">
+        <section className={styles.otArchiveSection}>
           <h2>Archives</h2>
-          <div className="ot-archive-container">
+          <div className={styles.otArchiveContainer}>
             {othersSectionData
               .filter((sec) => sec.sectionType === "archive")
               .map((sec, sIdx) => (
                 <React.Fragment key={`archive-frag-${sIdx}`}>
                   <h3
-                    className={`ot-archive-question ${openArchiveKey === `archive-${sIdx}` ? "active" : ""}`}
+                    className={`${styles.otArchiveQuestion} ${openArchiveKey === `archive-${sIdx}` ? styles.active : ""}`}
                     tabIndex={0}
                     onClick={() => handleToggleArchive(`archive-${sIdx}`)}
                     onKeyDown={(e) => {
@@ -625,18 +622,18 @@ export default function OthersSection() {
                   </h3>
 
                   <div
-                    className="ot-archive-answer"
+                    className={styles.otArchiveAnswer}
                     ref={(el) => {
                       if (el) archiveAnswerRefs.current[`archive-${sIdx}`] = el;
                       else delete archiveAnswerRefs.current[`archive-${sIdx}`];
                     }}>
 
-                    <div className="ot-archive-answer-container">
+                    <div className={styles.otArchiveAnswerContainer}>
                       {sec.pdfsByYear &&
                         sec.pdfsByYear.map((yearGroup, yIdx) => (
-                          <div key={`archive-${sIdx}-y-${yIdx}`} className="ot-year-group">
+                          <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.otYearGroup}>
                             <h2>Year {yearGroup.year}</h2>
-                            <div className="other-container">
+                            <div className={styles.otherContainer}>
                               {yearGroup.pdfs.map((pdf, pIdx) => {
                                 const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
                                 return renderPdfBox(pdf, id);
@@ -656,9 +653,9 @@ export default function OthersSection() {
       <PdfModal open={modalOpen} url={modalUrl} onClose={handleCloseModal} />
 
       {/* Toasts */}
-      <div className="ot-toast-container" aria-live="polite" aria-atomic="true">
+      <div className={styles.otToastContainer} aria-live="polite" aria-atomic="true">
         {toasts.map((t) => (
-          <div key={t.id} className="ot-toast show">
+          <div key={t.id} className={`${styles.otToast} ${styles.show}`}>
             {t.text}
           </div>
         ))}

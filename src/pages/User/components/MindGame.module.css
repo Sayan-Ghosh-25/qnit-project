@@ -1,0 +1,433 @@
+/* MindGame.module.css */
+:root {
+  /* Dark Theme (Default) */
+  --bg-primary: linear-gradient(135deg, #0f172a81, #1e3b8acd, #0f172a81);
+  --bg-secondary: rgba(30, 41, 59, 0.8);
+  --bg-card: linear-gradient(145deg, #1e293b 0%, #334155 100%);
+  --bg-card-front: linear-gradient(45deg, #f59e0b 0%, #d97706 100%);
+  --bg-win: rgba(0, 0, 0, 0.318);
+  --bg-button: #2563eb;
+  --bg-button-hover: #1c59dc;
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-accent: #fbbf24;
+  --text-win: #22c55e;
+  --text-card-back: #94a3b8;
+  
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.4);
+  --shadow-section: 0 20px 60px rgba(0, 0, 0, 0.4);
+  --shadow-button: 0 4px 15px rgba(6, 182, 212, 0.4);
+  
+  --border-radius-card: 12px;
+  --border-radius-section: 20px;
+  --border-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+/* ===== Light Theme Overrides ===== */
+:global(.light-theme) {
+  --bg-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --bg-secondary: rgba(255, 255, 255, 0.95);
+  --bg-card: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  --bg-card-front: #ba5fff;
+  --bg-win: rgba(255, 255, 255, 0.222);
+  --bg-button: #3e7bfe;
+  --bg-button-hover: #3575fe;
+  
+  --text-primary: #1e293b;
+  --text-secondary: #ffffff;
+  --text-accent: #fffb00;
+  --text-win: #00ff08;
+  --text-card-back: #64748b;
+  
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
+  --shadow-section: 0 20px 60px rgba(0, 0, 0, 0.15);
+  --shadow-button: 0 4px 15px rgba(59, 130, 246, 0.4);
+  
+  --border-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+/* ===== Base Section Styles ===== */
+.puzzleSection {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 2rem;
+  margin-top: 2rem;
+  border-radius: var(--border-radius-section);
+  text-align: center;
+  box-shadow: var(--shadow-section);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.puzzleSection::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+  animation: float 10s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(180deg); }
+}
+
+.puzzleSection h2 {
+  color: var(--text-accent);
+  margin-bottom: 0.75rem;
+  font-size: 2rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  position: relative;
+  display: inline-block;
+}
+
+.puzzleSection p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+/* ===== Grid System - Responsive ===== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* ===== Card Styles with 3D Flip ===== */
+.card {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-card);
+  cursor: pointer;
+  perspective: 1000px;
+  font-size: 1.75rem;
+  box-shadow: var(--shadow-card);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--text-accent);
+  box-shadow: var(--border-glow);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  border-radius: var(--border-radius-card);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.front, .back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--border-radius-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+  transition: transform 0.6s ease;
+  font-weight: bold;
+}
+
+.back {
+  background: var(--bg-card);
+  color: var(--text-card-back);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transform: rotateY(0deg);
+  font-size: 1.5rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.front {
+  background: var(--bg-card-front);
+  color: #1e293b;
+  transform: rotateY(180deg);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+/* Flip animation */
+.card.flipped .back {
+  transform: rotateY(180deg);
+}
+
+.card.flipped .front {
+  transform: rotateY(0deg);
+}
+
+/* Matched card animation */
+.card.matched .front {
+  animation: matchedPulse 0.6s ease-in-out;
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.5);
+}
+
+@keyframes matchedPulse {
+  0%, 100% { transform: rotateY(0deg) scale(1); }
+  50% { transform: rotateY(0deg) scale(1.1); }
+}
+
+/* ===== Win Message Styles ===== */
+.win {
+  margin-top: 2rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: var(--text-win);
+  background: var(--bg-win);
+  padding: 1.5rem;
+  border-radius: var(--border-radius-card);
+  backdrop-filter: blur(10px);
+  animation: slideInUp 0.5s ease-out;
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.win button {
+  font-family: inherit;
+  margin-top: 1rem;
+  padding: 0.65rem 1.25rem !important;
+  background: var(--bg-button);
+  border: none;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.244);
+  position: relative;
+  overflow: hidden;
+}
+
+.win button:hover {
+  background: var(--bg-button-hover);
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.244);
+}
+
+.win button:active {
+  transform: translateY(0);
+}
+
+/* ===== Responsive Design ===== */
+
+/* Tablets and larger phones (min-width: 30rem / 480px) */
+@media (min-width: 30rem) {
+  .puzzleSection {
+    padding: 2.5rem;
+    margin-top: 2.5rem;
+  }
+  
+  .puzzleSection h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+  }
+  
+  .puzzleSection p {
+    font-size: 1.2rem;
+  }
+  
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    max-width: 500px;
+  }
+  
+  .card {
+    font-size: 2rem;
+  }
+  
+  .back {
+    font-size: 1.75rem;
+  }
+  
+  .win {
+    font-size: 1.2rem;
+    padding: 2rem;
+  }
+  
+  .win button {
+    padding: 0.875rem 1.75rem;
+    font-size: 1.15rem;
+    font-weight: 500 !important;
+  }
+}
+
+/* Desktop and larger tablets (min-width: 48rem / 768px) */
+@media (min-width: 48rem) {
+  .puzzleSection {
+    padding: 3rem;
+    margin-top: 3rem;
+  }
+  
+  .puzzleSection h2 {
+    font-size: 2rem;
+  }
+  
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    max-width: 600px;
+  }
+  
+  .card {
+    font-size: 2.25rem;
+  }
+  
+  .win {
+    font-size: 1.2rem;
+  }
+}
+
+/* Large desktops (min-width: 64rem / 1024px) */
+@media (min-width: 64rem) {
+  .puzzleSection {
+    max-width: auto;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .grid {
+    max-width: 400px;
+  }
+}
+
+/* Small phones (max-width: 30rem) */
+@media (max-width: 30rem) {
+  .puzzleSection {
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    border-radius: 16px;
+  }
+  
+  .puzzleSection h2 {
+    font-size: 1.4rem;
+  }
+  
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .card {
+    font-size: 1.5rem;
+  }
+  
+  .back {
+    font-size: 1.25rem;
+  }
+  
+  .win {
+    font-size: 1rem;
+    padding: 1.25rem;
+  }
+  
+  .win button {
+    font-family: inherit;
+    margin-left: 0.75rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 500 !important;
+  }
+}
+
+/* Very small phones (max-width: 20rem) */
+@media (max-width: 20rem) {
+  .puzzleSection {
+    padding: 1rem;
+  }
+  
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .card {
+    font-size: 1.25rem;
+  }
+  
+  .back {
+    font-size: 1rem;
+  }
+}
+
+/* ===== Accessibility Improvements ===== */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .win button,
+  .puzzleSection::before {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --bg-card: #1e293b;
+    --bg-card-front: #f59e0b;
+    --border-glow: 0 0 0 3px #f59e0b;
+  }
+  
+  :global(.light-theme) {
+    --bg-card: #ffffff;
+    --bg-card-front: #ffd700;
+    --border-glow: 0 0 0 3px #3b82f6;
+  }
+}
+
+/* ===== Print Styles ===== */
+@media print {
+  .puzzleSection {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+  
+  .card {
+    box-shadow: none !important;
+    border: 1px solid black !important;
+  }
+}

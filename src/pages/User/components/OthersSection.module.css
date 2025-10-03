@@ -20,7 +20,7 @@
   --easing: cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
-.others-section {
+.othersSection {
   padding: clamp(1.5rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
   background: #001436;
   border-radius: var(--border-radius);
@@ -31,7 +31,7 @@
   overflow: hidden;
 }
 
-.others-section h2 {
+.othersSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
   text-align: left;
@@ -40,7 +40,7 @@
   position: relative;
 }
 
-.other-container {
+.otherContainer {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, max-content));
   justify-content: start;
@@ -48,7 +48,7 @@
   align-items: stretch;
 }
 
-.ot-latest-tag {
+.otLatestTag {
   background: linear-gradient(45deg, var(--pink), var(--blue));
   color: var(--white);
   font-size: 0.7rem;
@@ -63,7 +63,7 @@
   animation-delay: 0.05s;
 }
 
-.ot-latest-tag:hover {
+.otLatestTag:hover {
   box-shadow: 0 0 30px rgba(245, 125, 255, 0.5);
 }
 
@@ -82,7 +82,7 @@
   100% { transform: scale(1); }
 }
 
-.ot-archive-section {
+.otArchiveSection {
   padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 2rem);
   margin-top: 2rem;
   background: var(--navy);
@@ -95,7 +95,7 @@
   overflow: hidden;
 }
 
-.ot-archive-section h2 {
+.otArchiveSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
   text-align: center;
@@ -104,7 +104,7 @@
   position: relative;
 }
 
-.ot-archive-question {
+.otArchiveQuestion {
   cursor: pointer;
   padding: 1.2rem 1.5rem;
   background: #001232;
@@ -122,30 +122,30 @@
   overflow: hidden;
 }
 
-.ot-archive-question:hover { 
+.otArchiveQuestion:hover { 
   transform: translateX(-5px); 
   background: var(--navy); 
   box-shadow: var(--shadow-med);
 }
 
-.ot-archive-question.active { 
+.otArchiveQuestion.active { 
   transform: scale(1.01); 
   background: var(--navy);
   box-shadow: var(--shadow-med);
   border-color: var(--accent);
 }
 
-.ot-archive-question::after { 
+.otArchiveQuestion::after { 
   content: '\25BC'; 
   font-size: 0.65rem; 
   transition: transform 0.4s var(--easing); 
 }
 
-.ot-archive-question.active::after {
+.otArchiveQuestion.active::after {
   transform: rotate(180deg); 
 }
 
-.ot-archive-answer {
+.otArchiveAnswer {
   overflow: hidden;
   transition: height 0.4s var(--easing);
   background: rgba(10, 25, 47, 0.5);
@@ -156,17 +156,17 @@
   will-change: padding;
 }
 
-.ot-archive-answer-container {
+.otArchiveAnswerContainer {
   padding: 1.5rem;
 }
 
-.ot-archive-answer-container h2 {
+.otArchiveAnswerContainer h2 {
   margin-top: 1.5rem;
 }
 
-.ot-pdf-feature-box {
+.otPdfFeatureBox {
   position: relative;
-  padding: 1.2rem;
+  padding: 1.2rem 1.2rem 0.9rem;
   border: 1px solid var(--dark-slate);
   border-radius: var(--border-radius);
   background: var(--navy);
@@ -176,13 +176,13 @@
   overflow: hidden;
 }
 
-.ot-pdf-feature-box:hover {
+.otPdfFeatureBox:hover {
   transform: translateY(-5px);
   box-shadow: var(--shadow-hover);
   box-shadow: 0 0 15px rgba(0, 157, 255, 0.6);
 }
 
-.ot-pdf-card {
+.otPdfCard {
   width: clamp(14rem, 38vw, 16rem);
   border: 1px solid var(--dark-slate);
   border-radius: var(--border-radius);
@@ -196,7 +196,7 @@
   box-shadow: var(--shadow);
 }
 
-.ot-pdf-title { 
+.otPdfTitle { 
   text-align: center; 
   margin-top: 0.75rem; 
   font-weight: 600; 
@@ -204,7 +204,7 @@
   color: var(--white);
 }
 
-.ot-pdf-canvas { 
+.otPdfCanvas { 
   display: flex; 
   flex-direction: column; 
   align-items: center; 
@@ -212,15 +212,15 @@
   border-radius: var(--border-radius);
 }
 
-.ot-pdf-canvas canvas { 
+.otPdfCanvas canvas { 
   width: 100%; 
-  height: 20rem; 
+  height: 20rem !important; 
   border: 1px solid var(--dark-slate); 
   display: block; 
   border-radius: var(--border-radius);
 }
 
-.ot-pdf-canvas figcaption { 
+.otPdfCanvas figcaption { 
   margin-top: 0.75rem; 
   font-size: 0.9rem; 
   text-align: center; 
@@ -228,14 +228,14 @@
   font-weight: 600; 
 }
 
-.ot-menu-btn {
+.otMenuBtn {
   position: absolute;
-  bottom: 1.1rem;
+  bottom: 0.85rem;
   right: 0.45rem;
   padding: 0.5rem;
   background: transparent;
   border: none;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   cursor: pointer;
   z-index: 50;
   transition: var(--transition);
@@ -246,12 +246,12 @@
   display: flex;
 }
 
-.ot-menu-btn:hover { 
-  transform: scale(1.1); 
+.otMenuBtn:hover { 
+  transform: none !important; 
   color: var(--accent);
 }
 
-.ot-menu-options {
+.otMenuOptions {
   display: none;
   position: absolute;
   bottom: 2.8rem;
@@ -265,7 +265,7 @@
   animation: fadeIn 0.3s ease forwards;
 }
 
-.ot-menu-options a {
+.otMenuOptions a {
   display:block;
   padding:0.5rem 0.625rem;
   font-size:1rem;
@@ -275,7 +275,7 @@
   transition: all 0.2s ease;
 }
 
-.ot-menu-options a:hover {
+.otMenuOptions a:hover {
   border-radius:0.5rem;
   transform: translateX(3px); 
 }
@@ -285,7 +285,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.ot-pdfModal {
+.otPdfModal {
   display: flex;
   position: fixed;
   inset: 0;
@@ -295,11 +295,11 @@
   backdrop-filter: blur(5px);
 }
 
-.ot-pdfModal-inner {
+.otPdfModalInner {
   display: block;
   margin: auto;
   width: min(92vw, 80rem);
-  height: min(88vh, 60rem);
+  height: min(95vh, 85rem);
   background: #111;
   border-radius: var(--border-radius);
   animation: scaleIn 0.5s var(--easing) forwards;
@@ -308,7 +308,7 @@
   margin-top: 1rem;
 }
 
-.ot-close {
+.otClose {
   all: unset;
   position: absolute;
   right: 1.5rem;
@@ -327,7 +327,7 @@
   border-radius: 50%;
 }
 
-.ot-close:hover {
+.otClose:hover {
   color: #f44336; transform: rotate(90deg);
   background: var(--accent-tint);
 }
@@ -337,7 +337,7 @@
   to { transform: scale(1); opacity: 1; }
 }
 
-.ot-toast {
+.otToast {
   visibility: hidden;
   min-width: 12.5rem;
   background: var(--navy);
@@ -356,7 +356,7 @@
   backdrop-filter: blur(10px);
 }
 
-.ot-toast.show {
+.otToast.show {
   visibility: visible;
   opacity: 1;
   animation: slideUp 0.4s var(--easing) forwards;
@@ -374,7 +374,7 @@
 }
 
 /* ===== Empty State Styling ===== */
-.ot-empty-state {
+.otEmptyState {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -385,13 +385,13 @@
   max-width: 500px;
 }
 
-.ot-empty-state img {
+.otEmptyState img {
   width: 5rem;
   height: 5rem;
   margin-bottom: 1rem;
 }
 
-.ot-empty-state p {
+.otEmptyState p {
   font-size: 1.2rem;
   color: var(--white);
 }
@@ -399,53 +399,53 @@
 /* =========================
   Light Theme
   ========================= */
-.light-theme .others-section {
+:global(.light-theme) .othersSection {
   background: rgba(0, 217, 255, 0.216);
 }
-.light-theme .others-section h2 {
+:global(.light-theme) .othersSection h2 {
   color: #000;
 }
-.light-theme .ot-archive-section {
+:global(.light-theme) .otArchiveSection {
   background: rgba(0, 217, 255, 0.216);
   border: none;
 }
-.light-theme .ot-archive-section h2 {
+:global(.light-theme) .otArchiveSection h2 {
   color: #000;
 }
-.light-theme .ot-archive-question {
+:global(.light-theme) .otArchiveQuestion {
   background: rgb(238, 252, 255);
   color: #111;
   border: 1.5px solid var(--blue);
 }
-.light-theme .ot-archive-answer {
+:global(.light-theme) .otArchiveAnswer {
   background: rgb(209, 249, 255);
   border-left: 1px solid var(--blue);
   border-right: 1px solid var(--blue);
 }
-.light-theme .ot-pdf-feature-box {
+:global(.light-theme) .otPdfFeatureBox {
   background: rgb(229, 251, 255);
   border: 0.5px solid var(--blue);
 }
-.light-theme .ot-pdf-canvas canvas {
+:global(.light-theme) .otPdfCanvas canvas {
   border: 0.5px solid var(--blue);
 }
-.light-theme .ot-pdf-canvas figcaption {
+:global(.light-theme) .otPdfCanvas figcaption {
   color: #111;
 }
-.light-theme .ot-menu-btn {
+:global(.light-theme) .otMenuBtn {
   color: #444;
 }
-.light-theme .ot-menu-options {
+:global(.light-theme) .otMenuOptions {
   background: #c1ebff;
 }
-.light-theme .ot-latest-tag {
+:global(.light-theme) .otLatestTag {
   background: #e60f00;
   animation: none;
 }
-.light-theme .ot-empty-state p {
+:global(.light-theme) .otEmptyState p {
   color: #333;
 }
-.light-theme .ot-toast {
+:global(.light-theme) .otToast {
   background:#fff;
   color: #000
 }
@@ -453,116 +453,128 @@
       
 /* ===== Enhanced Responsiveness ===== */
 @media (max-width: 768px) {
-  .other-container {
+  .otherContainer {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
   }
   
-  .other-box {
+  .otherBox {
     padding: 1.75rem 1.25rem;
   }
   
-  .ot-archive-question {
+  .otArchiveQuestion {
     padding: 1rem 1.25rem;
     font-size: 1rem;
   }
   
-  .ot-pdf-card {
+  .otPdfCard {
     width: calc(50% - 1.5rem);
     margin: 0.75rem;
   }
 }
 
 @media (max-width: 480px) {
-  .others-section {
+  .othersSection {
     padding: 1.75rem 1rem;
     margin: 0.5rem;
     margin-bottom: 1rem;
     border-radius: calc(var(--border-radius) - 2px);
   }
   
-  .others-section h2 {
-    font-size: 1.5rem;
+  .othersSection h2 {
+    font-size: 1.4rem;
     margin-bottom: 1.25rem;
   }
   
-  .other-container {
+  .otherContainer {
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
   
-  .ot-latest-tag {
+  .otLatestTag {
     font-size: 0.65rem;
     padding: 0.15rem 0.6rem;
   }
   
-  .ot-archive-section {
+  .otArchiveSection {
     padding: 1.75rem 1rem;
     margin: 0.5rem;
     border-radius: calc(var(--border-radius) - 2px);
   }
   
-  .ot-archive-section h2 {
-    font-size: 1.5rem;
+  .otArchiveSection h2 {
+    font-size: 1.4rem;
     margin-bottom: 1.5rem;
   }
   
-  .ot-archive-question {
+  .otArchiveQuestion {
     padding: 1rem;
     font-size: 0.95rem;
     margin-top: 0.75rem;
   }
   
-  .ot-archive-question:hover { 
+  .otArchiveQuestion:hover { 
     transform: none;
   }
 
-  .ot-archive-answer {
+  .otArchiveAnswer {
     padding: 0;
   }
   
-  .ot-archive-answer-container {
+  .otArchiveAnswerContainer {
     padding: 0.4rem;
   }
 
-  .ot-archive-answer-container h2 {
+  .otArchiveAnswerContainer h2 {
     margin-top: 1.25rem;
   }
   
-  .ot-pdf-feature-box {
-    padding: 1rem;
+  .otPdfFeatureBox {
+    padding: 1.2rem 0 0.8rem;
     margin: 0.5rem;
   }
   
-  .ot-pdf-card {
+  .otPdfCard {
     width: 100%;
     margin: 0.5rem 0;
   }
   
-  .ot-pdf-canvas canvas {
-    height: 18rem;
-  }
-  
-  .ot-menu-btn {
-    bottom: 1.25rem;
-    right: 0.25rem;
+  .othersSection .otPdfCanvas canvas {
+    height: 19rem !important;
+    width: 16.5rem !important;
   }
 
-  .ot-menu-btn:hover { 
+  .otArchiveSection .otPdfCanvas canvas {
+    height: 18rem !important;
+    width: 15.5rem !important;
+  }
+  
+  .otMenuBtn {
+    bottom: 1.35rem !important;
+    right: 0.35rem !important;
+    font-size: 1.35rem;
+    width: 30px;
+    height: 30px;
+  }
+
+  .otMenuBtn:hover { 
     background: none;
   }
   
-  .ot-menu-options {
+  .otMenuOptions {
     bottom: 2.5rem;
-    right: 0.25rem;
   }
   
-  .ot-menu-options a {
-    padding: 0.5rem 0.75rem;
+  .otMenuOptions a {
+    padding: 0.5rem 0.7rem;
     font-size: 0.9rem;
   }
   
-  .ot-close {
+  .otPdfModalInner {
+    height: min(88vh, 85rem);
+  }
+
+  .otClose {
     right: 1.5rem;
     top: 1.7rem;
     font-size: 2rem;
@@ -570,7 +582,7 @@
     height: 35px;
   }
   
-  .ot-toast {
+  .otToast {
     min-width: 10rem;
     padding: 0.75rem 1rem;
     font-size: 0.9rem;
@@ -581,16 +593,16 @@
     max-width: 300px;
   }
 
-  .ot-empty-state {
+  .otEmptyState {
     margin-top: 15rem;
   }
   
-  .ot-empty-state img {
+  .otEmptyState img {
     width: 3rem;
     height: 3rem;
   }
   
-  .ot-empty-state p {
+  .otEmptyState p {
     font-size: 0.9rem;
   }
 }

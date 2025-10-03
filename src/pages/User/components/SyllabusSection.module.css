@@ -1,4 +1,4 @@
-/* ===== Enhanced UI For Question Section ===== */
+/* ===== Enhanced UI For Syllabus Section ===== */
 :root {
   /* Colors */
   --navy: #001436;
@@ -20,7 +20,7 @@
   --easing: cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
-.questions-section {
+.syllabusSection {
   padding: clamp(1.5rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
   background: #001436;
   border-radius: var(--border-radius);
@@ -31,7 +31,7 @@
   overflow: hidden;
 }
 
-.questions-section h2 {
+.syllabusSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
   text-align: left;
@@ -40,7 +40,7 @@
   position: relative;
 }
 
-.question-container {
+.syllabusContainer {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, max-content));
   justify-content: start;
@@ -48,7 +48,7 @@
   align-items: stretch;
 }
 
-.qu-latest-tag {
+.syLatestTag {
   background: linear-gradient(45deg, var(--pink), var(--blue));
   color: var(--white);
   font-size: 0.7rem;
@@ -63,7 +63,7 @@
   animation-delay: 0.05s;
 }
 
-.qu-latest-tag:hover {
+.syLatestTag:hover {
   box-shadow: 0 0 30px rgba(245, 125, 255, 0.5);
 }
 
@@ -82,7 +82,7 @@
   100% { transform: scale(1); }
 }
 
-.qu-archive-section {
+.syArchiveSection {
   padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 2rem);
   margin-top: 2rem;
   background: var(--navy);
@@ -95,7 +95,7 @@
   overflow: hidden;
 }
 
-.qu-archive-section h2 {
+.syArchiveSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
   text-align: center;
@@ -104,7 +104,7 @@
   position: relative;
 }
 
-.qu-archive-question {
+.syArchiveQuestion {
   cursor: pointer;
   padding: 1.2rem 1.5rem;
   background: #001232;
@@ -122,30 +122,30 @@
   overflow: hidden;
 }
 
-.qu-archive-question:hover { 
+.syArchiveQuestion:hover { 
   transform: translateX(-5px); 
   background: var(--navy); 
   box-shadow: var(--shadow-med);
 }
 
-.qu-archive-question.active { 
+.syArchiveQuestion.active { 
   transform: scale(1.01); 
   background: var(--navy);
   box-shadow: var(--shadow-med);
   border-color: var(--accent);
 }
 
-.qu-archive-question::after { 
+.syArchiveQuestion::after { 
   content: '\25BC'; 
   font-size: 0.65rem; 
   transition: transform 0.4s var(--easing); 
 }
 
-.qu-archive-question.active::after {
+.syArchiveQuestion.active::after {
   transform: rotate(180deg); 
 }
 
-.qu-archive-answer {
+.syArchiveAnswer {
   overflow: hidden;
   transition: height 0.4s var(--easing);
   background: rgba(10, 25, 47, 0.5);
@@ -156,15 +156,15 @@
   will-change: padding;
 }
 
-.qu-archive-answer-container {
+.syArchiveAnswerContainer {
   padding: 1.5rem;
 }
 
-.qu-archive-answer-container h2 {
+.syArchiveAnswerContainer h2 {
   margin-top: 1.5rem;
 }
 
-.qu-pdf-feature-box {
+.syPdfFeatureBox {
   position: relative;
   padding: 1.2rem 1.2rem 0.9rem;
   border: 1px solid var(--dark-slate);
@@ -176,13 +176,13 @@
   overflow: hidden;
 }
 
-.qu-pdf-feature-box:hover {
+.syPdfFeatureBox:hover {
   transform: translateY(-5px);
   box-shadow: var(--shadow-hover);
   box-shadow: 0 0 15px rgba(0, 157, 255, 0.6);
 }
 
-.qu-pdf-card {
+.syPdfCard {
   width: clamp(14rem, 38vw, 16rem);
   border: 1px solid var(--dark-slate);
   border-radius: var(--border-radius);
@@ -196,7 +196,7 @@
   box-shadow: var(--shadow);
 }
 
-.qu-pdf-title { 
+.syPdfTitle { 
   text-align: center; 
   margin-top: 0.75rem; 
   font-weight: 600; 
@@ -204,7 +204,7 @@
   color: var(--white);
 }
 
-.qu-pdf-canvas { 
+.syPdfCanvas { 
   display: flex; 
   flex-direction: column; 
   align-items: center; 
@@ -212,15 +212,15 @@
   border-radius: var(--border-radius);
 }
 
-.qu-pdf-canvas canvas { 
+.syPdfCanvas canvas { 
   width: 100%; 
-  height: 20rem; 
+  height: 20rem !important; 
   border: 1px solid var(--dark-slate); 
   display: block; 
   border-radius: var(--border-radius);
 }
 
-.qu-pdf-canvas figcaption { 
+.syPdfCanvas figcaption { 
   margin-top: 0.75rem; 
   font-size: 0.9rem; 
   text-align: center; 
@@ -228,14 +228,14 @@
   font-weight: 600; 
 }
 
-.qu-menu-btn {
+.syMenuBtn {
   position: absolute;
-  bottom: 0.95rem;
+  bottom: 0.85rem;
   right: 0.45rem;
   padding: 0.5rem;
   background: transparent;
   border: none;
-  font-size: 1.3rem;
+  font-size: 1.35rem;
   cursor: pointer;
   z-index: 50;
   transition: var(--transition);
@@ -246,11 +246,12 @@
   display: flex;
 }
 
-.qu-menu-btn:hover { 
+.syMenuBtn:hover { 
+  transform: none !important; 
   color: var(--accent);
 }
 
-.qu-menu-options {
+.syMenuOptions {
   display: none;
   position: absolute;
   bottom: 2.8rem;
@@ -264,17 +265,17 @@
   animation: fadeIn 0.3s ease forwards;
 }
 
-.qu-menu-options a {
-  display: block;
-  padding: 0.5rem 0.625rem;
-  font-size: 1rem;
-  color: #000;
-  text-decoration: none;
-  white-space: nowrap;
+.syMenuOptions a {
+  display:block;
+  padding:0.5rem 0.625rem;
+  font-size:1rem;
+  color:#000;
+   text-decoration:none;
+  white-space:nowrap;
   transition: all 0.2s ease;
 }
 
-.qu-menu-options a:hover {
+.syMenuOptions a:hover {
   border-radius:0.5rem;
   transform: translateX(3px); 
 }
@@ -284,11 +285,9 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.qu-pdfModal {
+.syPdfModal {
   display: flex;
   position: fixed;
-  justify-content: center;
-  align-items: center;
   inset: 0;
   z-index: 9999;
   background: rgba(2, 12, 27, 0.9);
@@ -296,11 +295,11 @@
   backdrop-filter: blur(5px);
 }
 
-.qu-pdfModal-inner {
+.syPdfModalInner {
   display: block;
   margin: auto;
   width: min(92vw, 80rem);
-  height: min(88vh, 60rem);
+  height: min(95vh, 85rem);
   background: #111;
   border-radius: var(--border-radius);
   animation: scaleIn 0.5s var(--easing) forwards;
@@ -309,7 +308,7 @@
   margin-top: 1rem;
 }
 
-.qu-close {
+.syClose {
   all: unset;
   position: absolute;
   right: 1.5rem;
@@ -328,9 +327,8 @@
   border-radius: 50%;
 }
 
-.qu-close:hover {
-  color: #f44336;
-  transform: rotate(90deg);
+.syClose:hover {
+  color: #f44336; transform: rotate(90deg);
   background: var(--accent-tint);
 }
 
@@ -339,7 +337,7 @@
   to { transform: scale(1); opacity: 1; }
 }
 
-.qu-toast {
+.syToast {
   visibility: hidden;
   min-width: 12.5rem;
   background: var(--navy);
@@ -358,7 +356,7 @@
   backdrop-filter: blur(10px);
 }
 
-.qu-toast.show {
+.syToast.show {
   visibility: visible;
   opacity: 1;
   animation: slideUp 0.4s var(--easing) forwards;
@@ -376,7 +374,7 @@
 }
 
 /* ===== Empty State Styling ===== */
-.qu-empty-state {
+.syEmptyState {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -387,13 +385,13 @@
   max-width: 500px;
 }
 
-.qu-empty-state img {
+.syEmptyState img {
   width: 5rem;
   height: 5rem;
   margin-bottom: 1rem;
 }
 
-.qu-empty-state p {
+.syEmptyState p {
   font-size: 1.2rem;
   color: var(--white);
 }
@@ -401,175 +399,182 @@
 /* =========================
   Light Theme
   ========================= */
-.light-theme .questions-section {
+:global(.light-theme) .syllabusSection {
   background: rgba(0, 217, 255, 0.216);
 }
-.light-theme .questions-section h2 {
+:global(.light-theme) .syllabusSection h2 {
   color: #000;
 }
-.light-theme .qu-archive-section {
+:global(.light-theme) .syArchiveSection {
   background: rgba(0, 217, 255, 0.216);
   border: none;
 }
-.light-theme .qu-archive-section h2 {
+:global(.light-theme) .syArchiveSection h2 {
   color: #000;
 }
-.light-theme .qu-archive-question {
+:global(.light-theme) .syArchiveQuestion {
   background: rgb(238, 252, 255);
   color: #111;
   border: 1.5px solid var(--blue);
 }
-.light-theme .qu-archive-answer {
+:global(.light-theme) .syArchiveAnswer {
   background: rgb(209, 249, 255);
   border-left: 1px solid var(--blue);
   border-right: 1px solid var(--blue);
 }
-.light-theme .qu-pdf-feature-box {
+:global(.light-theme) .syPdfFeatureBox {
   background: rgb(229, 251, 255);
   border: 0.5px solid var(--blue);
 }
-.light-theme .qu-pdf-canvas canvas {
+:global(.light-theme) .syPdfCanvas canvas {
   border: 0.5px solid var(--blue);
 }
-.light-theme .qu-pdf-canvas figcaption {
+:global(.light-theme) .syPdfCanvas figcaption {
   color: #111;
 }
-.light-theme .qu-menu-btn {
+:global(.light-theme) .syMenuBtn {
   color: #444;
 }
-.light-theme .qu-menu-options {
+:global(.light-theme) .syMenuOptions {
   background: #c1ebff;
 }
-.light-theme .qu-latest-tag {
+:global(.light-theme) .syLatestTag {
   background: #e60f00;
   animation: none;
 }
-.light-theme .qu-empty-state p {
+:global(.light-theme) .syEmptyState p {
   color: #333;
 }
-.light-theme .qu-toast {
+:global(.light-theme) .syToast {
   background:#fff;
   color: #000
 }
 
+      
 /* ===== Enhanced Responsiveness ===== */
 @media (max-width: 768px) {
-  .questions-container {
+  .syllabusContainer {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
   }
   
-  .question-box {
+  .syllabusBox { /* Assuming there was a .syllabus-box class not provided in original CSS */
     padding: 1.75rem 1.25rem;
   }
   
-  .qu-archive-question {
+  .syArchiveQuestion {
     padding: 1rem 1.25rem;
     font-size: 1rem;
   }
   
-  .qu-pdf-card {
+  .syPdfCard {
     width: calc(50% - 1.5rem);
     margin: 0.75rem;
   }
 }
 
 @media (max-width: 480px) {
-  .questions-section {
-    padding: 1rem 0.5rem;
+  .syllabusSection {
+    padding: 1.75rem 1rem;
     margin: 0.5rem;
     margin-bottom: 1rem;
     border-radius: calc(var(--border-radius) - 2px);
   }
   
-  .questions-section h2 {
+  .syllabusSection h2 {
     font-size: 1.4rem;
     margin-bottom: 1.25rem;
-    padding-left: 0.5rem;
   }
   
-  .question-container {
+  .syllabusContainer {
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
   
-  .qu-latest-tag {
+  .syLatestTag {
     font-size: 0.65rem;
     padding: 0.15rem 0.6rem;
   }
   
-  .qu-archive-section {
-    padding: 1.5rem 0.5rem;
+  .syArchiveSection {
+    padding: 1.75rem 1rem;
     margin: 0.5rem;
     border-radius: calc(var(--border-radius) - 2px);
   }
   
-  .qu-archive-section h2 {
+  .syArchiveSection h2 {
     font-size: 1.4rem;
     margin-bottom: 1.5rem;
   }
   
-  .qu-archive-question {
+  .syArchiveQuestion {
     padding: 1rem;
     font-size: 0.95rem;
     margin-top: 0.75rem;
   }
 
-  .qu-archive-question:hover { 
+  .syArchiveQuestion:hover { 
     transform: none;
   }
 
-  .qu-archive-answer {
+  .syArchiveAnswer {
     padding: 0;
   }
   
-  .qu-archive-answer-container {
-    padding: 0.5rem;
+  .syArchiveAnswerContainer {
+    padding: 0.4rem;
   }
 
-  .qu-archive-answer-container h2 {
+  .syArchiveAnswerContainer h2 {
     margin-top: 1.25rem;
   }
   
-  .qu-pdf-feature-box {
-    padding: 1rem 1rem 0.75rem;
-    margin: 0.25rem;
+  .syPdfFeatureBox {
+    padding: 1.2rem 0 0.8rem;
+    margin: 0.5rem;
   }
   
-  .qu-pdf-card {
+  .syPdfCard {
     width: 100%;
     margin: 0.5rem 0;
   }
   
-  .questions-section .qu-pdf-canvas canvas {
+  .syllabusSection .syPdfCanvas canvas {
+    height: 19rem !important;
+    width: 16.5rem !important;
+  }
+
+  .syArchiveSection .syPdfCanvas canvas {
     height: 18rem !important;
+    width: 15.5rem !important;
   }
 
-  .qu-archive-section .qu-pdf-canvas canvas {
-    height: 17rem !important;
-    width: 14rem !important;
+  .syMenuBtn {
+    bottom: 1.35rem !important;
+    right: 0.35rem !important;
+    font-size: 1.35rem;
+    width: 30px;
+    height: 30px;
   }
 
-  .qu-menu-btn:hover { 
+  .syMenuBtn:hover { 
     background: none;
   }
-  
-  .qu-menu-btn {
-    font-size: 1.4rem;
-    bottom: 1.15rem;
-    right: 0.25rem;
-  }
 
-  .qu-menu-options {
+  .syMenuOptions {
     bottom: 2.5rem;
   }
 
-  .qu-menu-options a {
+  .syMenuOptions a {
     padding: 0.5rem 0.7rem;
     font-size: 0.9rem;
   }
   
-  .qu-close {
+  .syPdfModalInner {
+    height: min(88vh, 85rem);
+  }
+
+  .syClose {
     right: 1.5rem;
     top: 1.7rem;
     font-size: 2rem;
@@ -577,7 +582,7 @@
     height: 35px;
   }
   
-  .qu-toast {
+  .syToast {
     min-width: 10rem;
     padding: 0.75rem 1rem;
     font-size: 0.9rem;
@@ -588,20 +593,16 @@
     max-width: 300px;
   }
 
-  .light-theme .qu-toast {
-    font-weight: 500;
-  }
-
-  .qu-empty-state {
+  .syEmptyState {
     margin-top: 15rem;
   }
   
-  .qu-empty-state img {
+  .syEmptyState img {
     width: 3rem;
     height: 3rem;
   }
   
-  .qu-empty-state p {
+  .syEmptyState p {
     font-size: 0.9rem;
   }
 }
