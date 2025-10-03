@@ -7,7 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import authRoutes from "./src/routes/authRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
-import feedbackRoutes from "./routes/feedbackRoutes.js";
+import feedbackRoutes from "./src/routes/feedbackRoutes.js";
 
 dotenv.config();
 

@@ -1,18 +1,10 @@
-// backend/src/routes/userRoutes.js
+// src/routes/userRoutes.js
 import express from "express";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "../config/supabaseClient.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 import { getProfile } from "../controllers/userController.js";
 
 const router = express.Router();
-
-// Ensure these env vars exist in your server environment:
-const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in env!");
-}
-
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Helper middleware: verify token, attach `req.user`(supabase user object)
 async function verifyToken(req, res, next) {
