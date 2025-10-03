@@ -121,25 +121,23 @@ export default function UserDashboard() {
   /* -----------------------
      Load user first name from Supabase / profiles
      ----------------------- */
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadUserFirstName() {
-      try {
-        let user = auth?.user || null;
-
-        // If not present, try supabase client methods (v2 or older fallbacks)
-        if (!user) {
-          if (typeof supabase.auth?.getUser === "function") {
+     useEffect(() => {
+      let cancelled = false;
+    
+      async function loadUserFirstName() {
+        try {
+          // Try to get user from auth context first, then fall back to supabase client methods
+          let user = auth?.user || null;
+    
+          if (!user && typeof supabase.auth?.getUser === "function") {
             try {
-              const result = await supabase.auth.getUser();
-              user = result?.data?.user || null;
+              const res = await supabase.auth.getUser();
+              user = res?.data?.user || null;
             } catch (e) {
-              // ignore and continue to other fallbacks
+              // ignore and continue
             }
           }
-
-          // older clients sometimes expose supabase.auth.user()
+    
           if (!user && typeof supabase.auth?.user === "function") {
             try {
               user = supabase.auth.user();
@@ -147,72 +145,77 @@ export default function UserDashboard() {
               // ignore
             }
           }
-        }
-
-        // No User -> Bail (Keep greeting fallback to "User")
-        if (!user) {
+    
+          // No User -> Bail (Keep greeting fallback to "User")
+          if (!user) {
+            if (!cancelled) setUserFirstName("");
+            return;
+          }
+    
+          const userId = user?.id;
+          const email = (user?.email || "").toLowerCase();
+          let firstName = "";
+    
+          try {
+            // Only select columns that exist in your schema
+            const selectCols = "full_name,email";
+            let query = supabase.from("profiles").select(selectCols).limit(1);
+    
+            if (userId) {
+              query = query.eq("id", userId);
+            } else if (email) {
+              query = query.eq("email", email);
+            }
+    
+            const { data: profileData, error: profileErr } = await query.maybeSingle();
+    
+            if (!profileErr && profileData) {
+              const raw = profileData.full_name || profileData.email || "";
+              if (raw) {
+                // If raw came from email, use local-part; otherwise use first token of full_name
+                firstName =
+                  raw === profileData.email
+                    ? raw.split("@")[0]
+                    : raw.toString().trim().split(/\s+/)[0];
+              }
+            }
+          } catch (e) {
+            console.warn("profiles lookup failed:", e);
+          }
+    
+          // Fallback: look into user metadata or email if no profile name found
+          if (!firstName) {
+            const meta = user?.user_metadata || {};
+            const rawMeta =
+              meta?.full_name ||
+              meta?.name ||
+              meta?.first_name ||
+              meta?.preferred_username ||
+              user?.email || "";
+    
+            if (rawMeta) {
+              // if it's an email, take local part; else first token
+              firstName =
+                (rawMeta && rawMeta.includes("@"))
+                  ? rawMeta.split("@")[0].toString().trim().split(/\s+/)[0]
+                  : rawMeta.toString().trim().split(/\s+/)[0] || "";
+            }
+          }
+    
+          if (!cancelled) setUserFirstName(firstName || "");
+        } catch (err) {
+          console.error("Failed to load user first name:", err);
           if (!cancelled) setUserFirstName("");
-          return;
         }
-
-        const userId = user?.id;
-        const email = (user?.email || "").toLowerCase();
-        let firstName = "";
-
-        try {
-          // Build basic select list we want to check
-          const selectCols = "first_name,full_name,name,display_name,email";
-          let query = supabase.from("profiles").select(selectCols).limit(1);
-
-          if (userId) {
-            query = query.eq("id", userId);
-          } else if (email) {
-            query = query.eq("email", email);
-          }
-
-          const { data: profileData, error: profileErr } = await query.maybeSingle();
-
-          if (!profileErr && profileData) {
-            // pick the best available candidate
-            const raw =
-              profileData.full_name ||
-              profileData.email || "";
-
-            firstName = (raw || "").toString().trim().split(/\s+/)[0] || "";
-          }
-        } catch (e) {
-          // ignore and try metadata fallback
-          console.warn("profiles lookup failed:", e);
-        }
-
-        // If still not found, look into user metadata
-        if (!firstName) {
-          const meta = user?.user_metadata || {};
-          const rawMeta =
-            meta?.first_name ||
-            meta?.full_name ||
-            meta?.name ||
-            meta?.preferred_username ||
-            user?.email || "";
-            
-          firstName = (rawMeta || "").toString().trim().split(/\s+/)[0] || "";
-        }
-
-        if (!cancelled) setUserFirstName(firstName || "");
-      } catch (err) {
-        console.error("Failed to load user first name:", err);
-        if (!cancelled) setUserFirstName("");
       }
-    }
-
-    loadUserFirstName();
-
-    return () => {
-      cancelled = true;
-    };
+        loadUserFirstName();
+      return () => {
+        cancelled = true;
+      };
     // Intentionally run on mount and when auth identity changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth?.user?.id, auth?.user?.email]);
+    }, [auth?.user?.id, auth?.user?.email]);
+    
 
   // Preload LogoutModal immediately
   useEffect(() => {
