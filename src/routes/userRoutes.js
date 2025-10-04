@@ -43,13 +43,13 @@ function normalizeDob(input) {
 router.get("/me", requireAuth, getProfile);
 
 /* GET /user/me/firstname
- * Returns the first name derived from full_name or email for the authenticated user
+ * Returns the first name derived from full_name or email
  */
 router.get("/me/firstname", requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id; // Get userId from the authenticated request
+    const userId = req.user.id;
 
-    // Query profiles using service role (bypasses RLS safely on server)
+    // Fetch from profiles using Supabase admin client
     const { data, error } = await supabaseAdmin
       .from("profiles")
       .select("full_name, email")
@@ -61,20 +61,25 @@ router.get("/me/firstname", requireAuth, async (req, res) => {
       return res.status(500).json({ error: error.message || "Database error" });
     }
 
-    const rawName = (data && (data.full_name || data.email)) || "";
     let firstName = "";
 
-    if (rawName) {
-      if (rawName.includes("@")) {
-        // If it's an email, use the local part
-        firstName = rawName.split("@")[0];
-      } else {
-        // If it's a full name, take the first word
-        firstName = rawName.toString().trim().split(/\s+/)[0] || "";
+    if (data) {
+      const fullName = (data.full_name || "").trim();
+      const email = (data.email || "").trim();
+
+      if (fullName && fullName.length > 0) {
+        firstName = fullName.split(/\s+/)[0];
+      } else if (email && email.includes("@")) {
+        firstName = email.split("@")[0];
       }
     }
 
-    return res.json({ firstName });
+    // Capitalize the first letter for neatness
+    if (firstName) {
+      firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    }
+
+    return res.json({ firstName: firstName || "User" });
   } catch (err) {
     console.error("userRoutes: Unexpected error GET /user/me/firstname:", err);
     return res.status(500).json({ error: err?.message || "Internal server error" });
