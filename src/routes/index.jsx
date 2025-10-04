@@ -20,12 +20,12 @@ export default function AppRoutes() {
 
       {/* Private/User Routes */}
       <Route element={<PrivateRoute />}>
-        <Route path="/User/*" element={<UserDashboard />} />
+        <Route path="/User/Dashboard/*" element={<UserDashboard />} />
       </Route>
 
       {/* Admin Routes */}
       <Route element={<AdminRoute />}>
-        <Route path="/Admin/*" element={<AdminDashboard />} />
+        <Route path="/Admin/Dashboard/*" element={<AdminDashboard />} />
       </Route>
 
       {/* Fallback: 404 page can be added here */}

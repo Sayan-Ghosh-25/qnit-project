@@ -1,4 +1,4 @@
-// src/context/AuthContex.jsx
+// src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -27,11 +27,32 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login
-  const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    setUser(data.user);
-    return data.user;
+  const login = async (email, password, captchaToken) => {
+    const response = await fetch('/api/auth/signin', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password, captchaToken }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Login failed through custom backend');
+    }
+
+    // After successful custom backend login, Supabase session should be established
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw authError;
+      setUser(authData.user);
+      return authData.user;
+    } else {
+      setUser(session.user);
+      return session.user;
+    }
   };
 
   // Signup
@@ -40,7 +61,7 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
       options: {
-        data: { role }, // stored in user_metadata
+        data: { role },
       },
     });
     if (error) throw error;

@@ -1,20 +1,20 @@
 {
-    "rewrites": [
-      {
-        "source": "/((?!.*\\.).*)",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/PYQs/:path*",
-        "destination": "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/:path*"
-      },
-      {
-        "source": "/Syllabus/:path*",
-        "destination": "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/Syllabus/:path*"
-      },
-      {
-        "source": "/Others/:path*",
-        "destination": "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/Others/:path*"
-      }
-    ]
-  }
+  "rewrites": [
+    {
+      "source": "/((?!.*\\.).*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/PYQs/:path*",
+      "destination": "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/:path*"
+    },
+    {
+      "source": "/Syllabus/:path*",
+      "destination": "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/Syllabus/:path*"
+    },
+    {
+      "source": "/Others/:path*",
+      "destination": "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/Others/:path*"
+    }
+  ]
+}
