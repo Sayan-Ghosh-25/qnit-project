@@ -142,6 +142,7 @@ textarea.dimmed {
 
 .editNote {
   font-size: 0.8rem;
+  text-align: center;
   display:block; 
   color:var(--white); 
   margin-top:0.5rem;

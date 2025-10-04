@@ -141,7 +141,9 @@ export default function UserDashboard() {
     else if (hour >= 17 && hour <= 23) greeting = "Good Evening";
 
     let namePart = "User";
-    if (profile?.full_name) {
+    if (userFirstName) {
+      namePart = userFirstName;
+    } else if (profile?.full_name) {
       namePart = profile.full_name.toString().trim().split(/\s+/)[0] || "User";
     } else if (auth?.user?.email) {
       namePart = (auth.user.email || "").split("@")[0] || "User";
