@@ -262,7 +262,14 @@ export default function FeedbackSection() {
       </div>
 
       {loading ? (
-        <p>Loading feedback…</p>
+        <div className={styles.skeletonWrapper}>
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className={styles.skeletonRow}>
+            <div className={styles.skeletonLabel}></div>
+            <div className={styles.skeletonInput}></div>
+          </div>
+        ))}
+      </div>
       ) : (
         <>
           <div
