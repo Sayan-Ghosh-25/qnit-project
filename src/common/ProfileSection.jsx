@@ -8,6 +8,7 @@ export default function ProfileSection() {
   const [isEditing, setIsEditing] = useState(false);
   const [updating, setUpdating] = useState(false);
 
+  // Authoritative profile state
   const [profile, setProfile] = useState({
     full_name: "",
     stream: "",
@@ -18,15 +19,8 @@ export default function ProfileSection() {
     dob: "",
   });
 
-  const [formData, setFormData] = useState({
-    full_name: "",
-    stream: "",
-    year_of_study: "",
-    semester: "",
-    email: "",
-    contact: "",
-    dob: "",
-  });
+  // Draft profile for editing (only exists when isEditing is true)
+  const [draftProfile, setDraftProfile] = useState(null);
 
   const firstEditableRef = useRef(null);
 
@@ -101,15 +95,6 @@ export default function ProfileSection() {
         };
         if (!cancelled) {
           setProfile(normalized);
-          setFormData({
-            full_name: normalized.full_name,
-            stream: normalized.stream,
-            year_of_study: normalized.year_of_study,
-            semester: normalized.semester,
-            email: normalized.email,
-            contact: normalized.contact,
-            dob: normalized.dob || "",
-          });
         }
       } catch (err) {
         console.error("Error fetching profile:", err);
@@ -124,68 +109,69 @@ export default function ProfileSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // controlled inputs
+  // controlled inputs for draftProfile
   const handleChange = (e) => {
     const { id, value } = e.target;
-    if (!id) return;
-    setFormData((prev) => ({ ...prev, [id]: value }));
+    if (!id || !draftProfile) return;
+    setDraftProfile((prev) => ({ ...prev, [id]: value }));
   };
 
   const enableEditing = () => {
+    setDraftProfile({ ...profile });
     setIsEditing(true);
     setTimeout(() => {
       if (firstEditableRef.current) firstEditableRef.current.focus();
     }, 50);
   };
 
-  const disableEditing = () => setIsEditing(false);
+  const disableEditing = () => {
+    setIsEditing(false);
+    setDraftProfile(null);
+  };
 
   const cancelChanges = (e) => {
     if (e?.preventDefault) e.preventDefault();
-    setFormData({
-      full_name: profile.full_name,
-      stream: profile.stream,
-      year_of_study: profile.year_of_study,
-      semester: profile.semester,
-      email: profile.email,
-      contact: profile.contact,
-      dob: profile.dob || "",
-    });
     disableEditing();
   };
 
-  // Validation + prepare update object
+  // Validation + prepare update object (compares against 'profile' and validates 'draftProfile')
   function validateAndBuildUpdate() {
-    const next = { ...profile };
+    if (!draftProfile) return { ok: false };
+
+    const updatePayload = {};
     let changed = false;
 
-    // stream
+    // Stream
     const streamPrev = (profile.stream || "").toString().trim();
-    const streamCur = (formData.stream || "").toString().trim();
+    const streamCur = (draftProfile.stream || "").toString().trim();
     if (streamCur === "" && streamPrev !== "") {
       window.alert("Stream Cannot Be Left Blank!");
       const el = document.getElementById("stream");
       if (el) el.focus();
       return { ok: false };
     }
-    next.stream = streamCur;
-    if (streamPrev.localeCompare(streamCur, undefined, { sensitivity: "accent" }) !== 0) changed = true;
+    if (streamPrev.localeCompare(streamCur, undefined, { sensitivity: "accent" }) !== 0) {
+      updatePayload.stream = streamCur;
+      changed = true;
+    }
 
-    // year_of_study
+    // Year of study
     const prevYear = (profile.year_of_study || "").toString().trim();
-    const curYear = (formData.year_of_study || "").toString().trim();
+    const curYear = (draftProfile.year_of_study || "").toString().trim();
     if (curYear === "" && prevYear !== "") {
       window.alert("Academic Year Cannot Be Left Blank!");
       const el = document.getElementById("academicYear");
       if (el) el.focus();
       return { ok: false };
     }
-    next.year_of_study = curYear;
-    if (prevYear.localeCompare(curYear, undefined, { sensitivity: "accent" }) !== 0) changed = true;
+    if (prevYear.localeCompare(curYear, undefined, { sensitivity: "accent" }) !== 0) {
+      updatePayload.year_of_study = curYear;
+      changed = true;
+    }
 
-    // semester
+    // Semester
     const prevSem = (profile.semester || "").toString().trim();
-    const curSem = (formData.semester || "").toString().trim();
+    const curSem = (draftProfile.semester || "").toString().trim();
     if (curSem === "" && prevSem !== "") {
       window.alert("Semester Cannot Be Left Blank!");
       const el = document.getElementById("semester");
@@ -201,12 +187,16 @@ export default function ProfileSection() {
         return { ok: false };
       }
     }
-    next.semester = curSem;
-    if (prevSem.localeCompare(curSem, undefined, { sensitivity: "accent" }) !== 0) changed = true;
+    if (prevSem.localeCompare(curSem, undefined, { sensitivity: "accent" }) !== 0) {
+      updatePayload.semester = curSem;
+      changed = true;
+    }
 
-    // dob
+    // DOB
     const prevDob = profile.dob ? profile.dob.toString() : "";
-    const curDobRaw = (formData.dob || "").toString().trim();
+    const curDobRaw = (draftProfile.dob || "").toString().trim();
+    let normalizedCurDob = prevDob;
+
     if ((curDobRaw === "" || curDobRaw === null) && prevDob) {
       window.alert("Date of Birth cannot be cleared once set!");
       const el = document.getElementById("dob");
@@ -221,31 +211,35 @@ export default function ProfileSection() {
         if (el) el.focus();
         return { ok: false };
       }
-      if (normalized !== prevDob) changed = true;
-      next.dob = normalized;
-    } else {
-      next.dob = prevDob || "";
+      normalizedCurDob = normalized;
     }
+
+    if (normalizedCurDob !== prevDob) {
+      updatePayload.dob = normalizedCurDob;
+      changed = true;
+    }
+
 
     if (!changed) {
       window.alert("No Changes Detected!");
       return { ok: false, noChanges: true };
     }
 
-    const payload = {
-      stream: next.stream || null,
-      year_of_study: next.year_of_study || null,
-      semester: next.semester || null,
-      dob: next.dob || null,
+    // Ensure payload fields are null if empty string as per backend expectation
+    const finalPayload = {
+      stream: updatePayload.stream ?? null,
+      year_of_study: updatePayload.year_of_study ?? null,
+      semester: updatePayload.semester ?? null,
+      dob: updatePayload.dob ?? null,
     };
 
-    return { ok: true, payload, optimisticProfile: next };
+    return { ok: true, payload: finalPayload, newProfileState: { ...profile, ...updatePayload } };
   }
 
   // Submit update to backend and update local state immediately after success
   const updateProfile = async (e) => {
     if (e?.preventDefault) e.preventDefault();
-    if (!isEditing) {
+    if (!isEditing || !draftProfile) {
       window.alert("Nothing To Update!");
       return;
     }
@@ -253,27 +247,18 @@ export default function ProfileSection() {
     const res = validateAndBuildUpdate();
     if (!res.ok) {
       if (res.noChanges) {
-        setFormData({
-          full_name: profile.full_name,
-          stream: profile.stream,
-          year_of_study: profile.year_of_study,
-          semester: profile.semester,
-          email: profile.email,
-          contact: profile.contact,
-          dob: profile.dob || "",
-        });
         disableEditing();
       }
       return;
     }
 
-    const { payload } = res;
+    const { payload, newProfileState } = res;
     setUpdating(true);
 
     try {
       const token = await getAccessToken();
       if (!token) {
-        window.alert("You are not signed in");
+        window.alert("You are not signed in.");
         setUpdating(false);
         return;
       }
@@ -293,62 +278,58 @@ export default function ProfileSection() {
         const body = await resp.json().catch(() => ({}));
         const errMsg = body?.error || `Update failed (${resp.status})`;
         window.alert(errMsg);
+        // On error, revert draftProfile to original (or simply disable editing)
+        disableEditing();
         setUpdating(false);
         return;
       }
 
-      // Prefer authoritative profile returned by server; otherwise use payload merged into current profile
       const body = await resp.json();
-      const updated = body?.profile || null;
+      const updatedFromServer = body?.profile || null;
 
-      let normalizedUpdated;
-      if (updated) {
-        normalizedUpdated = {
-          full_name: updated.full_name || profile.full_name,
-          stream: updated.stream ?? profile.stream ?? "",
-          year_of_study: updated.year_of_study ?? profile.year_of_study ?? "",
-          semester: updated.semester ?? profile.semester ?? "",
-          email: updated.email ?? profile.email ?? "",
-          contact: updated.contact ?? profile.contact ?? "",
-          dob: updated.dob ?? profile.dob ?? "",
+      let finalUpdatedProfile;
+      if (updatedFromServer) {
+        // If server returns an updated profile, use it as authoritative
+        finalUpdatedProfile = {
+          full_name: updatedFromServer.full_name || profile.full_name,
+          stream: updatedFromServer.stream ?? profile.stream,
+          year_of_study: updatedFromServer.year_of_study ?? profile.year_of_study,
+          semester: updatedFromServer.semester ?? profile.semester,
+          email: updatedFromServer.email || profile.email,
+          contact: updatedFromServer.contact || profile.contact,
+          dob: updatedFromServer.dob ?? profile.dob,
         };
       } else {
-        // no returned profile, merge payload
-        normalizedUpdated = {
-          ...profile,
-          stream: payload.stream ?? profile.stream,
-          year_of_study: payload.year_of_study ?? profile.year_of_study,
-          semester: payload.semester ?? profile.semester,
-          dob: payload.dob ?? profile.dob,
-        };
+        // Fallback to our optimistically built state if server doesn't return full profile
+        finalUpdatedProfile = newProfileState;
       }
 
-      // Immediate local update so UI reflects changes right away
-      setProfile(normalizedUpdated);
-      setFormData({
-        full_name: normalizedUpdated.full_name,
-        stream: normalizedUpdated.stream,
-        year_of_study: normalizedUpdated.year_of_study,
-        semester: normalizedUpdated.semester,
-        email: normalizedUpdated.email,
-        contact: normalizedUpdated.contact,
-        dob: normalizedUpdated.dob || "",
-      });
+      setProfile(finalUpdatedProfile);
+      disableEditing();
 
       // optionally notify other parts (if they listen)
       try {
-        window.dispatchEvent(new CustomEvent("qnit:profile-updated", { detail: normalizedUpdated }));
+        window.dispatchEvent(new CustomEvent("qnit:profile-updated", { detail: finalUpdatedProfile }));
       } catch (e) {}
 
       window.alert("Profile Updated Successfully!");
-      disableEditing();
+
     } catch (err) {
       console.error("Failed to update profile:", err);
       window.alert("Failed to update profile! Please try again");
+      disableEditing();
     } finally {
       setUpdating(false);
     }
   };
+
+  // Determine which profile object to use for rendering
+  // If editing, use draftProfile for inputs, else use the authoritative 'profile'
+  const currentProfileData = isEditing ? draftProfile : profile;
+
+  if (!currentProfileData) {
+    return <p>Loading Profile Data...</p>;
+  }
 
   return (
     <section className={styles.profileSection} id="profile-section" aria-label="Profile">
@@ -384,7 +365,7 @@ export default function ProfileSection() {
                     name="Name"
                     maxLength={100}
                     disabled
-                    value={formData.full_name || ""}
+                    value={currentProfileData.full_name || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -401,7 +382,7 @@ export default function ProfileSection() {
                     name="Stream"
                     maxLength={100}
                     disabled={!isEditing || updating}
-                    value={formData.stream || ""}
+                    value={currentProfileData.stream || ""}
                     onChange={handleChange}
                     ref={(el) => {
                       if (el && !firstEditableRef.current) firstEditableRef.current = el;
@@ -421,9 +402,11 @@ export default function ProfileSection() {
                     name="Academic Year"
                     maxLength={10}
                     disabled={!isEditing || updating}
-                    value={formData.year_of_study || ""}
+                    value={currentProfileData.year_of_study || ""}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, year_of_study: e.target.value }));
+                      if (isEditing) {
+                        setDraftProfile((prev) => ({ ...prev, year_of_study: e.target.value }));
+                      }
                     }}
                   />
                 </td>
@@ -440,7 +423,7 @@ export default function ProfileSection() {
                     name="Semester"
                     maxLength={6}
                     disabled={!isEditing || updating}
-                    value={formData.semester || ""}
+                    value={currentProfileData.semester || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -457,7 +440,7 @@ export default function ProfileSection() {
                     name="Email"
                     maxLength={50}
                     disabled
-                    value={formData.email || ""}
+                    value={currentProfileData.email || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -474,7 +457,7 @@ export default function ProfileSection() {
                     name="Phone"
                     maxLength={15}
                     disabled
-                    value={formData.contact || ""}
+                    value={`+91 ${currentProfileData.contact}` || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -490,7 +473,7 @@ export default function ProfileSection() {
                     id="dob"
                     name="DOB"
                     disabled={!isEditing || updating}
-                    value={formData.dob || ""}
+                    value={currentProfileData.dob || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -502,7 +485,7 @@ export default function ProfileSection() {
             <button
               type="button"
               id="updateBtn"
-              className={styles.updateButton}
+              className={styles.submitButton}
               onClick={updateProfile}
               disabled={!isEditing || updating}
             >
