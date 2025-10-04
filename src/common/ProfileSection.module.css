@@ -228,7 +228,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     width: 100px;
     height: 16px;
     border-radius: 4px;
-    background: linear-gradient(90deg, #e2e2e2 25%, #f4f4f4 50%, #e2e2e2 75%);
+    background: linear-gradient(90deg, #1e2b48 25%, #24355d 50% #1e2b48 75%);
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
   }
@@ -237,7 +237,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     flex: 1;
     height: 22px;
     border-radius: 6px;
-    background: linear-gradient(90deg, #e2e2e2 25%, #f4f4f4 50%, #e2e2e2 75%);
+    background: linear-gradient(90deg, #1e2b48 25%, #24355d 50% #1e2b48 75%);
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
   }
@@ -290,7 +290,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 :global(.light-theme) .editButton {
   color: #0037c2e6;
 }
-
+:global(.light-theme) .skeletonLabel,
+:global(.light-theme) .skeletonInput {
+  background: linear-gradient(90deg, #e2e2e2 25%, #f4f4f4 50%, #e2e2e2 75%);
+}
 
 /* ===== Responsive Adjustments ===== */
 @media (max-width: 768px) {
