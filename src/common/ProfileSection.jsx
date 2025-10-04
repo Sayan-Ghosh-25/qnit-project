@@ -8,7 +8,7 @@ export default function ProfileSection() {
   const [isEditing, setIsEditing] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  // Authoritative profile state
+  // authoritative profile state
   const [profile, setProfile] = useState({
     full_name: "",
     stream: "",
@@ -19,12 +19,12 @@ export default function ProfileSection() {
     dob: "",
   });
 
-  // Draft profile for editing (only present when editing)
+  // draft while editing
   const [draftProfile, setDraftProfile] = useState(null);
 
   const firstEditableRef = useRef(null);
 
-  // helper to get client JWT access token (works with Supabase v2 or older fallbacks)
+  // helper to get client JWT access token (works with v2 and fallback)
   async function getAccessToken() {
     try {
       if (supabase?.auth?.getSession) {
@@ -42,7 +42,7 @@ export default function ProfileSection() {
     }
   }
 
-  // Normalize DOB input helper (accepts yyyy-mm-dd or dd-mm-yyyy)
+  // Normalize DOB helper (accepts yyyy-mm-dd or dd-mm-yyyy or browser formats)
   function normalizeDobInput(input) {
     if (!input) return null;
     const s = String(input).trim();
@@ -62,65 +62,66 @@ export default function ProfileSection() {
     return null;
   }
 
-  // Fetch profile once on mount
+  // fetch profile function (callable after updates too)
+  async function fetchProfile() {
+    setLoading(true);
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        setLoading(false);
+        return null;
+      }
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+      const res = await fetch(`${API_BASE}/user/me/profile`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      if (!res.ok) {
+        console.warn("Failed to fetch profile:", res.status);
+        setLoading(false);
+        return null;
+      }
+      const payload = await res.json();
+      const p = payload?.profile || {};
+      const normalized = {
+        full_name: p.full_name || "",
+        stream: p.stream || "",
+        year_of_study: p.year_of_study || "",
+        semester: p.semester || "",
+        email: p.email || "",
+        contact: p.contact || "",
+        dob: p.dob || "",
+      };
+      setProfile(normalized);
+      return normalized;
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // initial load
   useEffect(() => {
     let cancelled = false;
-    async function fetchProfile() {
-      setLoading(true);
-      try {
-        const token = await getAccessToken();
-        if (!token) {
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
-        const res = await fetch(`${API_BASE}/user/me/profile`, {
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        });
-        if (!res.ok) {
-          console.warn("Failed to fetch profile:", res.status);
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        const payload = await res.json();
-        const p = payload?.profile || {};
-        const normalized = {
-          full_name: p.full_name || "",
-          stream: p.stream || "",
-          year_of_study: p.year_of_study || "",
-          semester: p.semester || "",
-          email: p.email || "",
-          contact: p.contact || "",
-          dob: p.dob || "",
-        };
-        if (!cancelled) {
-          setProfile(normalized);
-        }
-      } catch (err) {
-        console.error("Error fetching profile:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    fetchProfile();
+    (async () => {
+      if (cancelled) return;
+      await fetchProfile();
+    })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // convenience: which data to render (when editing show draft, otherwise authoritative profile)
+  // render source (if editing use draft, else authoritative profile)
   const currentProfileData = isEditing ? draftProfile : profile;
 
-  // controlled inputs for draftProfile (single handler)
+  // controlled input handler (works only when editing)
   const handleChange = (e) => {
     const { id, value } = e.target;
     if (!id) return;
-    // only update draft when editing
-    setDraftProfile((prev) => {
-      if (!prev) return prev;
-      return { ...prev, [id]: value };
-    });
+    setDraftProfile((prev) => (prev ? { ...prev, [id]: value } : prev));
   };
 
   const enableEditing = () => {
@@ -128,7 +129,7 @@ export default function ProfileSection() {
     setIsEditing(true);
     setTimeout(() => {
       if (firstEditableRef.current) firstEditableRef.current.focus();
-    }, 50);
+    }, 40);
   };
 
   const disableEditing = () => {
@@ -141,28 +142,28 @@ export default function ProfileSection() {
     disableEditing();
   };
 
-  // Validate and build payload — only include changed keys in payload
+  // validate and build payload only containing changed fields
   function validateAndBuildUpdate() {
     if (!draftProfile) return { ok: false };
 
     const updatePayload = {};
     let changed = false;
 
-    // STREAM
-    const streamPrev = (profile.stream || "").toString().trim();
-    const streamCur = (draftProfile.stream || "").toString().trim();
-    if (streamCur === "" && streamPrev !== "") {
+    // stream
+    const prevStream = (profile.stream || "").toString().trim();
+    const curStream = (draftProfile.stream || "").toString().trim();
+    if (curStream === "" && prevStream !== "") {
       window.alert("Stream Cannot Be Left Blank!");
       const el = document.getElementById("stream");
       if (el) el.focus();
       return { ok: false };
     }
-    if (streamPrev.localeCompare(streamCur, undefined, { sensitivity: "accent" }) !== 0) {
-      updatePayload.stream = streamCur || null;
+    if (prevStream.localeCompare(curStream, undefined, { sensitivity: "accent" }) !== 0) {
+      updatePayload.stream = curStream || null;
       changed = true;
     }
 
-    // YEAR OF STUDY (Academic Year)
+    // year_of_study (academic year)
     const prevYear = (profile.year_of_study || "").toString().trim();
     const curYear = (draftProfile.year_of_study || "").toString().trim();
     if (curYear === "" && prevYear !== "") {
@@ -176,7 +177,7 @@ export default function ProfileSection() {
       changed = true;
     }
 
-    // SEMESTER
+    // semester
     const prevSem = (profile.semester || "").toString().trim();
     const curSem = (draftProfile.semester || "").toString().trim();
     if (curSem === "" && prevSem !== "") {
@@ -188,7 +189,7 @@ export default function ProfileSection() {
     if (curSem) {
       const ok = /^\d+(st|nd|rd|th)?$/i.test(curSem);
       if (!ok) {
-        window.alert("Semester Must Be In Format Like 'nth'");
+        window.alert("Semester must be in format like '5th' or '6th'.");
         const el = document.getElementById("semester");
         if (el) el.focus();
         return { ok: false };
@@ -199,13 +200,12 @@ export default function ProfileSection() {
       changed = true;
     }
 
-    // DOB
+    // dob
     const prevDob = profile.dob ? profile.dob.toString() : "";
     const curDobRaw = (draftProfile.dob || "").toString().trim();
     let normalizedCurDob = prevDob;
-
     if ((curDobRaw === "" || curDobRaw === null) && prevDob) {
-      window.alert("Date of Birth Cannot Be Cleared Once Set!");
+      window.alert("Date of Birth cannot be cleared once set!");
       const el = document.getElementById("dob");
       if (el) el.focus();
       return { ok: false };
@@ -213,14 +213,13 @@ export default function ProfileSection() {
     if (curDobRaw) {
       const normalized = normalizeDobInput(curDobRaw);
       if (!normalized) {
-        window.alert("Invalid Date of Birth");
+        window.alert("Invalid Date of Birth.");
         const el = document.getElementById("dob");
         if (el) el.focus();
         return { ok: false };
       }
       normalizedCurDob = normalized;
     }
-
     if (normalizedCurDob !== prevDob) {
       updatePayload.dob = normalizedCurDob || null;
       changed = true;
@@ -231,33 +230,38 @@ export default function ProfileSection() {
       return { ok: false, noChanges: true };
     }
 
-    // Only return fields that changed (don't include other fields as null)
-    return { ok: true, payload: updatePayload, newProfileState: { ...profile, ...updatePayload } };
+    return { ok: true, payload: updatePayload, optimistic: { ...profile, ...updatePayload } };
   }
 
-  // Submit update to backend and update local state immediately after success
+  // update profile: optimistic UI + call server + re-fetch authoritative profile
   const updateProfile = async (e) => {
     if (e?.preventDefault) e.preventDefault();
     if (!isEditing || !draftProfile) {
-      window.alert("Nothing To Update!");
+      window.alert("Nothing to update!");
       return;
     }
 
     const res = validateAndBuildUpdate();
     if (!res.ok) {
-      if (res.noChanges) {
-        disableEditing();
-      }
+      if (res.noChanges) disableEditing();
       return;
     }
 
-    const { payload, newProfileState } = res;
+    const { payload, optimistic } = res;
     setUpdating(true);
 
+    const prevProfile = { ...profile };
+
     try {
+      // optimistic local update (instant feedback)
+      setProfile(optimistic);
+      setDraftProfile((d) => (d ? { ...d, ...payload } : d));
+
       const token = await getAccessToken();
       if (!token) {
         window.alert("You are not signed in!");
+        // rollback
+        setProfile(prevProfile);
         setUpdating(false);
         return;
       }
@@ -276,55 +280,42 @@ export default function ProfileSection() {
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}));
         const errMsg = body?.error || `Update failed (${resp.status})`;
+        // rollback
+        setProfile(prevProfile);
         window.alert(errMsg);
         disableEditing();
         setUpdating(false);
         return;
       }
 
-      const body = await resp.json();
-      const updatedFromServer = body?.profile || null;
-
-      let finalUpdatedProfile;
-      if (updatedFromServer) {
-        finalUpdatedProfile = {
-          full_name: updatedFromServer.full_name || profile.full_name,
-          stream: updatedFromServer.stream ?? profile.stream,
-          year_of_study: updatedFromServer.year_of_study ?? profile.year_of_study,
-          semester: updatedFromServer.semester ?? profile.semester,
-          email: updatedFromServer.email || profile.email,
-          contact: updatedFromServer.contact || profile.contact,
-          dob: updatedFromServer.dob ?? profile.dob,
-        };
-      } else {
-        finalUpdatedProfile = newProfileState;
+      // success: re-fetch authoritative profile
+      const refreshed = await fetchProfile();
+      if (!refreshed) {
+        // if fetch failed, fallback to optimistic state
+        setProfile(optimistic);
       }
 
-      // immediate local update (authoritative)
-      setProfile(finalUpdatedProfile);
       disableEditing();
 
-      // optional global notification (other components may listen)
       try {
-        window.dispatchEvent(new CustomEvent("qnit:profile-updated", { detail: finalUpdatedProfile }));
+        window.dispatchEvent(new CustomEvent("qnit:profile-updated", { detail: refreshed || optimistic }));
       } catch (e) {}
 
-      window.alert("Profile Updated Successfully!");
+      window.alert("Profile updated successfully!");
     } catch (err) {
       console.error("Failed to update profile:", err);
-      window.alert("Failed to update profile! Please try again");
+      // rollback
+      setProfile(prevProfile);
+      window.alert("Failed to update profile! Please try again.");
       disableEditing();
     } finally {
       setUpdating(false);
     }
   };
 
-  // If profile not yet loaded, show a loading state
-  if (!currentProfileData && loading) {
-    return <p>Loading Profile Data...</p>;
-  }
+  // If data not loaded yet, show loading
+  if (!currentProfileData && loading) return <p>Loading profile…</p>;
 
-  // Use the authoritative or draft object for rendering values:
   const renderData = currentProfileData || profile || {};
 
   return (
@@ -355,15 +346,7 @@ export default function ProfileSection() {
                   <label htmlFor="full_name">Name</label>
                 </th>
                 <td>
-                  <input
-                    type="text"
-                    id="full_name"
-                    name="Name"
-                    maxLength={100}
-                    disabled
-                    value={renderData.full_name || ""}
-                    onChange={handleChange}
-                  />
+                  <input type="text" id="full_name" disabled value={renderData.full_name || ""} />
                 </td>
               </tr>
 
@@ -375,14 +358,13 @@ export default function ProfileSection() {
                   <input
                     type="text"
                     id="stream"
-                    name="Stream"
-                    maxLength={100}
                     disabled={!isEditing || updating}
                     value={renderData.stream || ""}
                     onChange={handleChange}
                     ref={(el) => {
                       if (el && !firstEditableRef.current) firstEditableRef.current = el;
                     }}
+                    maxLength={100}
                   />
                 </td>
               </tr>
@@ -395,14 +377,13 @@ export default function ProfileSection() {
                   <input
                     type="text"
                     id="year_of_study"
-                    name="Academic Year"
-                    maxLength={10}
                     disabled={!isEditing || updating}
                     value={renderData.year_of_study || ""}
                     onChange={(e) => {
                       const v = e.target.value;
                       setDraftProfile((prev) => (prev ? { ...prev, year_of_study: v } : prev));
                     }}
+                    maxLength={10}
                   />
                 </td>
               </tr>
@@ -415,11 +396,10 @@ export default function ProfileSection() {
                   <input
                     type="text"
                     id="semester"
-                    name="Semester"
-                    maxLength={6}
                     disabled={!isEditing || updating}
                     value={renderData.semester || ""}
                     onChange={handleChange}
+                    maxLength={6}
                   />
                 </td>
               </tr>
@@ -429,15 +409,7 @@ export default function ProfileSection() {
                   <label htmlFor="email">Email</label>
                 </th>
                 <td>
-                  <input
-                    type="email"
-                    id="email"
-                    name="Email"
-                    maxLength={50}
-                    disabled
-                    value={renderData.email || ""}
-                    onChange={handleChange}
-                  />
+                  <input type="email" id="email" disabled value={renderData.email || ""} maxLength={50} />
                 </td>
               </tr>
 
@@ -446,15 +418,7 @@ export default function ProfileSection() {
                   <label htmlFor="contact">Phone Number</label>
                 </th>
                 <td>
-                  <input
-                    type="tel"
-                    id="contact"
-                    name="Phone"
-                    maxLength={15}
-                    disabled
-                    value={renderData.contact || ""}
-                    onChange={handleChange}
-                  />
+                  <input type="tel" id="contact" disabled value={`+91 ${renderData.contact}` || ""} maxLength={15} />
                 </td>
               </tr>
 
@@ -466,7 +430,6 @@ export default function ProfileSection() {
                   <input
                     type="date"
                     id="dob"
-                    name="DOB"
                     disabled={!isEditing || updating}
                     value={renderData.dob || ""}
                     onChange={handleChange}
@@ -477,23 +440,11 @@ export default function ProfileSection() {
           </table>
 
           <div className={styles.profileSectionButtons}>
-            <button
-              type="button"
-              id="updateBtn"
-              className={styles.updateButton}
-              onClick={updateProfile}
-              disabled={!isEditing || updating}
-            >
+            <button type="button" id="updateBtn" className={styles.updateButton} onClick={updateProfile} disabled={!isEditing || updating}>
               {updating ? "Updating" : "Update"}
             </button>
 
-            <button
-              type="button"
-              id="cancelBtn"
-              className={styles.cancelButton}
-              onClick={cancelChanges}
-              disabled={!isEditing || updating}
-            >
+            <button type="button" id="cancelBtn" className={styles.cancelButton} onClick={cancelChanges} disabled={!isEditing || updating}>
               Cancel
             </button>
           </div>
