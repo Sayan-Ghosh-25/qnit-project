@@ -19,12 +19,12 @@ export default function ProfileSection() {
     dob: "",
   });
 
-  // Draft profile for editing (only exists when isEditing is true)
+  // Draft profile for editing (only present when editing)
   const [draftProfile, setDraftProfile] = useState(null);
 
   const firstEditableRef = useRef(null);
 
-  // helper to get client JWT access token
+  // helper to get client JWT access token (works with Supabase v2 or older fallbacks)
   async function getAccessToken() {
     try {
       if (supabase?.auth?.getSession) {
@@ -109,11 +109,18 @@ export default function ProfileSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // controlled inputs for draftProfile
+  // convenience: which data to render (when editing show draft, otherwise authoritative profile)
+  const currentProfileData = isEditing ? draftProfile : profile;
+
+  // controlled inputs for draftProfile (single handler)
   const handleChange = (e) => {
     const { id, value } = e.target;
-    if (!id || !draftProfile) return;
-    setDraftProfile((prev) => ({ ...prev, [id]: value }));
+    if (!id) return;
+    // only update draft when editing
+    setDraftProfile((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [id]: value };
+    });
   };
 
   const enableEditing = () => {
@@ -134,14 +141,14 @@ export default function ProfileSection() {
     disableEditing();
   };
 
-  // Validation + prepare update object (compares against 'profile' and validates 'draftProfile')
+  // Validate and build payload — only include changed keys in payload
   function validateAndBuildUpdate() {
     if (!draftProfile) return { ok: false };
 
     const updatePayload = {};
     let changed = false;
 
-    // Stream
+    // STREAM
     const streamPrev = (profile.stream || "").toString().trim();
     const streamCur = (draftProfile.stream || "").toString().trim();
     if (streamCur === "" && streamPrev !== "") {
@@ -151,25 +158,25 @@ export default function ProfileSection() {
       return { ok: false };
     }
     if (streamPrev.localeCompare(streamCur, undefined, { sensitivity: "accent" }) !== 0) {
-      updatePayload.stream = streamCur;
+      updatePayload.stream = streamCur || null;
       changed = true;
     }
 
-    // Year of study
+    // YEAR OF STUDY (Academic Year)
     const prevYear = (profile.year_of_study || "").toString().trim();
     const curYear = (draftProfile.year_of_study || "").toString().trim();
     if (curYear === "" && prevYear !== "") {
       window.alert("Academic Year Cannot Be Left Blank!");
-      const el = document.getElementById("academicYear");
+      const el = document.getElementById("year_of_study");
       if (el) el.focus();
       return { ok: false };
     }
     if (prevYear.localeCompare(curYear, undefined, { sensitivity: "accent" }) !== 0) {
-      updatePayload.year_of_study = curYear;
+      updatePayload.year_of_study = curYear || null;
       changed = true;
     }
 
-    // Semester
+    // SEMESTER
     const prevSem = (profile.semester || "").toString().trim();
     const curSem = (draftProfile.semester || "").toString().trim();
     if (curSem === "" && prevSem !== "") {
@@ -181,14 +188,14 @@ export default function ProfileSection() {
     if (curSem) {
       const ok = /^\d+(st|nd|rd|th)?$/i.test(curSem);
       if (!ok) {
-        window.alert("Semester must be in format like '5th' or '6th'.");
+        window.alert("Semester Must Be In Format Like 'nth'");
         const el = document.getElementById("semester");
         if (el) el.focus();
         return { ok: false };
       }
     }
     if (prevSem.localeCompare(curSem, undefined, { sensitivity: "accent" }) !== 0) {
-      updatePayload.semester = curSem;
+      updatePayload.semester = curSem || null;
       changed = true;
     }
 
@@ -198,7 +205,7 @@ export default function ProfileSection() {
     let normalizedCurDob = prevDob;
 
     if ((curDobRaw === "" || curDobRaw === null) && prevDob) {
-      window.alert("Date of Birth cannot be cleared once set!");
+      window.alert("Date of Birth Cannot Be Cleared Once Set!");
       const el = document.getElementById("dob");
       if (el) el.focus();
       return { ok: false };
@@ -206,7 +213,7 @@ export default function ProfileSection() {
     if (curDobRaw) {
       const normalized = normalizeDobInput(curDobRaw);
       if (!normalized) {
-        window.alert("Invalid Date of Birth.");
+        window.alert("Invalid Date of Birth");
         const el = document.getElementById("dob");
         if (el) el.focus();
         return { ok: false };
@@ -215,25 +222,17 @@ export default function ProfileSection() {
     }
 
     if (normalizedCurDob !== prevDob) {
-      updatePayload.dob = normalizedCurDob;
+      updatePayload.dob = normalizedCurDob || null;
       changed = true;
     }
-
 
     if (!changed) {
       window.alert("No Changes Detected!");
       return { ok: false, noChanges: true };
     }
 
-    // Ensure payload fields are null if empty string as per backend expectation
-    const finalPayload = {
-      stream: updatePayload.stream ?? null,
-      year_of_study: updatePayload.year_of_study ?? null,
-      semester: updatePayload.semester ?? null,
-      dob: updatePayload.dob ?? null,
-    };
-
-    return { ok: true, payload: finalPayload, newProfileState: { ...profile, ...updatePayload } };
+    // Only return fields that changed (don't include other fields as null)
+    return { ok: true, payload: updatePayload, newProfileState: { ...profile, ...updatePayload } };
   }
 
   // Submit update to backend and update local state immediately after success
@@ -258,7 +257,7 @@ export default function ProfileSection() {
     try {
       const token = await getAccessToken();
       if (!token) {
-        window.alert("You are not signed in.");
+        window.alert("You are not signed in!");
         setUpdating(false);
         return;
       }
@@ -278,7 +277,6 @@ export default function ProfileSection() {
         const body = await resp.json().catch(() => ({}));
         const errMsg = body?.error || `Update failed (${resp.status})`;
         window.alert(errMsg);
-        // On error, revert draftProfile to original (or simply disable editing)
         disableEditing();
         setUpdating(false);
         return;
@@ -289,7 +287,6 @@ export default function ProfileSection() {
 
       let finalUpdatedProfile;
       if (updatedFromServer) {
-        // If server returns an updated profile, use it as authoritative
         finalUpdatedProfile = {
           full_name: updatedFromServer.full_name || profile.full_name,
           stream: updatedFromServer.stream ?? profile.stream,
@@ -300,20 +297,19 @@ export default function ProfileSection() {
           dob: updatedFromServer.dob ?? profile.dob,
         };
       } else {
-        // Fallback to our optimistically built state if server doesn't return full profile
         finalUpdatedProfile = newProfileState;
       }
 
+      // immediate local update (authoritative)
       setProfile(finalUpdatedProfile);
       disableEditing();
 
-      // optionally notify other parts (if they listen)
+      // optional global notification (other components may listen)
       try {
         window.dispatchEvent(new CustomEvent("qnit:profile-updated", { detail: finalUpdatedProfile }));
       } catch (e) {}
 
       window.alert("Profile Updated Successfully!");
-
     } catch (err) {
       console.error("Failed to update profile:", err);
       window.alert("Failed to update profile! Please try again");
@@ -323,13 +319,13 @@ export default function ProfileSection() {
     }
   };
 
-  // Determine which profile object to use for rendering
-  // If editing, use draftProfile for inputs, else use the authoritative 'profile'
-  const currentProfileData = isEditing ? draftProfile : profile;
-
-  if (!currentProfileData) {
+  // If profile not yet loaded, show a loading state
+  if (!currentProfileData && loading) {
     return <p>Loading Profile Data...</p>;
   }
+
+  // Use the authoritative or draft object for rendering values:
+  const renderData = currentProfileData || profile || {};
 
   return (
     <section className={styles.profileSection} id="profile-section" aria-label="Profile">
@@ -356,16 +352,16 @@ export default function ProfileSection() {
             <tbody>
               <tr>
                 <th scope="row">
-                  <label htmlFor="username">Name</label>
+                  <label htmlFor="full_name">Name</label>
                 </th>
                 <td>
                   <input
                     type="text"
-                    id="username"
+                    id="full_name"
                     name="Name"
                     maxLength={100}
                     disabled
-                    value={currentProfileData.full_name || ""}
+                    value={renderData.full_name || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -382,7 +378,7 @@ export default function ProfileSection() {
                     name="Stream"
                     maxLength={100}
                     disabled={!isEditing || updating}
-                    value={currentProfileData.stream || ""}
+                    value={renderData.stream || ""}
                     onChange={handleChange}
                     ref={(el) => {
                       if (el && !firstEditableRef.current) firstEditableRef.current = el;
@@ -393,20 +389,19 @@ export default function ProfileSection() {
 
               <tr>
                 <th scope="row">
-                  <label htmlFor="academicYear">Academic Year</label>
+                  <label htmlFor="year_of_study">Academic Year</label>
                 </th>
                 <td>
                   <input
                     type="text"
-                    id="academicYear"
+                    id="year_of_study"
                     name="Academic Year"
                     maxLength={10}
                     disabled={!isEditing || updating}
-                    value={currentProfileData.year_of_study || ""}
+                    value={renderData.year_of_study || ""}
                     onChange={(e) => {
-                      if (isEditing) {
-                        setDraftProfile((prev) => ({ ...prev, year_of_study: e.target.value }));
-                      }
+                      const v = e.target.value;
+                      setDraftProfile((prev) => (prev ? { ...prev, year_of_study: v } : prev));
                     }}
                   />
                 </td>
@@ -423,7 +418,7 @@ export default function ProfileSection() {
                     name="Semester"
                     maxLength={6}
                     disabled={!isEditing || updating}
-                    value={currentProfileData.semester || ""}
+                    value={renderData.semester || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -440,7 +435,7 @@ export default function ProfileSection() {
                     name="Email"
                     maxLength={50}
                     disabled
-                    value={currentProfileData.email || ""}
+                    value={renderData.email || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -448,16 +443,16 @@ export default function ProfileSection() {
 
               <tr>
                 <th scope="row">
-                  <label htmlFor="phone">Phone Number</label>
+                  <label htmlFor="contact">Phone Number</label>
                 </th>
                 <td>
                   <input
                     type="tel"
-                    id="phone"
+                    id="contact"
                     name="Phone"
                     maxLength={15}
                     disabled
-                    value={`+91 ${currentProfileData.contact}` || ""}
+                    value={renderData.contact || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -473,7 +468,7 @@ export default function ProfileSection() {
                     id="dob"
                     name="DOB"
                     disabled={!isEditing || updating}
-                    value={currentProfileData.dob || ""}
+                    value={renderData.dob || ""}
                     onChange={handleChange}
                   />
                 </td>
@@ -485,7 +480,7 @@ export default function ProfileSection() {
             <button
               type="button"
               id="updateBtn"
-              className={styles.submitButton}
+              className={styles.updateButton}
               onClick={updateProfile}
               disabled={!isEditing || updating}
             >
