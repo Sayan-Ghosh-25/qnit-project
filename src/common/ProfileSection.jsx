@@ -314,7 +314,16 @@ export default function ProfileSection() {
   };
 
   // If data not loaded yet, show loading
-  if (!currentProfileData && loading) return <p>Loading profile…</p>;
+  if (!currentProfileData && loading) return (
+    <div className={styles.skeletonWrapper}>
+    {Array.from({ length: 7 }).map((_, i) => (
+      <div key={i} className={styles.skeletonRow}>
+        <div className={styles.skeletonLabel}></div>
+        <div className={styles.skeletonInput}></div>
+      </div>
+    ))}
+  </div>
+  );
 
   const renderData = currentProfileData || profile || {};
 
@@ -336,7 +345,14 @@ export default function ProfileSection() {
       </div>
 
       {loading ? (
-        <p>Loading profile…</p>
+        <div className={styles.skeletonWrapper}>
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className={styles.skeletonRow}>
+            <div className={styles.skeletonLabel}></div>
+            <div className={styles.skeletonInput}></div>
+          </div>
+        ))}
+      </div>
       ) : (
         <>
           <table aria-describedby="profile-section">
