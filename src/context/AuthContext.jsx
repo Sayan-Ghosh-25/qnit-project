@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 const AuthContext = createContext();
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -28,7 +29,7 @@ export const AuthProvider = ({ children }) => {
 
   // Login
   const login = async (email, password, captchaToken) => {
-    const response = await fetch('/api/auth/signin', {
+    const response = await fetch(`${API_BASE}/api/auth/signin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
