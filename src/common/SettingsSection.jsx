@@ -172,8 +172,6 @@ export default function SettingsSection({ onAccountDelete }) {
     }
 
     navigate("/", { replace: true });
-    // This is a powerful, but sometimes necessary, step for logout security.
-    window.location.replace("/");
 
   }, [logout, navigate]);
 

@@ -1,10 +1,19 @@
-.newsSection h2 {
-    font-weight: 700;
-    margin-bottom: 2rem;
-    text-align: center;
-    font-size: clamp(1.25rem, 3vw, 1.75rem);
-    color: #fffb00;
-  }
+.news h2 {
+  margin-top: 0.5rem;
+  font-weight: 700;
+  text-align: center;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  color: #fffb00;
+}
+
+.news p {
+  margin-top: 0.5rem;
+  font-style: italic;
+  margin-bottom: 2rem;
+  text-align: center;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  color: #fff;
+}
   
   .newsList {
     list-style: none;
@@ -13,11 +22,12 @@
   
   .newsItem {
     margin-bottom: 16px;
-    border-bottom: 1px solid yellow;
+    border-bottom: 1px solid rgba(205, 249, 255, 0.321);
     padding-bottom: 8px;
   }
   
   .newsItem a {
+    font-size: 1.1rem;
     color: #00bfff;
     text-decoration: none;
   }
@@ -27,6 +37,7 @@
   }
   
   .newsItem p {
+    font-size: 1rem;
     margin: 4px 0;
     text-align: start;
   }
@@ -35,12 +46,19 @@
     color: #ccc;
   }
 
+  .warning {
+    color: red;
+    font-weight: 500;
+    text-align: center;
+  }
+
   /* Light Theme Styles */
   :global(.light-theme) .newsItem {
     background-color: #fff;
     padding: 1rem;
     border: none;
     border-radius: 0.625rem;
+    box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.1);
   }
 
   :global(.light-theme) .newsItem a {
@@ -53,4 +71,18 @@
 
   :global(.light-theme) .newsItem small {
     color: #555;
+  }
+
+  :global(.light-theme) .news p {
+    color: #666;
+    font-weight: 500;
+  }
+
+  @media (max-width: 30rem) {
+    .newsItem a {
+      font-size: 1rem;
+    }
+    .newsItem p {
+      font-size: 0.9rem;
+    }
   }

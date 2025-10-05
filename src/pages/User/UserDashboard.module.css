@@ -529,6 +529,9 @@ nav li a.active {
     width: clamp(12rem, 22vw, 16rem);
     min-width: clamp(12rem, 22vw, 16rem);
   }
+  .newsSection {
+    padding: 1.5rem;
+  }
 }
 
 /* Smartphones ≥ 480px */
@@ -641,6 +644,10 @@ nav li a.active {
   .home-toggler:active {
     transform: scale(0.95);
     box-shadow: none;
+  }
+
+  .newsSection {
+    padding: 1rem;
   }
   
   .text-muted {
