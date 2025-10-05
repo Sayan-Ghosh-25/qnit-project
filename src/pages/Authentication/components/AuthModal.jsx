@@ -586,8 +586,9 @@ export default function AuthModal({
           </div>
 
           <div className={styles.rowBetween}>
-            <div className={styles.captchaContainer}>
-              {/* ReCAPTCHA: only show if site key present */}
+            {/* ReCAPTCHA: only show if user email exists */}
+            <div className={styles.captchaContainer}
+            style={{ display: userExistsEmailStatus ? "block" : "none" }}>
               {RECAPTCHA_SITE_KEY ? (
                 <ReCAPTCHA
                   sitekey={RECAPTCHA_SITE_KEY}
@@ -671,8 +672,9 @@ export default function AuthModal({
           </div>
 
         <div className={styles.rowBetween}>
-          <div className={styles.captchaContainer}>
-            {/* ReCAPTCHA: only show if site key present */}
+          {/* ReCAPTCHA: only show if user email exists */}
+          <div className={styles.captchaContainer}
+          style={{ display: userExistsEmailStatus ? "block" : "none" }}>
             {RECAPTCHA_SITE_KEY ? (
               <ReCAPTCHA
                 sitekey={RECAPTCHA_SITE_KEY}
