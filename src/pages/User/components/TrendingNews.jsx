@@ -1,45 +1,55 @@
-// src/components/TrendingNews.jsx
 import { useEffect, useState } from "react";
 import styles from "./TrendingNews.module.css";
 
-const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY;
-const QUERY = "AI Software Engineering";
-const PAGE_SIZE = 5;
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 export default function TrendingNews() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function fetchNews() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/news`);
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setArticles(data);
+      } else {
+        console.error("Unexpected API response:", data);
+        setError("Invalid response format");
+      }
+    } catch (err) {
+      console.error("Failed to fetch news:", err);
+      setError("Failed to load news! Please try again later");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchNews() {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `https://gnews.io/api/v4/search?q=${encodeURIComponent(
-            QUERY
-          )}&lang=en&max=${PAGE_SIZE}&sortby=publishedAt&token=${NEWS_API_KEY}`
-        );
-        const data = await res.json();
-        if (data.articles && Array.isArray(data.articles)) {
-          setArticles(data.articles);
-        } else {
-          console.error("GNews API error:", data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch news:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchNews();
   }, []);
 
   return (
     <section className={styles.newsSection} aria-label="Software Industry Trending News">
-      <h2>Trending Software Industry News</h2>
-      {loading && <p style={{ textAlign: "center" }}>Loading News...</p>}
-      {!loading && articles.length === 0 && <p style={{ textAlign: "center" }}>No news available right now!</p>}
+      <div className={styles.news}>
+      <h2>Trending Tech News</h2>
+      <p>Get updated with the latest news daily</p>
+      </div>
+      {loading && (
+        <div className={styles.skeletonWrapper}>
+          {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className={styles.skeletonRow}>
+            <div className={styles.skeletonLabel}></div>
+            <div className={styles.skeletonInput}></div>
+         </div>
+        ))}
+      </div>)}
+      {!loading && articles.length === 0 && <p className= {styles.warning}>Sorry, No news available right now!</p>}
+
       <ul className={styles.newsList}>
         {articles.map((article, idx) => (
           <li key={idx} className={styles.newsItem}>
@@ -47,7 +57,9 @@ export default function TrendingNews() {
               <strong>{article.title}</strong>
             </a>
             {article.description && <p>{article.description}</p>}
-            <small>{new Date(article.publishedAt).toLocaleDateString()}</small>
+            <small>
+              {new Date(article.publishedAt).toLocaleDateString("en-IN")}
+            </small>
           </li>
         ))}
       </ul>
