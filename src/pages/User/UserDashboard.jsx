@@ -283,81 +283,103 @@ export default function UserDashboard() {
   }, [navigate]);
 
   /* -----------------------
-     Sidebar collapse / Logo click behavior
-     ----------------------- */
+  Sidebar collapse / Logo click behavior
+  ----------------------- */
+  const [collapsed, setCollapsed] = useState(() => {
+    // initial collapsed state based on width
+    if (typeof window !== "undefined") {
+      const collapseRangeMql = window.matchMedia("(min-width: 30.0625rem) and (max-width: 48rem)");
+      return !!collapseRangeMql.matches;
+    }
+    return false;
+  });
+  const lastScrollRef = useRef(typeof window !== "undefined" ? window.scrollY : 0);
+  const mqlMobileRef = useRef(null);
+  
+  /* ---------- Collapse / Responsive Behavior ---------- */
   useEffect(() => {
     const navOuter = navRef.current;
     if (!navOuter) return;
-
-    const collapsedClass = styles?.collapsed ?? "collapsed";
-    const logoImg = document.getElementById("logoImg");
+  
+    const collapseRangeMql = window.matchMedia("(min-width: 30.0625rem) and (max-width: 48rem)");
     const mobileMql = window.matchMedia("(max-width: 30rem)");
-    const collapseRangeMql = window.matchMedia(
-      "(min-width: 30.0625rem) and (max-width: 48rem)"
-    );
-
+    mqlMobileRef.current = mobileMql;
+  
     const applyState = () => {
       if (mobileMql.matches) {
-        navOuter.classList.remove(collapsedClass);
+        setCollapsed(false);
       } else if (collapseRangeMql.matches) {
-        navOuter.classList.add(collapsedClass);
+        setCollapsed(true);
       } else {
-        navOuter.classList.remove(collapsedClass);
+        setCollapsed(false);
       }
     };
-
+  
     applyState();
-
+  
     const mqHandler = () => applyState();
-    mobileMql.addEventListener("change", mqHandler);
     collapseRangeMql.addEventListener("change", mqHandler);
-
+    mobileMql.addEventListener("change", mqHandler);
+  
+    // logo click should toggle collapsed only on non-mobile
+    const logoEl = document.getElementById("logoImg");
     const logoClickHandler = () => {
       if (mobileMql.matches) return;
-      navOuter.classList.toggle(collapsedClass);
+      setCollapsed((s) => !s);
     };
-
-    if (logoImg) logoImg.addEventListener("click", logoClickHandler);
-
+    if (logoEl) logoEl.addEventListener("click", logoClickHandler);
+  
     return () => {
-      mobileMql.removeEventListener("change", mqHandler);
       collapseRangeMql.removeEventListener("change", mqHandler);
-      if (logoImg) logoImg.removeEventListener("click", logoClickHandler);
+      mobileMql.removeEventListener("change", mqHandler);
+      if (logoEl) logoEl.removeEventListener("click", logoClickHandler);
     };
   }, []);
-
+  
   /* -----------------------
     Navbar auto-hide while scrolling down
     ----------------------- */
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScroll = window.scrollY;
-
-      if (currentScroll > lastScroll) {
-        setHideNavbar(true);
+    const mobileMql = window.matchMedia("(max-width: 30rem)");
+    mqlMobileRef.current = mobileMql;
+  
+    let rafId = null;
+  
+    const onScroll = () => {
+      if (!mobileMql.matches) return;
+  
+      const current = window.scrollY;
+      const last = lastScrollRef.current;
+  
+      // small threshold to avoid toggling on tiny scrolls
+      if (Math.abs(current - last) < 12) return;
+  
+      if (current > last && current > 80) {
+        // scrolling down => hide
+        setHideNavbar((prev) => (prev ? prev : true));
       } else {
-        setHideNavbar(false);
+        // scrolling up => show
+        setHideNavbar((prev) => (prev ? false : prev));
       }
-      setLastScroll(currentScroll);
+      lastScrollRef.current = current;
     };
-
-    // Throttle scroll for performance
-    let ticking = false;
-    const throttledScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          handleScroll();
-          ticking = false;
+  
+    const handler = () => {
+      if (rafId === null) {
+        rafId = window.requestAnimationFrame(() => {
+          onScroll();
+          rafId = null;
         });
-        ticking = true;
       }
     };
-
-    window.addEventListener("scroll", throttledScroll);
-
-    return () => window.removeEventListener("scroll", throttledScroll);
-  }, [lastScroll]);
-
+  
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handler);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+  
   /* -----------------------
      Global key handler for Escape (close modals)
      ----------------------- */
@@ -449,7 +471,8 @@ export default function UserDashboard() {
   return (
     <div className={cx("container")}>
       {/* Sidebar / Navigation */}
-      <nav aria-label="Main navigation" className={cx("nav", hideNavbar ? "hide-navbar" : "")}
+      <nav aria-label="Main navigation"
+      className={cx("nav", collapsed && "collapsed", hideNavbar && "hide-navbar")}
       id="nav" ref={navRef}>
         <div className={cx("navbar")}>
           <div className={cx("logo")} id="logoImg">
@@ -492,10 +515,7 @@ export default function UserDashboard() {
               <Route path="SyllabusSection" element={<SyllabusSection />} />
               <Route path="OthersSection" element={<OthersSection />} />
               <Route path="FeedbackSection" element={<FeedbackSection />} />
-              {/* Settings Section, possibly with sub-routes for overlays like ChangePassword */}
-              <Route path="SettingsSection/*" element={
-                <SettingsSection />
-              } />
+              <Route path="SettingsSection/*" element={<SettingsSection />} />
 
               {/* Catch-all for unknown dashboard routes */}
               <Route path="*" element={<NotFoundSection />} />
@@ -512,7 +532,7 @@ export default function UserDashboard() {
           ref={homeTogglerRef}
           title="Return Home"
         >
-          <span className="material-symbols-outlined">home</span>
+          <i className="fas fa-home" style={{ fontSize: "1.25rem", color: "#fff"}}></i>
         </button>
       </main>
 

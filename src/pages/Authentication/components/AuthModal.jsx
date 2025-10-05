@@ -133,13 +133,7 @@ export default function AuthModal({
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
   }
 
-  /* Secure, fast "does this email exist?" check
-   * Strategy:
-   *  1) Debounce input
-   *  2) Try RPC check_email_exists(p_email) that returns boolean (recommended)
-   *  3) If RPC fails or not available, fallback to minimal select("id").eq("email", trimmed)
-   *  4) Always only request minimal data (id or boolean)
-   */
+  /* Secure, fast "does this email exist?" check */
   useEffect(() => {
     const trimmed = trimEnds(identifier);
     // clear previous timers/abort signals
@@ -147,7 +141,7 @@ export default function AuthModal({
       clearTimeout(checkTimerRef.current);
       checkTimerRef.current = null;
     }
-    checkAbortFlagRef.current.aborted = true; // mark previous call aborted
+    checkAbortFlagRef.current.aborted = true;
     checkAbortFlagRef.current.currentKey = null;
 
     if (!trimmed) {
@@ -158,7 +152,6 @@ export default function AuthModal({
     setUserExistsEmailStatus("checking");
 
     if (!validateEmail(trimmed)) {
-      // wait until looks valid
       return;
     }
 
@@ -170,7 +163,7 @@ export default function AuthModal({
       try {
         let exists = false;
 
-        // Try RPC first (recommended). RPC should return a boolean.
+        // Try RPC first, should return a boolean
         try {
           const { data: rpcData, error: rpcErr } = await supabase.rpc("check_email_exists", { p_email: key });
           // guard: if this call was aborted meanwhile, ignore result
@@ -196,14 +189,11 @@ export default function AuthModal({
               return;
             }
           }
-          // otherwise fall through to minimal select
         } catch (e) {
           // ignore RPC errors -> fallback to select
-          // console.warn('RPC check failed, falling back to select:', e);
         }
 
-        // Fallback: minimal select on profiles table (only id).
-        // This uses .eq on normalized email so an index helps (ensure lowercased storage / index).
+        // Fallback: minimal select on profiles table 
         try {
           const { data, error } = await supabase
             .from("profiles")
@@ -255,7 +245,7 @@ export default function AuthModal({
     };
   }, []);
 
-  // sign-in handler: call backend /auth/signin which verifies captcha then signs-in via server (recommended)
+  // sign-in handler: call backend /auth/signin which verifies captcha then signs-in via server
   async function handleSignIn(e) {
     e?.preventDefault?.();
     const emailTrimmed = trimEnds(identifier).toLowerCase();
@@ -337,7 +327,7 @@ export default function AuthModal({
         }, 700);
         timeoutsRef.current.push(navT);
       } else {
-        // No API base: fall back to direct supabase sign-in (you lose server-side captcha enforcement)
+        // No API base: fall back to direct supabase sign-in
         const { data, error } = await supabase.auth.signInWithPassword({
           email: emailTrimmed,
           password,
@@ -588,7 +578,7 @@ export default function AuthModal({
           <div className={styles.rowBetween}>
             {/* ReCAPTCHA: only show if user email exists */}
             <div className={styles.captchaContainer}
-            style={{ display: userExistsEmailStatus ? "block" : "none" }}>
+            style={{ display: userExistsEmailStatus === true ? "block" : "none" }}>
               {RECAPTCHA_SITE_KEY ? (
                 <ReCAPTCHA
                   sitekey={RECAPTCHA_SITE_KEY}
@@ -674,7 +664,7 @@ export default function AuthModal({
         <div className={styles.rowBetween}>
           {/* ReCAPTCHA: only show if user email exists */}
           <div className={styles.captchaContainer}
-          style={{ display: userExistsEmailStatus ? "block" : "none" }}>
+          style={{ display: userExistsEmailStatus === true ? "block" : "none" }}>
             {RECAPTCHA_SITE_KEY ? (
               <ReCAPTCHA
                 sitekey={RECAPTCHA_SITE_KEY}
