@@ -42,12 +42,23 @@ function normalizeDob(input) {
 // GET logged-in user's profile (using controller function)
 router.get("/me", requireAuth, getProfile);
 
-/* GET /user/me/firstname
- * Returns the first name derived from full_name or email
- */
-router.get("/me/firstname", requireAuth, async (req, res) => {
+/* GET /user/me/firstname */
+router.get("/me/firstname", async (req, res) => {
   try {
-    const userId = req.user.id;
+    const authHeader = req.headers.authorization || req.headers.Authorization || "";
+    const token = (authHeader.startsWith("Bearer ") && authHeader.split(" ")[1]) || null;
+
+    if (!token) {
+      return res.status(401).json({ error: "Missing authorization token" });
+    }
+
+    // Verify token and obtain user
+    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return res.status(401).json({ error: userErr?.message || "Invalid token" });
+    }
+    const user = userData.user;
+    const userId = user.id;
 
     // Fetch from profiles using Supabase admin client
     const { data, error } = await supabaseAdmin

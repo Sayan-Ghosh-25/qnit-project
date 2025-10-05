@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import authRoutes from "./src/routes/authRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import feedbackRoutes from "./src/routes/feedbackRoutes.js";
+import newsRoutes from "./src/routes/newsRoute.js";
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ const PORT = process.env.PORT || 5000;
 // Check required env variables
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY!");
-  process.exit(1); // crash early to catch config issues
+  process.exit(1);
 }
 
 // Initialize Supabase client
@@ -47,6 +48,7 @@ app.use(cors({
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
 app.use("/user", feedbackRoutes);
+app.use("/api/news", newsRoutes);
 
 // Health check
 app.get("/", (req, res) => res.json({ ok: true }));
