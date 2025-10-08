@@ -34,7 +34,7 @@
 .questionsSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
-  text-align: left;
+  text-align: center;
   font-size: clamp(1.125rem, 2.4vw, 1.5rem);
   color: var(--white);
   position: relative;
@@ -46,6 +46,14 @@
   justify-content: start;
   gap: 1.5rem;
   align-items: stretch;
+}
+
+.pyqQuestionContainer h2 {
+  color: #dbf6ff;
+  background: radial-gradient(circle at center, #00215b 30%, transparent 80%);
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 1.4rem;
 }
 
 .quLatestTag {
@@ -161,7 +169,10 @@
 }
 
 .quArchiveAnswerContainer h2 {
+  color: #dbf6ff;
+  background: radial-gradient(circle at center, #00215b 30%, transparent 80%);
   margin-top: 1.5rem;
+  font-size: 1.4rem;
 }
 
 .quPdfFeatureBox {
@@ -405,6 +416,11 @@
 :global(.light-theme) .questionsSection h2 {
   color: #000;
 }
+:global(.light-theme) .pyqQuestionContainer h2,
+:global(.light-theme) .quArchiveAnswerContainer h2 {
+  color: #111;
+  background: radial-gradient(circle at center, rgba(93, 244, 255, 0.647) 30%, transparent 80%);
+}
 :global(.light-theme) .quArchiveSection {
   background: rgba(0, 217, 255, 0.216);
   border: none;
@@ -525,10 +541,23 @@
     padding: 0.4rem;
   }
 
+  .pyqQuestionContainer h2 {
+    background: radial-gradient(circle at center, #00215b 40%, transparent 100%);
+    font-size: 1.1rem;
+  }
+
   .quArchiveAnswerContainer h2 {
+    background: radial-gradient(circle at center, #00215b 40%, transparent 100%);
     margin-top: 1.25rem;
+    font-size: 1.1rem;
   }
   
+  :global(.light-theme) .pyqQuestionContainer h2,
+  :global(.light-theme) .quArchiveAnswerContainer h2 {
+    color: #111;
+    background: radial-gradient(circle at center, rgba(93, 244, 255, 0.647) 30%, transparent 100%);
+  }
+
   .quPdfFeatureBox {
     padding: 1.2rem 0 0.8rem;
     margin: 0.5rem;

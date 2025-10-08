@@ -11,7 +11,7 @@
   font-style: italic;
   margin-bottom: 2rem;
   text-align: center;
-  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
   color: #fff;
 }
   

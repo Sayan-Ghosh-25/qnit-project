@@ -6,75 +6,116 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.min?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
+// Early Sanitization
+function encodeIfNeeded(url) {
+  if (typeof url !== "string") return "";
+  // Return as-is if already encoded
+  if (/%[0-9A-Fa-f]{2}/.test(url)) return url;
+  // Otherwise safely encode
+  try {
+    return encodeURI(url);
+  } catch {
+    return url;
+  }
+}
+
+// Point to your path on Vercel
+function getPublicPdfUrl(filename) {
+  return `https://qnit.vercel.app/PYQs/${filename}`;
+}
+
 // ----------------------
 // Admin-controlled Dataset
 // ----------------------
 const questionSectionData = [
   {
     sectionType: "pyq",
-    heading: "Previous Year Questions for 3rd Semester",
+    heading: "Previous Year Questions for 5th Semester",
     isLatest: true,
-    pdfs: [
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT401-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT402-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "IT401-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "IT402-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "IT403-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "IT404-2023" },
+    pdfsBySubject: [
+      {
+        subject: "Database Management System",
+        pdfs: [
+          { url: getPublicPdfUrl("IT501-2019.pdf"), caption: "IT501-2019" },
+          { url: getPublicPdfUrl("IT501-2021.pdf"), caption: "IT501-2021" },
+          { url: getPublicPdfUrl("IT501-2022.pdf"), caption: "IT501-2022" },
+          { url: getPublicPdfUrl("IT501-2023.pdf"), caption: "IT501-2023" },
+          { url: getPublicPdfUrl("IT501-2024.pdf"), caption: "IT501-2024" },
+        ],
+      },
+      {
+        subject: "Computer Networking",
+        pdfs: [
+          { url: getPublicPdfUrl("IT502-2019.pdf"), caption: "IT502-2019" },
+          { url: getPublicPdfUrl("IT502-2021.pdf"), caption: "IT502-2021" },
+          { url: getPublicPdfUrl("IT502-2022.pdf"), caption: "IT502-2022" },
+          { url: getPublicPdfUrl("IT502-2023.pdf"), caption: "IT502-2023" },
+          { url: getPublicPdfUrl("IT502-2024.pdf"), caption: "IT502-2024" },
+        ],
+      },
+      {
+        subject: "Design & Analysis of Algorithm",
+        pdfs: [
+          { url: getPublicPdfUrl("IT503-2019.pdf"), caption: "IT503-2019" },
+          { url: getPublicPdfUrl("IT503-2020.pdf"), caption: "IT503-2020" },
+          { url: getPublicPdfUrl("IT503-2021.pdf"), caption: "IT503-2021" },
+          { url: getPublicPdfUrl("IT503-2022.pdf"), caption: "IT503-2022" },
+          { url: getPublicPdfUrl("IT503-2023.pdf"), caption: "IT503-2023" },
+          { url: getPublicPdfUrl("IT503-2024.pdf"), caption: "IT503-2024" },
+        ],
+      },
+      {
+        subject: "Artificial Intellingence",
+        pdfs: [
+          { url: getPublicPdfUrl("IT504-2019.pdf"), caption: "IT504-2019" },
+        ],
+      },
     ],
   },
   {
     sectionType: "archive",
     heading: "Previous Year Questions for 4th Semester",
-    pdfsByYear: [
+    pdfsBySubject: [
       {
-        year: 2024,
+        subject: "Software Engineering",
         pdfs: [
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "Exam Paper 2024" },
+          { url: getPublicPdfUrl("IT402-2019.pdf"), caption: "IT402-2019" },
+          { url: getPublicPdfUrl("IT402-2020.pdf"), caption: "IT402-2020" },
+          { url: getPublicPdfUrl("IT402-2021.pdf"), caption: "IT402-2021" },
+          { url: getPublicPdfUrl("IT402-2023.pdf"), caption: "IT402-2023" },
+          { url: getPublicPdfUrl("IT402-2024.pdf"), caption: "IT402-2024" },
         ],
       },
       {
-        year: 2023,
+        subject: "Operating System",
         pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-        ],
-      },
-    ],
-  },
-  {
-    sectionType: "archive",
-    heading: "Previous Year Questions for 3rd Semester",
-    pdfsByYear: [
-      {
-        year: 2024,
-        pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
+          { url: getPublicPdfUrl("IT403-2019.pdf"), caption: "IT403-2019" },
+          { url: getPublicPdfUrl("IT403-2020.pdf"), caption: "IT403-2020" },
+          { url: getPublicPdfUrl("IT403-2021.pdf"), caption: "IT403-2021" },
+          { url: getPublicPdfUrl("IT403-2022.pdf"), caption: "IT403-2022" },
+          { url: getPublicPdfUrl("IT403-2023.pdf"), caption: "IT403-2023" },
+          { url: getPublicPdfUrl("IT403-2024.pdf"), caption: "IT403-2024" },
         ],
       },
       {
-        year: 2023,
+        subject: "Discrete Mathematics",
         pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
+          { url: getPublicPdfUrl("M(IT)401-2019.pdf"), caption: "M(IT)401-2019" },
+          { url: getPublicPdfUrl("M(IT)401-2020.pdf"), caption: "M(IT)401-2020" },
+          { url: getPublicPdfUrl("M(IT)401-2021.pdf"), caption: "M(IT)401-2021" },
+          { url: getPublicPdfUrl("M(IT)401-2023.pdf"), caption: "M(IT)401-2023" },
+          { url: getPublicPdfUrl("M(IT)401-2024.pdf"), caption: "M(IT)401-2024" },
+        ],
+      },
+      {
+        subject: "Engineering Economics",
+        pdfs: [
+          { url: getPublicPdfUrl("HU401-2019.pdf"), caption: "HU401-2019" },
+          { url: getPublicPdfUrl("HU401-2020.pdf"), caption: "HU401-2020" },
+          { url: getPublicPdfUrl("HU401-2021.pdf"), caption: "HU401-2021" },
+          { url: getPublicPdfUrl("HU401-2022.pdf"), caption: "HU401-2022" },
+          { url: getPublicPdfUrl("HU401-2023.pdf"), caption: "HU401-2023" },
+          { url: getPublicPdfUrl("HU401-2024.pdf"), caption: "HU401-2024" },
         ],
       },
     ],
@@ -236,7 +277,7 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
         let docUrl = url;
         if (typeof docUrl !== "string") docUrl = String(docUrl);
 
-        loadingTaskRef.current = pdfjsLib.getDocument(encodeURI(docUrl));
+        loadingTaskRef.current = pdfjsLib.getDocument(encodeIfNeeded(docUrl));
         const pdf = await loadingTaskRef.current.promise;
         if (canceled || !mountedRef.current) {
           try {
@@ -296,8 +337,8 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
         pdfRef.current = null;
       } catch (err) {
         // render error (could be 404 or corrupted PDF)
-        console.error("PDF thumbnail render error for", url, err);
-        drawPlaceholder("Preview unavailable");
+        // console.error("PDF thumbnail render error for", url, err);
+        drawPlaceholder("Preview Unavailable");
         try {
           loadingTaskRef.current?.destroy?.();
         } catch (e) {}
@@ -322,7 +363,7 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
           renderThumbnail()
             .then(() => resolve())
             .catch((err) => {
-              console.error("RenderThumbnail internal error", err);
+              // console.error("RenderThumbnail internal error", err);
               resolve();
             });
         });
@@ -381,7 +422,12 @@ function PdfModal({ open, url, onClose }) {
   if (!mounted || !open) return null;
 
   // sanitize simple cases — avoid javascript: or data URIs that you don't intend to allow
-  const safeUrl = typeof url === "string" && /^https?:\/\//.test(url) ? encodeURI(url) : url ? encodeURI(String(url)) : "";
+  const safeUrl =
+  typeof url === "string" && /^https?:\/\//.test(url)
+    ? encodeIfNeeded(url)
+    : url
+    ? encodeIfNeeded(String(url))
+    : "";
 
   return createPortal(
     <div
@@ -590,12 +636,20 @@ export default function QuestionSection() {
               {sec.heading}
               {sec.isLatest ? <span className={styles.quLatestTag}>LATEST</span> : null}
             </h2>
-            <div className={styles.questionContainer}>
-              {sec.pdfs.map((pdf, pIdx) => {
-                const id = `pyq-${sIdx}-p${pIdx}`;
-                return renderPdfBox(pdf, id);
-              })}
-            </div>
+            <div className={styles.pyqQuestionContainer}>
+            {sec.pdfsBySubject &&
+              sec.pdfsBySubject.map((latestGroup, yIdx) => (
+                <div key={`pyq-${sIdx}-y-${yIdx}`} className={styles.quLatestGroup}>
+                  <h2>&#9733; {latestGroup.subject} &#9733;</h2>
+                  <div className={styles.questionContainer}>
+                    {latestGroup.pdfs.map((pdf, pIdx) => {
+                      const id = `pyq-${sIdx}-y${yIdx}-p${pIdx}`;
+                      return renderPdfBox(pdf, id);
+                    })}
+                  </div>
+                </div>
+              ))}
+          </div>
           </section>
         ))}
 
@@ -629,12 +683,12 @@ export default function QuestionSection() {
                     }}>
 
                     <div className={styles.quArchiveAnswerContainer}>
-                      {sec.pdfsByYear &&
-                        sec.pdfsByYear.map((yearGroup, yIdx) => (
-                          <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.quYearGroup}>
-                            <h2>Year {yearGroup.year}</h2>
+                      {sec.pdfsBySubject &&
+                        sec.pdfsBySubject.map((archiveGroup, yIdx) => (
+                          <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.quArchiveGroup}>
+                            <h2>&#9733; {archiveGroup.subject} &#9733;</h2>
                             <div className={styles.questionContainer}>
-                              {yearGroup.pdfs.map((pdf, pIdx) => {
+                              {archiveGroup.pdfs.map((pdf, pIdx) => {
                                 const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
                                 return renderPdfBox(pdf, id);
                               })}

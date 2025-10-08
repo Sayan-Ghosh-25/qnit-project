@@ -6,75 +6,61 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.min?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
+// Early Sanitization
+function encodeIfNeeded(url) {
+  if (typeof url !== "string") return "";
+  // Return as-is if already encoded
+  if (/%[0-9A-Fa-f]{2}/.test(url)) return url;
+  // Otherwise safely encode
+  try {
+    return encodeURI(url);
+  } catch {
+    return url;
+  }
+}
+
+// Point to your path on Vercel
+function getPublicPdfUrl(filename) {
+  return `https://qnit.vercel.app/Others/${filename}`;
+}
+
 // ----------------------
 // Admin-controlled Dataset
 // ----------------------
 const othersSectionData = [
   {
     sectionType: "pyq",
-    heading: "Previous Year Questions for 5th Semester",
+    heading: "Lab Index Pages for 5th Semester",
     isLatest: true,
     pdfs: [
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT401-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "IT402-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "IT401-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "IT402-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "IT403-2023" },
-      { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "IT404-2023" },
+      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT591.pdf"),
+        caption: "IT591 Lab Index" },
+      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT592.pdf"),
+        caption: "IT592 Lab Index" },
+      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT593.pdf"),
+        caption: "IT593 Lab Index" },
+      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT594.pdf"),
+        caption: "IT594 Lab Index" },
+      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT595A.pdf"),
+        caption: "IT595A Lab Index" },
     ],
   },
   {
     sectionType: "archive",
-    heading: "Previous Year Questions for 4th Semester",
+    heading: "Lab Index Pages for 4th Semester",
     pdfsByYear: [
       {
-        year: 2024,
         pdfs: [
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2019.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2021.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2022.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2023.pdf", caption: "Exam Paper 2024" },
-          { url: "https://huvrnsovuehehxwysetr.supabase.co/storage/v1/object/public/PYQs/IT501-2024.pdf", caption: "Exam Paper 2024" },
-        ],
-      },
-      {
-        year: 2023,
-        pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-        ],
-      },
-    ],
-  },
-  {
-    sectionType: "archive",
-    heading: "Previous Year Questions for 3rd Semester",
-    pdfsByYear: [
-      {
-        year: 2024,
-        pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2024" },
-        ],
-      },
-      {
-        year: 2023,
-        pdfs: [
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
-          { url: "/ECG-NET Research Paper.pdf", caption: "Exam Paper 2023" },
+          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT491.pdf"),
+            caption: "IT491 Lab Index" },
+          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT492.pdf"),
+            caption: "IT492 Lab Index" },
+          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT493.pdf"),
+            caption: "IT493 Lab Index" },
+          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT494.pdf"),
+            caption: "IT494 Lab Index" },
+          { url: getPublicPdfUrl("Lab%20Index%20Page%20HU(IT)495.pdf"),
+            caption: "HU(IT)495 Lab Index" },
         ],
       },
     ],
@@ -236,7 +222,7 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
         let docUrl = url;
         if (typeof docUrl !== "string") docUrl = String(docUrl);
 
-        loadingTaskRef.current = pdfjsLib.getDocument(encodeURI(docUrl));
+        loadingTaskRef.current = pdfjsLib.getDocument(encodeIfNeeded(docUrl));
         const pdf = await loadingTaskRef.current.promise;
         if (canceled || !mountedRef.current) {
           try {
@@ -296,8 +282,8 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
         pdfRef.current = null;
       } catch (err) {
         // render error (could be 404 or corrupted PDF)
-        console.error("PDF thumbnail render error for", url, err);
-        drawPlaceholder("Preview unavailable");
+        // console.error("PDF thumbnail render error for", url, err);
+        drawPlaceholder("Preview Unavailable");
         try {
           loadingTaskRef.current?.destroy?.();
         } catch (e) {}
@@ -322,7 +308,7 @@ const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailab
           renderThumbnail()
             .then(() => resolve())
             .catch((err) => {
-              console.error("RenderThumbnail internal error", err);
+              // console.error("RenderThumbnail internal error", err);
               resolve();
             });
         });
@@ -381,7 +367,12 @@ function PdfModal({ open, url, onClose }) {
   if (!mounted || !open) return null;
 
   // sanitize simple cases — avoid javascript: or data URIs that you don't intend to allow
-  const safeUrl = typeof url === "string" && /^https?:\/\//.test(url) ? encodeURI(url) : url ? encodeURI(String(url)) : "";
+  const safeUrl =
+  typeof url === "string" && /^https?:\/\//.test(url)
+    ? encodeIfNeeded(url)
+    : url
+    ? encodeIfNeeded(String(url))
+    : "";
 
   return createPortal(
     <div
@@ -632,7 +623,6 @@ export default function OthersSection() {
                       {sec.pdfsByYear &&
                         sec.pdfsByYear.map((yearGroup, yIdx) => (
                           <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.otYearGroup}>
-                            <h2>Year {yearGroup.year}</h2>
                             <div className={styles.otherContainer}>
                               {yearGroup.pdfs.map((pdf, pIdx) => {
                                 const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
