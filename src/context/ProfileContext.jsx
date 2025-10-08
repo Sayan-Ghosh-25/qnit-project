@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 const ProfileContext = createContext(null);
-
+const FIRSTNAME_KEY = "user_firstname";
 const DEFAULT_PROFILE = {
   full_name: "",
   stream: "",
@@ -32,7 +32,18 @@ async function getAccessToken() {
 }
 
 export function ProfileProvider({ children }) {
-  const [profile, setProfile] = useState(DEFAULT_PROFILE);
+  // Try to seed full_name from local cache to avoid flicker
+  let cachedFirst = "";
+  try {
+    cachedFirst = localStorage.getItem(FIRSTNAME_KEY) || "";
+  } catch (err) {
+    cachedFirst = "";
+  }
+
+  const [profile, setProfile] = useState({
+    ...DEFAULT_PROFILE,
+    full_name: cachedFirst || DEFAULT_PROFILE.full_name,
+  });
   const [loading, setLoading] = useState(true);
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
@@ -59,6 +70,7 @@ export function ProfileProvider({ children }) {
 
       const payload = await res.json();
       const p = payload?.profile || {};
+
       const normalized = {
         full_name: p.full_name || "",
         stream: p.stream || "",
@@ -68,7 +80,19 @@ export function ProfileProvider({ children }) {
         contact: p.contact || "",
         dob: p.dob || "",
       };
+
       setProfile(normalized);
+
+      // persist a canonical first name to localStorage so AuthContext can show instantly next time
+      try {
+        const first = (normalized.full_name || normalized.email || "")
+          .toString()
+          .trim()
+          .split(/\s+/)[0] || "";
+        if (first) localStorage.setItem(FIRSTNAME_KEY, first);
+      } catch (err) {
+        // ignore localStorage errors
+      }
     } catch (err) {
       console.error("fetchProfile error:", err);
       setProfile(DEFAULT_PROFILE);
@@ -77,8 +101,23 @@ export function ProfileProvider({ children }) {
     }
   }
 
+  // On mount, fetch profile and also re-fetch when auth state changes
   useEffect(() => {
+    let mounted = true;
+
     fetchProfile();
+
+    // subscribe to auth state changes so profile refreshes on login/logout
+    const { data: { subscription } = {} } = supabase.auth.onAuthStateChange((_event, _session) => {
+      if (!mounted) return;
+      // call fetchProfile but don't await
+      fetchProfile().catch(() => {});
+    });
+
+    return () => {
+      subscription?.unsubscribe?.();
+      mounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
