@@ -267,7 +267,7 @@
   position: absolute;
   bottom: 2.8rem;
   right: 0.5rem;
-  background: var(--accent);
+  background: #64ffda;
   border-radius: 0.5rem;
   box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   z-index: 10001;

@@ -34,7 +34,7 @@
 .othersSection h2 {
   font-weight: 700;
   margin-bottom: 1.5rem;
-  text-align: left;
+  text-align: center;
   font-size: clamp(1.125rem, 2.4vw, 1.5rem);
   color: var(--white);
   position: relative;
@@ -256,7 +256,7 @@
   position: absolute;
   bottom: 2.8rem;
   right: 0.5rem;
-  background: var(--accent);
+  background: #64ffda;
   border-radius: 0.5rem;
   box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   z-index: 10001;
