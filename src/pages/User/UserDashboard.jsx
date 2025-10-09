@@ -58,7 +58,7 @@ function DashboardHomeContent({ greetingText, quoteText, openLearnMore, handleNa
     <div className={cx("main-body")} id="dashboardHome">
       <div className={cx("main-content")}>
         <div className={cx("image-text-section")}>
-          <img src="/Welcome.svg" alt="Classroom Management" />
+          <img src="/Dashboard.png" alt="Classroom Management" />
           <div className={cx("text")}>
             <h2>{greetingText}</h2>
             <p>

@@ -848,7 +848,7 @@ export default function UserReg() {
                     disabled={accessKeyDisabled}
                   />
                   {accessAutoFoundFor && (
-                    <small className={styles.hint} style={{color: "#2ecc71"}}>Auto-filled by database</small>
+                    <small className={styles.hint} style={{color: "#2ecc71"}}>System Auto-filled, No Edit Needed</small>
                   )}
                 </div>
               )}

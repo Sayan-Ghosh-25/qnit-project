@@ -68,13 +68,13 @@ h1, h2, h3, h4, h5, h6 {
   Main Header
   ========================= */
 .main-top {
+  font-family: Bookman Old Style;
   background: #000;
   padding: 0.5rem 1rem;
   text-align: center;
   color: #fff;
-  letter-spacing: 0.125rem;
   text-transform: uppercase;
-  font-size: clamp(1.125rem, 2.8vw, 1.5625rem);
+  font-size: clamp(1.125rem, 2.8vw, 1.6rem);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -240,8 +240,10 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 .feature-box p {
+  font-family: Inter;
+  font-weight: 500;
   font-size: 1rem;
-  color: #222;
+  color: #555;
 }
 
 /* =========================
@@ -263,14 +265,14 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 1rem;
 }
 .faq-question {
-  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  text-transform: capitalize;
   cursor: pointer;
   padding: 1rem 1.25rem;
   background: #002443;
   border-radius: 0.5rem;
   border: 0.5px solid #00ccff;
   font-size: 1.1rem;
-  font-weight: 300;
+  font-weight: 500;
   color: #fff;
   display: flex;
   justify-content: space-between;
@@ -289,14 +291,16 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 4px 20px rgba(255, 205, 60, 0.3);
 }
 .faq-question::after {
-  content: "\25BC";
-  font-size: 0.65rem;
+  content: "\fe40";
+  font-size: 1.1rem;
   transition: transform 0.4s;
 }
 .faq-question.active::after {
   transform: rotate(180deg);
 }
 .faq-answer {
+  font-family: Inter;
+  letter-spacing: 0.015rem;
   height: 0;
   overflow: hidden;
   transition: height 0.35s ease;
@@ -389,7 +393,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .modal-content li {
   color: #ddd;
-  line-height: 1.6rem;
+  font-size: 0.95rem;
 }
 
 /* =========================
@@ -442,6 +446,9 @@ h1, h2, h3, h4, h5, h6 {
     overflow-y: auto;
     background: linear-gradient(225deg, #001f2e, #00258338);
   }
+  .main-top {
+    letter-spacing: 0.05rem;
+  }
 
   .image-text-section {
     margin: 0.8rem 0.5rem;
@@ -472,6 +479,7 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 1.15rem;
   }
   .feature-box p {
+    color: #333;
     font-size: 0.95rem;
   }
   .faq-section {
@@ -481,16 +489,24 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 1.25rem;
   }
   .faq-question {
-    font-size: 1rem;
-  }
-  .faq-question::after {
-    font-size: 0.5rem;
-  }
-  .faq-answer p {
+    padding: 1rem;
     font-size: 0.95rem;
   }
+  .faq-question::after {
+    font-size: 0.6rem;
+  }
+  .faq-answer p {
+    font-size: 0.925rem;
+  }
+  .modal-content {
+    padding: 2rem 1.3rem 1.5rem;
+    width: 90vw;
+  }
+  .modal-content li {
+    font-size: 0.875rem;
+  }
  .modal-content button {
-    top: -0.5rem;
+    right: 1rem;
   }
   .text-muted {
     font-size: 0.9rem;

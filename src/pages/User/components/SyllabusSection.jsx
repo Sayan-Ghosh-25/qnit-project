@@ -29,7 +29,7 @@ function getPublicPdfUrl(filename) {
 // ----------------------
 const syllabusSectionData = [
   {
-    sectionType: "pyq",
+    sectionType: "latest",
     heading: "Syllabus for 5th Semester",
     isLatest: true,
     pdfs: [
@@ -142,7 +142,7 @@ class ThumbnailErrorBoundary extends React.Component {
 // ----------------------
 // PdfThumbnail — robust & fault-tolerant
 // ----------------------
-const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailable" }) => {
+  const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview Unavailable" }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
   const loadingTaskRef = useRef(null);
@@ -429,8 +429,17 @@ export default function SyllabusSection() {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openArchiveKey, setOpenArchiveKey] = useState(null);
   const [toasts, pushToast] = useToasts();
+  const [loading, setLoading] = useState(true);
   const archiveAnswerRefs = useRef({});
   const rootRef = useRef(null);
+
+  // Simulate loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Menu outside click
   useEffect(() => {
@@ -571,22 +580,31 @@ export default function SyllabusSection() {
 
   // Final JSX
   return (
-    <section id="syllabus-section" aria-label="PYQs" ref={rootRef}>
+    <section id="syllabus-section" aria-label="Syllabus" ref={rootRef}>
       {/* Render Syllabus Section */}
       {syllabusSectionData
-        .filter((sec) => sec.sectionType === "pyq")
+        .filter((sec) => sec.sectionType === "latest")
         .map((sec, sIdx) => (
-          <section className={styles.syllabusSection} key={`pyq-${sIdx}`}>
+          <section className={styles.syllabusSection} key={`latest-${sIdx}`}>
             <h2>
               {sec.heading}
               {sec.isLatest ? <span className={styles.syLatestTag}>LATEST</span> : null}
             </h2>
+          {loading ?
+            <div className={styles.skeletonWrapper}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className={styles.skeletonRow}>
+                  <div className={styles.skeletonLabel}></div>
+                  <div className={styles.skeletonInput}></div>
+                </div>
+              ))}
+            </div> :
             <div className={styles.syllabusContainer}>
               {sec.pdfs.map((pdf, pIdx) => {
-                const id = `pyq-${sIdx}-p${pIdx}`;
+                const id = `latest-${sIdx}-p${pIdx}`;
                 return renderPdfBox(pdf, id);
               })}
-            </div>
+            </div> }
           </section>
         ))}
 
@@ -620,7 +638,16 @@ export default function SyllabusSection() {
                     }}>
 
                     <div className={styles.syArchiveAnswerContainer}>
-                      {sec.pdfsByYear &&
+                    {loading ?
+                      <div className={styles.skeletonWrapper}>
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <div key={i} className={styles.skeletonRow}>
+                            <div className={styles.skeletonLabel}></div>
+                            <div className={styles.skeletonInput}></div>
+                          </div>
+                        ))}
+                      </div> :
+                        (sec.pdfsByYear &&
                         sec.pdfsByYear.map((yearGroup, yIdx) => (
                           <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.syYearGroup}>
                             <div className={styles.syllabusContainer}>
@@ -630,7 +657,7 @@ export default function SyllabusSection() {
                               })}
                             </div>
                           </div>
-                        ))}
+                        )))}
                     </div>
                   </div>
                 </React.Fragment>

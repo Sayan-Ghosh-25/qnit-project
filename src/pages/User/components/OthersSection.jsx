@@ -29,7 +29,7 @@ function getPublicPdfUrl(filename) {
 // ----------------------
 const othersSectionData = [
   {
-    sectionType: "pyq",
+    sectionType: "latest",
     heading: "Lab Index Pages for 5th Semester",
     isLatest: true,
     pdfs: [
@@ -142,7 +142,7 @@ class ThumbnailErrorBoundary extends React.Component {
 // ----------------------
 // PdfThumbnail — robust & fault-tolerant
 // ----------------------
-const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailable" }) => {
+  const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview Unavailable" }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
   const loadingTaskRef = useRef(null);
@@ -429,8 +429,17 @@ export default function OthersSection() {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openArchiveKey, setOpenArchiveKey] = useState(null);
   const [toasts, pushToast] = useToasts();
+  const [loading, setLoading] = useState(true);
   const archiveAnswerRefs = useRef({});
   const rootRef = useRef(null);
+
+  // Simulate loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Menu outside click
   useEffect(() => {
@@ -571,22 +580,31 @@ export default function OthersSection() {
 
   // Final JSX
   return (
-    <section id="others-section" aria-label="PYQs" ref={rootRef}>
+    <section id="others-section" aria-label="others" ref={rootRef}>
       {/* Render Others Section */}
       {othersSectionData
-        .filter((sec) => sec.sectionType === "pyq")
+        .filter((sec) => sec.sectionType === "latest")
         .map((sec, sIdx) => (
-          <section className={styles.othersSection} key={`pyq-${sIdx}`}>
+          <section className={styles.othersSection} key={`latest-${sIdx}`}>
             <h2>
               {sec.heading}
               {sec.isLatest ? <span className={styles.otLatestTag}>LATEST</span> : null}
             </h2>
+          {loading ?
+            <div className={styles.skeletonWrapper}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className={styles.skeletonRow}>
+                  <div className={styles.skeletonLabel}></div>
+                  <div className={styles.skeletonInput}></div>
+                </div>
+              ))}
+            </div> :
             <div className={styles.otherContainer}>
               {sec.pdfs.map((pdf, pIdx) => {
-                const id = `pyq-${sIdx}-p${pIdx}`;
+                const id = `latest-${sIdx}-p${pIdx}`;
                 return renderPdfBox(pdf, id);
               })}
-            </div>
+            </div> }
           </section>
         ))}
 
@@ -620,7 +638,16 @@ export default function OthersSection() {
                     }}>
 
                     <div className={styles.otArchiveAnswerContainer}>
-                      {sec.pdfsByYear &&
+                    {loading ?
+                      <div className={styles.skeletonWrapper}>
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <div key={i} className={styles.skeletonRow}>
+                            <div className={styles.skeletonLabel}></div>
+                            <div className={styles.skeletonInput}></div>
+                          </div>
+                        ))}
+                      </div> :
+                        (sec.pdfsByYear &&
                         sec.pdfsByYear.map((yearGroup, yIdx) => (
                           <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.otYearGroup}>
                             <div className={styles.otherContainer}>
@@ -630,7 +657,7 @@ export default function OthersSection() {
                               })}
                             </div>
                           </div>
-                        ))}
+                        )))}
                     </div>
                   </div>
                 </React.Fragment>

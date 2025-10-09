@@ -18,32 +18,32 @@ function FAQ() {
     {
       q: "How can I preview and download study materials?",
       a:
-        'After logging in, browse the available question papers or syllabus. Click on the preview to view the document, and then download or save it to your device',
+        'After logging in, browse the available question papers or syllabus. Click on the preview to view the document, and then download or save it to your device.',
     },
     {
-      q: "Can I share materials with others?",
+      q: "Can I upload study materials here?",
       a:
-        'Yes! Use the "Share" button to send pdf file links to classmates or friends directly from the platform',
+        "Uploading study materials is only allowed for system administrators, normal users don't have that right."
     },
     {
       q: "Is my personal data safe?",
       a:
-        "Absolutely! We use advanced security measures and encryption to keep user account and personal information safe",
+        "Absolutely! We use advanced security measures and encryption to keep user account and personal information safe.",
     },
     {
       q: "How often is the database updated?",
       a:
-        "We update our database regularly with the latest question papers, syllabus, and other accessories to ensure you always have access to current materials",
+        "We update our database regularly with the latest question papers, syllabus, and other accessories to ensure you always have access to the current materials.",
     },
     {
-      q: "Can I access this platform on my mobile phone?",
+      q: "Can I invite my friends to this platform?",
       a:
-        "Yes, our platform is fully responsive and works smoothly on smartphones, tablets or desktops",
+        "Unfortunately, you can't add your friends or cousins to this platfrom who are not part of your college department.",
     },
     {
-      q: "Who can I contact for any queries or support?",
+      q: "Who can I reach out to for any query or support?",
       a:
-        'Use the in-App Feedback section to share your experience or reach out to our team through the contact shared',
+        'Use the in-Platform feedback section to share your experience or reach out to our team through the contact shared.',
     },
   ];
 
@@ -104,7 +104,7 @@ function FAQ() {
    ----------------------------- */
 export default function HomeLander() {
   // Refs
-  const mainBodyRef = useRef(null); // the home body area
+  const mainBodyRef = useRef(null);
 
   // UI state
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -149,7 +149,7 @@ export default function HomeLander() {
       {/* Main area */}
       <main className={cx("main")} id="main-content">
         <div className={cx("main-top")}>
-          <p>STUDY MANAGEMENT SYSTEM</p>
+          <p>QNIT &#10038; All Your Study Needs</p>
         </div>
 
         {/* Home / Dashboard body */}
@@ -157,8 +157,8 @@ export default function HomeLander() {
           <div className={cx("main-content")}>
             <div className={cx("image-text-section")}>
               <img
-                src="Welcome.svg"
-                alt="Classroom Management"
+                src="/Welcome.svg"
+                alt="Welcome Image"
               />
               <div className={cx("text")}>
                 <h2>About The System</h2>
@@ -206,7 +206,7 @@ export default function HomeLander() {
               >
                 <div className={cx("feature-box")}>
                   <img
-                    src="Pdf.png"
+                    src="/Pdf.png"
                     alt="PDF Access"
                   />
                   <h3>Instant PDF Access</h3>
@@ -218,7 +218,7 @@ export default function HomeLander() {
 
                 <div className={cx("feature-box")}>
                   <img
-                    src="Share.png"
+                    src="/Share.svg"
                     alt="Share"
                   />
                   <h3>Easy Sharing</h3>
@@ -230,49 +230,46 @@ export default function HomeLander() {
 
                 <div className={cx("feature-box")}>
                   <img
-                    src="Smartphone.png"
-                    alt="Mobile Friendly"
+                    src="/Multi Devices.png"
+                    alt="Cross Device Compatibility"
                   />
-                  <h3>Mobile Friendly</h3>
+                  <h3>Cross Device Compatibility</h3>
                   <p>
-                    Access all the features of our platfrom from any device - Desktop, Tablet or
+                    Access all the features of the platfrom from any device - Desktop, Tablet or
                     Smartphone
                   </p>
                 </div>
 
                 <div className={cx("feature-box")}>
                   <img
-                    src="Security.png"
-                    alt="Security"
+                    src="/News.svg"
+                    alt="News"
                   />
-                  <h3>Advanced Security</h3>
+                  <h3>Dedicated News Service</h3>
                   <p>
-                    Your account and personal data are protected with robust
-                    security measures and encryption
+                    Stay updated with the latest global updates and trends shaping the fast-growing software industry
                   </p>
                 </div>
 
                 <div className={cx("feature-box")}>
                   <img
-                    src="Database.png"
-                    alt="Frequent Updates"
+                    src="/Puzzle.svg"
+                    alt="Game Arena"
                   />
-                  <h3>Frequently Updated Database</h3>
+                  <h3>Mind Refreshing Games</h3>
                   <p>
-                    The resource library is actively updated with the latest
-                    question papers, syllabus, and others
+                    In-Platform Game Arena that provides mind refreshment and stress-free enjoyment
                   </p>
                 </div>
 
                 <div className={cx("feature-box")}>
                   <img
-                    src="Support.png"
-                    alt="Support"
+                    src="/Theme.png"
+                    alt="Theme"
                   />
-                  <h3>Support & Feedback</h3>
+                  <h3>Theme Switch</h3>
                   <p>
-                    Reach out for help or share feedback to help in improving
-                    user experience
+                    Seamless theme switching option to let user choose their preference between various themes
                   </p>
                 </div>
               </div>
@@ -316,28 +313,23 @@ export default function HomeLander() {
           <h2 id="learnMoreModalTitle">Insights of the System</h2>
           <ul>
             <li>
-              <strong>Comprehensive Database:</strong> Previous year question
-              papers, syllabus, and notes stored as Google Drive links.
+              <strong>Authorized Access:</strong> Only verified college students can create accounts, ensuring study materials remain exclusive and secure from external users.
             </li>
+            <li style={{ marginTop: "0.5rem" }}></li>
             <li>
-              <strong>Preview & Download:</strong> Instantly preview PDFs before
-              downloading or sharing.
+              <strong>Comprehensive Account Control:</strong> Users have full control over their accounts, including the ability to update personal details or permanently delete their profile at any time.
             </li>
+            <li style={{ marginTop: "0.5rem" }}></li>
             <li>
-              <strong>Easy Sharing:</strong> Share materials with classmates
-              directly from the platform.
+              <strong>Regular Content Updates:</strong> Study materials are frequently refreshed with the latest information to maintain accuracy, reliability, and relevance.
             </li>
+            <li style={{ marginTop: "0.5rem" }}></li>
             <li>
-              <strong>Frequent Updates:</strong> Study materials are regularly
-              updated for accuracy and relevance.
+              <strong>Enhanced Data Security:</strong> Advanced security measures protect all user data and personal information, minimizing any risk of data breaches or unauthorized access.
             </li>
+            <li style={{ marginTop: "0.5rem" }}></li>
             <li>
-              <strong>Advanced Security:</strong> Your personal data is
-              protected with robust security measures.
-            </li>
-            <li>
-              <strong>Mobile Friendly:</strong> Access resources from any
-              device, anytime.
+              <strong>24&times;7 Support & Feedback:</strong> A dedicated support system is available around the clock to assist users and continuously enhance their overall experience.
             </li>
           </ul>
         </div>

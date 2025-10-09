@@ -29,7 +29,7 @@ function getPublicPdfUrl(filename) {
 // ----------------------
 const questionSectionData = [
   {
-    sectionType: "pyq",
+    sectionType: "latest",
     heading: "Previous Year Questions for 5th Semester",
     isLatest: true,
     pdfsBySubject: [
@@ -197,7 +197,7 @@ class ThumbnailErrorBoundary extends React.Component {
 // ----------------------
 // PdfThumbnail — robust & fault-tolerant
 // ----------------------
-const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview unavailable" }) => {
+  const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview Unavailable" }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
   const loadingTaskRef = useRef(null);
@@ -484,8 +484,17 @@ export default function QuestionSection() {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openArchiveKey, setOpenArchiveKey] = useState(null);
   const [toasts, pushToast] = useToasts();
+  const [loading, setLoading] = useState(true);
   const archiveAnswerRefs = useRef({});
   const rootRef = useRef(null);
+
+  // Simulate loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Menu outside click
   useEffect(() => {
@@ -626,30 +635,39 @@ export default function QuestionSection() {
 
   // Final JSX
   return (
-    <section id="question-section" aria-label="PYQs" ref={rootRef}>
+    <section id="question-section" aria-label="pyqs" ref={rootRef}>
       {/* Render PYQ Section */}
       {questionSectionData
-        .filter((sec) => sec.sectionType === "pyq")
+        .filter((sec) => sec.sectionType === "latest")
         .map((sec, sIdx) => (
-          <section className={styles.questionsSection} key={`pyq-${sIdx}`}>
+          <section className={styles.questionsSection} key={`latest-${sIdx}`}>
             <h2>
               {sec.heading}
               {sec.isLatest ? <span className={styles.quLatestTag}>LATEST</span> : null}
             </h2>
-            <div className={styles.pyqQuestionContainer}>
+              {loading ?
+                <div className={styles.skeletonWrapper}>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className={styles.skeletonRow}>
+                      <div className={styles.skeletonLabel}></div>
+                      <div className={styles.skeletonInput}></div>
+                    </div>
+                  ))}
+                </div> :
+              <div className={styles.pyqQuestionContainer}>
             {sec.pdfsBySubject &&
               sec.pdfsBySubject.map((latestGroup, yIdx) => (
-                <div key={`pyq-${sIdx}-y-${yIdx}`} className={styles.quLatestGroup}>
+                <div key={`latest-${sIdx}-y-${yIdx}`} className={styles.quLatestGroup}>
                   <h2>&#9733; {latestGroup.subject} &#9733;</h2>
                   <div className={styles.questionContainer}>
                     {latestGroup.pdfs.map((pdf, pIdx) => {
-                      const id = `pyq-${sIdx}-y${yIdx}-p${pIdx}`;
+                      const id = `latest-${sIdx}-y${yIdx}-p${pIdx}`;
                       return renderPdfBox(pdf, id);
                     })}
                   </div>
                 </div>
               ))}
-          </div>
+          </div> }
           </section>
         ))}
 
@@ -681,20 +699,28 @@ export default function QuestionSection() {
                       if (el) archiveAnswerRefs.current[`archive-${sIdx}`] = el;
                       else delete archiveAnswerRefs.current[`archive-${sIdx}`];
                     }}>
-
                     <div className={styles.quArchiveAnswerContainer}>
-                      {sec.pdfsBySubject &&
-                        sec.pdfsBySubject.map((archiveGroup, yIdx) => (
-                          <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.quArchiveGroup}>
-                            <h2>&#9733; {archiveGroup.subject} &#9733;</h2>
-                            <div className={styles.questionContainer}>
-                              {archiveGroup.pdfs.map((pdf, pIdx) => {
-                                const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
-                                return renderPdfBox(pdf, id);
-                              })}
-                            </div>
+                    {loading ?
+                    <div className={styles.skeletonWrapper}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className={styles.skeletonRow}>
+                          <div className={styles.skeletonLabel}></div>
+                          <div className={styles.skeletonInput}></div>
+                        </div>
+                      ))}
+                    </div> :
+                      (sec.pdfsBySubject &&
+                      sec.pdfsBySubject.map((archiveGroup, yIdx) => (
+                        <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.quArchiveGroup}>
+                          <h2>&#9733; {archiveGroup.subject} &#9733;</h2>
+                          <div className={styles.questionContainer}>
+                            {archiveGroup.pdfs.map((pdf, pIdx) => {
+                              const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
+                              return renderPdfBox(pdf, id);
+                            })}
                           </div>
-                        ))}
+                        </div>
+                      )))}
                     </div>
                   </div>
                 </React.Fragment>
