@@ -645,15 +645,6 @@ export default function QuestionSection() {
               {sec.heading}
               {sec.isLatest ? <span className={styles.quLatestTag}>LATEST</span> : null}
             </h2>
-              {loading ?
-                <div className={styles.skeletonWrapper}>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className={styles.skeletonRow}>
-                      <div className={styles.skeletonLabel}></div>
-                      <div className={styles.skeletonInput}></div>
-                    </div>
-                  ))}
-                </div> :
               <div className={styles.pyqQuestionContainer}>
             {sec.pdfsBySubject &&
               sec.pdfsBySubject.map((latestGroup, yIdx) => (
@@ -667,7 +658,7 @@ export default function QuestionSection() {
                   </div>
                 </div>
               ))}
-          </div> }
+          </div>
           </section>
         ))}
 
@@ -700,16 +691,7 @@ export default function QuestionSection() {
                       else delete archiveAnswerRefs.current[`archive-${sIdx}`];
                     }}>
                     <div className={styles.quArchiveAnswerContainer}>
-                    {loading ?
-                    <div className={styles.skeletonWrapper}>
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className={styles.skeletonRow}>
-                          <div className={styles.skeletonLabel}></div>
-                          <div className={styles.skeletonInput}></div>
-                        </div>
-                      ))}
-                    </div> :
-                      (sec.pdfsBySubject &&
+                    {sec.pdfsBySubject &&
                       sec.pdfsBySubject.map((archiveGroup, yIdx) => (
                         <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.quArchiveGroup}>
                           <h2>&#9733; {archiveGroup.subject} &#9733;</h2>
@@ -720,7 +702,7 @@ export default function QuestionSection() {
                             })}
                           </div>
                         </div>
-                      )))}
+                      ))}
                     </div>
                   </div>
                 </React.Fragment>

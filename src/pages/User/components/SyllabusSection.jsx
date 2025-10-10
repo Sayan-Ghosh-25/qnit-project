@@ -590,21 +590,12 @@ export default function SyllabusSection() {
               {sec.heading}
               {sec.isLatest ? <span className={styles.syLatestTag}>LATEST</span> : null}
             </h2>
-          {loading ?
-            <div className={styles.skeletonWrapper}>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className={styles.skeletonRow}>
-                  <div className={styles.skeletonLabel}></div>
-                  <div className={styles.skeletonInput}></div>
-                </div>
-              ))}
-            </div> :
             <div className={styles.syllabusContainer}>
               {sec.pdfs.map((pdf, pIdx) => {
                 const id = `latest-${sIdx}-p${pIdx}`;
                 return renderPdfBox(pdf, id);
               })}
-            </div> }
+            </div>
           </section>
         ))}
 
@@ -638,16 +629,7 @@ export default function SyllabusSection() {
                     }}>
 
                     <div className={styles.syArchiveAnswerContainer}>
-                    {loading ?
-                      <div className={styles.skeletonWrapper}>
-                        {Array.from({ length: 8 }).map((_, i) => (
-                          <div key={i} className={styles.skeletonRow}>
-                            <div className={styles.skeletonLabel}></div>
-                            <div className={styles.skeletonInput}></div>
-                          </div>
-                        ))}
-                      </div> :
-                        (sec.pdfsByYear &&
+                    {sec.pdfsByYear &&
                         sec.pdfsByYear.map((yearGroup, yIdx) => (
                           <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.syYearGroup}>
                             <div className={styles.syllabusContainer}>
@@ -657,7 +639,7 @@ export default function SyllabusSection() {
                               })}
                             </div>
                           </div>
-                        )))}
+                        ))}
                     </div>
                   </div>
                 </React.Fragment>

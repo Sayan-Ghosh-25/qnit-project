@@ -1,3 +1,4 @@
+// src/common/ChangePassword.jsx
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -101,20 +102,22 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
       lower: /[a-z]/.test(password),
       digit: /[0-9]/.test(password),
       special: /[^A-Za-z0-9]/.test(password),
-      noName: true,
+      noName: false,
     };
 
-    if (password.length > 0 && fullName) {
+    if (password.length > 0) {
       const tokens = fullName
         .split(/\s+/)
         .map((t) => t.trim().toLowerCase())
         .filter((t) => t.length >= 2);
+      let ok = true;
       for (const tk of tokens) {
         if (tk && password.toLowerCase().includes(tk)) {
-          checks.noName = false;
+          ok = false;
           break;
         }
       }
+      checks.noName = ok;
     }
 
     setPasswordChecks(checks);

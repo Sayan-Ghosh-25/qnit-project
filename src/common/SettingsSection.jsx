@@ -5,97 +5,77 @@ import { useTheme } from "@/context/ThemeContext";
 import { useNavigate, Routes, Route, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
-// Lazy load modals
+// Lazy load modals/components
 const LogoutModalComponent = lazy(() => import("@/common/LogoutModal.jsx"));
 const ChangePassword = lazy(() => import("@/common/ChangePassword.jsx"));
 
-// Small presentational fallback used within Suspense while a component loads
-function SpinnerOverlay({ visible = true }) {
-  if (!visible) return null;
+// Skeleton Loader for ChangePassword lazy loading
+function ChangePasswordSkeleton() {
   return (
-    <div
-      id="loading-spinner"
-      className={cx("loading-spinner", { show: visible })}
-      aria-hidden={!visible}
-    >
-      <div className={cx("spinner")} />
+    <div className={styles.skeletonWrapper}>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} className={styles.skeletonRow}>
+          <div className={styles.skeletonLabel}></div>
+          <div className={styles.skeletonInput}></div>
+        </div>
+      ))}
     </div>
   );
-}
-
-// Helper to compose class names in a safe way
-function cx(...names) {
-  return names
-    .filter(Boolean)
-    .map((n) => (styles && styles[n] ? styles[n] : n))
-    .join(" ");
 }
 
 export default function SettingsSection({ onAccountDelete }) {
   const { lightMode, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth() || {};
+  const { logout, userRole } = useAuth() || {};
 
-  // State for Delete Account modal
+  const isAdminPath = location.pathname.startsWith("/Admin/");
+  const baseParentPath = isAdminPath
+    ? "/Admin/Dashboard/SettingsSection"
+    : "/User/Dashboard/SettingsSection";
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const modalRef = useRef(null);
   const confirmBtnRef = useRef(null);
-
-  // State for Logout modal
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const isChangePasswordRoute = location.pathname.includes("/SettingsSection/ChangePassword");
 
-  // Determine if ChangePassword route is active
-  const isChangePasswordRoute =
-    location.pathname === "/User/Dashboard/SettingsSection/ChangePassword";
-
-  // Effect for Delete Account modal
   useEffect(() => {
     try {
       if (deleteModalOpen || showLogoutModal || isChangePasswordRoute) {
         document.body.classList.add("modal-open");
-        if (deleteModalOpen) {
-          setTimeout(() => confirmBtnRef.current?.focus?.(), 30);
-        }
+        if (deleteModalOpen) setTimeout(() => confirmBtnRef.current?.focus?.(), 30);
       } else {
         document.body.classList.remove("modal-open");
       }
-    } catch (err) {
-      // ignore (server-side or restricted env)
-    }
+    } catch {}
     return () => {
       try {
         document.body.classList.remove("modal-open");
-      } catch (e) {}
+      } catch {}
     };
   }, [deleteModalOpen, showLogoutModal, isChangePasswordRoute]);
 
-  // ESC to close any active modal/route overlay
   useEffect(() => {
     function onKey(e) {
       if (e.key === "Escape") {
         if (deleteModalOpen) setDeleteModalOpen(false);
         if (showLogoutModal) setShowLogoutModal(false);
-        if (isChangePasswordRoute) navigate("/User/Dashboard/SettingsSection");
+        if (isChangePasswordRoute) navigate(baseParentPath);
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [deleteModalOpen, showLogoutModal, isChangePasswordRoute, navigate]);
+  }, [deleteModalOpen, showLogoutModal, isChangePasswordRoute, navigate, baseParentPath]);
 
-  // Click on backdrop closes modal
   const onBackdropClick = (e) => {
-    if (e.target === modalRef.current) {
-      setDeleteModalOpen(false);
-    }
+    if (e.target === modalRef.current) setDeleteModalOpen(false);
   };
 
-  // Safe clearing of user-like localStorage keys
   const safeClearUserData = useCallback(() => {
     try {
       const keysToKeep = [];
-      const dangerousKeyPattern =
-        /(profile|feedback|auth|token|session|user|credential|login)/i;
+      const dangerousKeyPattern = /(profile|feedback|auth|token|session|user|credential|login)/i;
       const toRemove = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -104,57 +84,45 @@ export default function SettingsSection({ onAccountDelete }) {
         if (dangerousKeyPattern.test(k)) toRemove.push(k);
       }
       toRemove.forEach((k) => localStorage.removeItem(k));
-    } catch (err) {
-      // ignore if localStorage unavailable
-    }
+    } catch {}
   }, []);
 
-  // Confirm deletion handler
   const onConfirmDelete = useCallback(() => {
     setDeleteModalOpen(false);
     safeClearUserData();
-
     try {
       alert("Your Account Has Been Deleted!");
-    } catch (err) {}
-
+    } catch {}
     if (typeof onAccountDelete === "function") {
       try {
         onAccountDelete();
         return;
-      } catch (err) {
-        // if it fails, fallback to redirect below
-      }
+      } catch {}
     }
-    // Fallback if onAccountDelete not provided or fails
     navigate("/");
   }, [onAccountDelete, safeClearUserData, navigate]);
 
-  // Logout modal handlers
   const openLogoutModal = useCallback(() => setShowLogoutModal(true), []);
   const handleLogoutConfirm = useCallback(async () => {
     setShowLogoutModal(false);
-
     try {
       await logout?.();
     } catch (err) {
       console.error("Logout failed:", err);
-      // Even if logout fails, still clear the client state
     }
 
     try {
       sessionStorage.clear();
       const keys = ["sb-", "session", "profile", "auth", "user", "token", "_grecaptcha"];
       keys.forEach((k) => {
-        if (k.startsWith('sb-')) {
+        if (k.startsWith("sb-")) {
+          const toRemove = [];
           for (let i = 0; i < localStorage.length; i++) {
             const currentKey = localStorage.key(i);
-            if (currentKey && currentKey.startsWith(k)) {
-              localStorage.removeItem(currentKey);
-            }
+            if (currentKey && currentKey.startsWith(k)) toRemove.push(currentKey);
           }
+          toRemove.forEach((rk) => localStorage.removeItem(rk));
         } else {
-          // Remove specific keys
           localStorage.removeItem(k);
         }
       });
@@ -164,7 +132,7 @@ export default function SettingsSection({ onAccountDelete }) {
 
     try {
       if (window.history.pushState) {
-        window.history.pushState(null, '', window.location.href);
+        window.history.pushState(null, "", window.location.href);
         window.history.go(1);
       }
     } catch (e) {
@@ -172,8 +140,15 @@ export default function SettingsSection({ onAccountDelete }) {
     }
 
     navigate("/", { replace: true });
-
   }, [logout, navigate]);
+
+  const handleChangePassword = useCallback(() => {
+    const isAdmin = (userRole && userRole === "Admin") || isAdminPath;
+    const target = isAdmin
+      ? "/Admin/Dashboard/SettingsSection/ChangePassword"
+      : "/User/Dashboard/SettingsSection/ChangePassword";
+    navigate(target);
+  }, [userRole, isAdminPath, navigate]);
 
   return (
     <>
@@ -181,24 +156,15 @@ export default function SettingsSection({ onAccountDelete }) {
         <Route
           index
           element={
-            // Settings Section - Main content
-            <section
-              className={styles.settingsSection}
-              id="settings-section"
-              aria-label="Settings"
-            >
+            <section className={styles.settingsSection} id="settings-section" aria-label="Settings">
               <h2>Settings</h2>
 
               {/* Theme Settings */}
-              <div
-                className={styles.settingsContainer}
-                aria-labelledby="theme-heading"
-              >
+              <div className={styles.settingsContainer} aria-labelledby="theme-heading">
                 <h4 id="theme-heading">Theme</h4>
                 <div className={styles.compartment}>
-                  <label htmlFor="themeSwitch">Light Theme</label>
-
-                  <label className={styles.switch} aria-hidden="false">
+                  <label htmlFor="themeSwitch" style={{ cursor: "pointer" }}>Light Theme</label>
+                  <label className={styles.switch}>
                     <input
                       id="themeSwitch"
                       type="checkbox"
@@ -211,63 +177,42 @@ export default function SettingsSection({ onAccountDelete }) {
                 </div>
               </div>
 
-              <div
-                className={styles.settingsContainer}
-                aria-labelledby="account-heading"
-              >
+              {/* Account Settings */}
+              <div className={styles.settingsContainer} aria-labelledby="account-heading">
                 <h4 id="account-heading">Manage Account</h4>
 
-                {/* Account Settings - Change Password */}
+                {/* Change Password */}
                 <div className={styles.compartment}>
-                  <label htmlFor="changePassword">Change Password</label>
+                  <label htmlFor="changePassword" style={{ cursor: "pointer" }}>Change Password</label>
                   <button
                     id="changePassword"
                     aria-haspopup="dialog"
                     aria-controls="change-modal"
-                    onClick={() =>
-                      navigate("/User/Dashboard/SettingsSection/ChangePassword")
-                    } // Navigate to sub-route
+                    onClick={handleChangePassword}
                   >
-                    <i
-                      className="fas fa-pen"
-                      aria-hidden="true"
-                      style={{ color: "#00e6b0ff" }}
-                    />
+                    <i className="fas fa-pen" aria-hidden="true" style={{ color: "#00e6b0ff" }} />
                   </button>
                 </div>
 
-                {/* Account Settings - Delete Account */}
+                {/* Delete Account */}
                 <div
                   className={styles.compartment}
-                  style={{
-                    marginTop: "1rem",
-                    borderTop: "0.5px solid #57caff56",
-                    paddingTop: "0.9rem",
-                  }}
+                  style={{ marginTop: "1rem", borderTop: "0.5px solid #57caff56", paddingTop: "0.9rem" }}
                 >
-                  <label htmlFor="deleteAccount" style={{ color: "#f44336ed" }}>
+                  <label htmlFor="deleteAccount" style={{ color: "#f44336ed", cursor: "pointer" }}>
                     Delete My Account
                   </label>
-                  <button
-                    id="deleteAccount"
-                    aria-haspopup="dialog"
-                    aria-controls="delete-modal"
-                    onClick={() => setDeleteModalOpen(true)}
-                  >
+                  <button id="deleteAccount" aria-haspopup="dialog" aria-controls="delete-modal" onClick={() => setDeleteModalOpen(true)}>
                     <i className="fas fa-trash" aria-hidden="true" />
                   </button>
                 </div>
 
-                {/* Account Settings - Log Out */}
+                {/* Log Out */}
                 <div
                   className={styles.compartment}
-                  style={{
-                    marginTop: "1rem",
-                    borderTop: "0.5px solid #57caff56",
-                    paddingTop: "0.9rem",
-                  }}
+                  style={{ marginTop: "1rem", borderTop: "0.5px solid #57caff56", paddingTop: "0.9rem" }}
                 >
-                  <label htmlFor="logoutBtn" style={{ color: "#f44336ed" }}>
+                  <label htmlFor="logoutBtn" style={{ color: "#f44336ed", cursor: "pointer" }}>
                     Log Out
                   </label>
                   <button
@@ -286,62 +231,49 @@ export default function SettingsSection({ onAccountDelete }) {
             </section>
           }
         />
+
         {/* Route For ChangePassword */}
         <Route
           path="ChangePassword"
           element={
-            <Suspense fallback={<SpinnerOverlay visible={true} />}>
+            <Suspense fallback={<ChangePasswordSkeleton />}>
               <ChangePassword
-                onCancel={() => navigate("/User/Dashboard/SettingsSection")}
-                onClose={() => navigate("/User/Dashboard/SettingsSection")}
+                onCancel={() => navigate(baseParentPath)}
+                onClose={() => navigate(baseParentPath)}
               />
             </Suspense>
           }
         />
+
         <Route path="*" element={<p>Settings Sub-Section Not Found</p>} />
       </Routes>
 
       {/* Delete Modal */}
       <div
         id="delete-modal"
-        className={`${styles.deleteModal} ${
-          deleteModalOpen ? styles.show : styles.hiddenDelete
-        }`}
+        className={`${styles.deleteModal} ${deleteModalOpen ? styles.show : styles.hiddenDelete}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-modal-title"
         ref={modalRef}
         onClick={onBackdropClick}
       >
-        <div
-          className={`${styles.deleteContent} ${deleteModalOpen ? "" : ""}`}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className={styles.deleteContent} onClick={(e) => e.stopPropagation()}>
           <h2 id="delete-modal-title">Confirm Deletion</h2>
           <p>Are you sure you want to delete your account?</p>
 
           <div className={styles.deleteActions}>
-            <button
-              id="confirm-delete"
-              className={styles.deleteBtn}
-              onClick={onConfirmDelete}
-              ref={confirmBtnRef}
-            >
+            <button id="confirm-delete" className={styles.deleteBtn} onClick={onConfirmDelete} ref={confirmBtnRef}>
               Delete
             </button>
-
-            <button
-              id="cancel-delete"
-              className={styles.cancelBtn}
-              onClick={() => setDeleteModalOpen(false)}
-            >
+            <button id="cancel-delete" className={styles.cancelBtn} onClick={() => setDeleteModalOpen(false)}>
               Cancel
             </button>
           </div>
         </div>
       </div>
 
-      {/* Logout Modal Area (React-driven) */}
+      {/* Logout Modal */}
       {showLogoutModal && (
         <Suspense fallback={null}>
           <LogoutModalComponent

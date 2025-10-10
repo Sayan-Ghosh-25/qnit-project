@@ -590,21 +590,12 @@ export default function OthersSection() {
               {sec.heading}
               {sec.isLatest ? <span className={styles.otLatestTag}>LATEST</span> : null}
             </h2>
-          {loading ?
-            <div className={styles.skeletonWrapper}>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className={styles.skeletonRow}>
-                  <div className={styles.skeletonLabel}></div>
-                  <div className={styles.skeletonInput}></div>
-                </div>
-              ))}
-            </div> :
             <div className={styles.otherContainer}>
               {sec.pdfs.map((pdf, pIdx) => {
                 const id = `latest-${sIdx}-p${pIdx}`;
                 return renderPdfBox(pdf, id);
               })}
-            </div> }
+            </div>
           </section>
         ))}
 
@@ -638,16 +629,7 @@ export default function OthersSection() {
                     }}>
 
                     <div className={styles.otArchiveAnswerContainer}>
-                    {loading ?
-                      <div className={styles.skeletonWrapper}>
-                        {Array.from({ length: 8 }).map((_, i) => (
-                          <div key={i} className={styles.skeletonRow}>
-                            <div className={styles.skeletonLabel}></div>
-                            <div className={styles.skeletonInput}></div>
-                          </div>
-                        ))}
-                      </div> :
-                        (sec.pdfsByYear &&
+                    {sec.pdfsByYear &&
                         sec.pdfsByYear.map((yearGroup, yIdx) => (
                           <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.otYearGroup}>
                             <div className={styles.otherContainer}>
@@ -657,7 +639,7 @@ export default function OthersSection() {
                               })}
                             </div>
                           </div>
-                        )))}
+                        ))}
                     </div>
                   </div>
                 </React.Fragment>

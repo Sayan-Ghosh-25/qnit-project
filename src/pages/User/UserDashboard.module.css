@@ -616,6 +616,9 @@ nav li a.active {
     text-decoration: none !important;
     color: #fff !important;
   }
+  nav li a:hover {
+    transform: none !important;
+  }
   nav i {
     font-size: 1.25rem !important;
     line-height: 1 !important;

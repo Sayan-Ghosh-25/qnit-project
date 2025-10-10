@@ -1,39 +1,21 @@
-// src/pages/AdminDashboard.jsx
+// src/pages/Admin/AdminDashboard.jsx
 import { useCallback, useEffect, useRef, useState, Suspense, lazy } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Routes, Route, NavLink as RouterNavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "./AdminDashboard.module.css";
+import { useProfile } from "@/context/ProfileContext";
 
 /* -----------------------
-   Static import helper map
+   Lazy loaded section components
    ----------------------- */
-const importers = {
-  ProfileSection: () => import("./components/ProfileSection.jsx"),
-  QuestionSection: () => import("./components/QuestionSection.jsx"),
-  SyllabusSection: () => import("./components/SyllabusSection.jsx"),
-  OthersSection: () => import("./components/OthersSection.jsx"),
-  SettingsSection: () => import("@/common/SettingsSection.jsx"),
-  FeedbackSection: () => import("./components/FeedbackSection.jsx"),
-};
+const ProfileSection = lazy(() => import("@/common/ProfileSection.jsx"));
+const ManageUsers = lazy(() => import("./components/ManageUsers.jsx"));
+const UploadSection = lazy(() => import("./components/UploadSection.jsx"));
+const UserFeedbacks = lazy(() => import("./components/UserFeedbacks.jsx"));
+const SettingsSection = lazy(() => import("@/common/SettingsSection.jsx"));
 
-/* Lazy components created from the importers map */
-const Sections = {
-  ProfileSection: lazy(() => importers.ProfileSection()),
-  QuestionSection: lazy(() => importers.QuestionSection()),
-  SyllabusSection: lazy(() => importers.SyllabusSection()),
-  OthersSection: lazy(() => importers.OthersSection()),
-  SettingsSection: lazy(() => importers.SettingsSection()),
-  FeedbackSection: lazy(() => importers.FeedbackSection()),
-};
-
-/* Keep logout & overlays as separate lazies (they are not part of the main Sections map) */
-const LogoutModalComponent = lazy(() => import("@/common/LogoutModal.jsx"));
-const OverlayComponents = {
-  ChangePassword: lazy(() => import("@/common/ChangePassword.jsx")),
-};
-
-/* Helper to compose class names in a safe way (keeps existing behavior) */
+/* Helper to compose class names in a safe way */
 function cx(...names) {
   return names
     .filter(Boolean)
@@ -47,104 +29,62 @@ function SpinnerOverlay({ visible = true }) {
   return (
     <div
       id="loading-spinner"
-      className={cx("loading-spinner", { show: visible })}
+      className={cx("loading-spinner", visible ? "show" : "")}
       aria-hidden={!visible}
+      style={{ zIndex: 9999 }}
     >
       <div className={cx("spinner")} />
     </div>
   );
 }
 
-/* Fallback when a named section doesn't exist as a component */
-function NotFoundSection({ name }) {
+/* Fallback for unknown routes within the dashboard */
+function NotFoundSection() {
   return (
-    <div style={{ padding: 24, color: "#fff" }}>
-      <h3>Section not found</h3>
-      <p>
-        No component found for <strong>{name}</strong>. Create <code>{name}.jsx</code> in <code>src/components</code>.
-      </p>
+    <div style={{ padding: 24, color: "#fff", textAlign: "center" }}>
+      <h3>404 - Dashboard Section Not Found</h3>
+      <p>The requested dashboard section does not exist</p>
     </div>
   );
 }
 
-/* The FAQ content — React-driven (kept behavior, accessible accordions) */
-function FAQ() {
-  const items = [
-    {
-      q: "How can I preview and download study materials?",
-      a:
-        'After logging in, browse the available question papers, syllabus, or notes. Click "Preview" to view the document, or "Download" to save it to your device',
-    },
-    {
-      q: "Can I share materials with others?",
-      a:
-        'Yes! Use the "Share" button to send Google Drive links to classmates or friends directly from the platform',
-    },
-    {
-      q: "How often is the database updated?",
-      a:
-        "We update our database regularly with the latest question papers, syllabus, and notes to ensure you always have access to current materials",
-    },
-    {
-      q: "Is my personal data safe?",
-      a:
-        "Absolutely! We use advanced security measures and encryption to keep your account and personal information safe",
-    },
-    {
-      q: "Does this platform support cross device compatibility?",
-      a: "Yes, our platform is fully responsive and works smoothly on any type of device",
-    },
-    {
-      q: "Who can I contact for support or feedback?",
-      a: 'Use the "Support & Feedback" section to reach out to our team.\'re here to help!',
-    },
-  ];
-
-  const [openIndex, setOpenIndex] = useState(null);
-  const answerRefs = useRef([]);
-
-  useEffect(() => {
-    items.forEach((_, i) => {
-      const el = answerRefs.current[i];
-      if (!el) return;
-      if (openIndex === i) {
-        el.style.height = el.scrollHeight + "px";
-      } else {
-        el.style.height = "0";
-      }
-    });
-  }, [openIndex, items]);
-
-  function toggle(i) {
-    setOpenIndex((prev) => (prev === i ? null : i));
-  }
-
+/* -----------------------------
+   Dashboard Home Content
+   ----------------------------- */
+function DashboardHomeContent({ greetingText, openLearnMore, handleNavClick }) {
   return (
-    <section className={cx("faq-section")} aria-label="FAQ">
-      <h2>Frequently Asked Questions (FAQ)</h2>
-      <div className={cx("faq-container")}>
-        {items.map((it, i) => (
-          <div className={cx("faq-item")} key={i}>
-            <h3
-              className={cx("faq-question", openIndex === i && "active")}
-              tabIndex={0}
-              onClick={() => toggle(i)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggle(i);
-                }
-              }}
-            >
-              {it.q}
-            </h3>
-            <div className={cx("faq-answer")} ref={(el) => (answerRefs.current[i] = el)}>
-              <p>{it.a}</p>
+    <div className={cx("main-body")} id="dashboardHome">
+      <div className={cx("main-content")}>
+        <div className={cx("image-text-section")}>
+          <img src="/Welcome.svg" alt="Welcome Image" />
+          <div className={cx("text")}>
+            <h2>{greetingText}</h2>
+            <p>
+              Turn Stress Into Your Strength! All You Need Just A Little Bit
+              Motivation...
+              <br />
+              Let's Power Up Your Day With The Perfect Motivational Quote:
+            </p>
+            <div className={cx("intro-buttons")}>
+              <a href="#" id="learnMoreBtn" data-modal="learnMoreModal" onClick={openLearnMore}>
+                What's New
+              </a>
             </div>
           </div>
-        ))}
+        </div>
+
+        <p className={cx("text-muted")}>
+          <i className="far fa-copyright" style={{ marginRight: "0.15rem" }}></i>{" "}
+          {new Date().getFullYear()} QNIT. All Rights Reserved.
+          <br />
+          <span className={cx("divider")}>
+            <i className="fas fa-lock" style={{ marginRight: "0.15rem" }}></i> Secured Data
+          </span>
+          <i className="fas fa-wrench" style={{ marginRight: "0.15rem" }}></i> Made in India <br />
+          <i className="fas fa-envelope" style={{ marginRight: "0.15rem" }}></i> Contact - devtruster@gmail.com
+        </p>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -153,243 +93,267 @@ function FAQ() {
    ----------------------------- */
 export default function AdminDashboard() {
   // Refs
-  const contentAreaRef = useRef(null); // where lazy sections render
-  const mainBodyRef = useRef(null); // the home body area
-  const navRef = useRef(null); // sidebar nav
+  const navRef = useRef(null);
   const inactivityTimerRef = useRef(null);
   const homeTogglerRef = useRef(null);
+  const spinnerTimerRef = useRef(null);
+  const spinnerShownAtRef = useRef(0);
 
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const location = useLocation();
+  const auth = useAuth();
+  const { profile } = useProfile();
 
   // UI state
-  const [spinnerVisible, setSpinnerVisible] = useState(false); // show spinner only during lazy loads
-  const [activeSection, setActiveSection] = useState("home"); // 'home' or 'ProfileSection', etc.
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [spinnerVisible, setSpinnerVisible] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
-  const [quoteText, setQuoteText] = useState(""); // motivational quote
   const [greetingText, setGreetingText] = useState("");
-  const [togglerVisible, setTogglerVisible] = useState(false); // home toggler visibility due to inactivity
-  const { lightMode } = useTheme();
-  const [overlay, setOverlay] = useState(null); // e.g. "ChangePassword"
-  const [overlayProps, setOverlayProps] = useState({});
+  const [togglerVisible, setTogglerVisible] = useState(false);
+  const [hideNavbar, setHideNavbar] = useState(false);
+  const [userFirstName, setUserFirstName] = useState("");
+
+  // Determine if current path is the dashboard home
+  const isHome =
+    location.pathname === "/Admin/Dashboard" ||
+    location.pathname === "/Admin/Dashboard/";
 
   /* -----------------------
-     Compute greeting (kept behavior)
+     Compute greeting (uses fetched userFirstName)
      ----------------------- */
   useEffect(() => {
-    const userName = "Sayan"; // keep this behavior; replace with real user data when available
     const hour = new Date().getHours();
     let greeting = "Hello";
     if (hour >= 5 && hour < 12) greeting = "Good Morning";
     else if (hour >= 12 && hour < 17) greeting = "Good Afternoon";
     else if (hour >= 17 && hour <= 23) greeting = "Good Evening";
-    setGreetingText(`${greeting} ${userName}`);
-  }, []);
 
-  // Preload LogoutModal immediately
-  useEffect(() => {
-    import("@/common/LogoutModal.jsx").catch(() => {});
-  }, []);
-  
+    let namePart = "User";
+    if (userFirstName) {
+      namePart = userFirstName;
+    } else if (profile?.full_name) {
+      namePart = profile.full_name.toString().trim().split(/\s+/)[0] || "User";
+    } else if (auth?.user?.email) {
+      namePart = (auth.user.email || "").split("@")[0] || "User";
+    }
+    setGreetingText(`${greeting} ${namePart}`);
+  }, [profile?.full_name, auth?.user?.email, userFirstName]);
+
   /* -----------------------
-     Load motivational quote from Quotes.json (safe fetch + JSON parsing)
+     Load user first name from Database / Profiles
      ----------------------- */
   useEffect(() => {
     let cancelled = false;
-    async function loadQuote() {
+
+    async function fetchFirstNameViaBackend() {
       try {
-        const res = await fetch("/data/Quotes.json", { cache: "no-cache" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const payload = await res.json();
-
-        const list =
-          Array.isArray(payload)
-            ? payload
-            : Array.isArray(payload.motivationalQuotes)
-            ? payload.motivationalQuotes
-            : [];
-
-        if (!list.length) {
-          const altList = payload.quotes || payload.items || payload.data || [];
-          if (Array.isArray(altList) && altList.length) {
-            const q = altList[Math.floor(Math.random() * altList.length)];
-            const txt = q?.text || q?.quote || q?.message || "";
-            if (!cancelled) setQuoteText(txt || "");
-            return;
+        let token = null;
+        if (supabase?.auth?.getSession) {
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            token = sessionData?.session?.access_token || null;
+          } catch (e) {
+            // ignore and fallback
           }
-          if (!cancelled) setQuoteText("");
+        }
+
+        if (!token && auth?.session?.access_token) {
+          token = auth.session.access_token;
+        }
+
+        if (!token) {
+          if (!cancelled) setUserFirstName("");
           return;
         }
 
-        const q = list[Math.floor(Math.random() * list.length)];
-        const text = q?.text || q?.quote || q?.content || q?.quoteText || q?.message || "";
-        if (!cancelled) setQuoteText(text || "");
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+        const url = `${API_BASE}/user/me/firstname`;
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+
+        if (!res.ok) {
+          console.warn("Could not fetch first name from backend:", res.status);
+          if (!cancelled) setUserFirstName("");
+          return;
+        }
+
+        const payload = await res.json();
+        if (!cancelled) setUserFirstName(payload?.firstName || "");
       } catch (err) {
-        if (!cancelled) setQuoteText("");
+        console.error("Error fetching first name via backend:", err);
+        if (!cancelled) setUserFirstName("");
       }
     }
 
-    loadQuote();
+    fetchFirstNameViaBackend();
+
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.user?.id, auth?.user?.email]);
 
-  // SpinnerVisible is only used when loading sections.
+  // Ensure spinner is hidden on mount
   useEffect(() => {
     setSpinnerVisible(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* -----------------------
-     Overlay control helpers
+     Loading Spinner Helpers
      ----------------------- */
-  const openOverlay = useCallback((name, props = {}) => {
-    if (!name) return;
-    setOverlay(name);
-    setOverlayProps(props || {});
-    try {
-      document.body.classList.add("modal-open");
-    } catch (e) {}
-  }, []);
+  const MIN_SPINNER_MS = 220;
 
-  const closeOverlay = useCallback(() => {
-    setOverlay(null);
-    setOverlayProps({});
-    try {
-      document.body.classList.remove("modal-open");
-    } catch (e) {}
-  }, []);
-
-  /* -----------------------
-     Section preloading helper (uses the static importers)
-     ----------------------- */
-  const preloadSection = useCallback((compName) => {
-    if (!compName || !importers[compName]) return;
-    // Call the static importer to warm the module cache
-    try {
-      importers[compName]();
-    } catch (e) {
-      // ignore preload errors
+  const showSpinner = useCallback(() => {
+    if (spinnerTimerRef.current) {
+      clearTimeout(spinnerTimerRef.current);
+      spinnerTimerRef.current = null;
     }
+    spinnerShownAtRef.current = Date.now();
+    setSpinnerVisible(true);
   }, []);
 
-  /* -----------------------
-     Dynamic initializer (single function for all sections)
-     If a section module exports init / initSection / init<CompName>, call it.
-     ----------------------- */
-  const runSectionInitializer = useCallback(
-    async (compName) => {
-      if (!compName || !importers[compName]) return;
-      try {
-        const mod = await importers[compName]().catch(() => null);
-        if (!mod) return;
-        const possibleInits = [mod.init, mod.initSection, mod[`init${compName}`], mod.default && mod.default.init].filter(Boolean);
-        const initFn = possibleInits.length ? possibleInits[0] : null;
-        if (typeof initFn === "function") {
-          const container = contentAreaRef.current || document.body;
-          setTimeout(() => {
-            try {
-              initFn(container);
-            } catch (e) {
-              // swallow init errors
-            }
-          }, 40);
-        }
-      } catch (err) {
-        // ignore
+  const hideSpinnerRespectingMinTime = useCallback(() => {
+    const shownAt = spinnerShownAtRef.current || 0;
+    const elapsed = Date.now() - shownAt;
+    const remaining = Math.max(0, MIN_SPINNER_MS - elapsed);
+    if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
+    spinnerTimerRef.current = setTimeout(() => {
+      spinnerTimerRef.current = null;
+      setSpinnerVisible(false);
+      spinnerShownAtRef.current = 0;
+    }, remaining);
+  }, []);
+
+  // hide spinner when route changes
+  useEffect(() => {
+    hideSpinnerRespectingMinTime();
+    return () => {
+      if (spinnerTimerRef.current) {
+        clearTimeout(spinnerTimerRef.current);
+        spinnerTimerRef.current = null;
       }
-    },
-    [contentAreaRef]
-  );
+    };
+  }, [location.pathname, hideSpinnerRespectingMinTime]);
 
   /* -----------------------
-     Navigation click handler (Vite-friendly: uses Sections mapping)
+     Navigation click handler
      ----------------------- */
   const handleNavClick = useCallback(
-    (e, dataSection) => {
+    (e, sectionPath) => {
       e?.preventDefault?.();
-      const compName = (dataSection || "").replace(/\.html$/i, "");
-      if (!compName) return;
-
-      // If user clicked logout action, open logout modal — don't change activeSection
-      if (/logout/i.test(compName)) {
-        setShowLogoutModal(true);
-        return;
-      }
-
-      setSpinnerVisible(true);
-      try {
-        setActiveSection(compName);
-
-        // hide home body (original behavior)
-        if (mainBodyRef.current) mainBodyRef.current.classList.add("hidden");
-
-        // warm module and run initializer (non-blocking)
-        if (importers[compName]) {
-          importers[compName]()
-            .then(() => runSectionInitializer(compName))
-            .catch(() => {})
-            .finally(() => {
-              setTimeout(() => setSpinnerVisible(false), 80);
-            });
-        } else {
-          // no importer (section missing) — stop spinner
-          setTimeout(() => setSpinnerVisible(false), 80);
-        }
-      } catch (err) {
-        setSpinnerVisible(false);
-        console.error("Error loading section:", err);
-      }
+      const targetPath = `/Admin/Dashboard/${sectionPath}`;
+      if (location.pathname === targetPath) return;
+      showSpinner();
+      navigate(targetPath);
     },
-    [runSectionInitializer]
+    [navigate, location.pathname, showSpinner]
   );
 
   /* -----------------------
      Home toggler click
      ----------------------- */
   const handleHomeClick = useCallback(() => {
-    setActiveSection("home");
-    if (mainBodyRef.current) {
-      mainBodyRef.current.classList.remove("hidden");
-      mainBodyRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    setShowLogoutModal(false);
+    showSpinner();
+    navigate("/Admin/Dashboard");
     setShowLearnMore(false);
-    closeOverlay();
-  }, [closeOverlay]);
+  }, [navigate, showSpinner]);
 
   /* -----------------------
-     Sidebar collapse / logo click behavior
-     ----------------------- */
+  Sidebar collapse / Logo click behavior
+  ----------------------- */
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      const collapseRangeMql = window.matchMedia("(min-width: 30.0625rem) and (max-width: 48rem)");
+      return !!collapseRangeMql.matches;
+    }
+    return false;
+  });
+  const lastScrollRef = useRef(typeof window !== "undefined" ? window.scrollY : 0);
+  const mqlMobileRef = useRef(null);
+
+  /* ---------- Collapse / Responsive Behavior ---------- */
   useEffect(() => {
     const navOuter = navRef.current;
-    const logoImg = navRef.current ? navRef.current.querySelector(`.${styles.logo} img`) : null;
+    if (!navOuter) return;
 
-    function logoClickHandler() {
-      if (navOuter) navOuter.classList.toggle(styles.collapsed);
-    }
+    const collapseRangeMql = window.matchMedia("(min-width: 30.0625rem) and (max-width: 48rem)");
+    const mobileMql = window.matchMedia("(max-width: 30rem)");
+    mqlMobileRef.current = mobileMql;
 
-    if ((logoImg && navOuter) || window.innerWidth < 768) {
-      if (logoImg) logoImg.addEventListener("click", logoClickHandler);
-    }
-
-    function handleSidebarCollapse() {
-      if (!navOuter) return;
-      if (window.innerWidth < 768) {
-        navOuter.classList.add(styles.collapsed);
+    const applyState = () => {
+      if (mobileMql.matches) {
+        setCollapsed(false);
+      } else if (collapseRangeMql.matches) {
+        setCollapsed(true);
       } else {
-        navOuter.classList.remove(styles.collapsed);
+        setCollapsed(false);
       }
-    }
+    };
 
-    handleSidebarCollapse();
-    window.addEventListener("resize", handleSidebarCollapse);
+    applyState();
+
+    const mqHandler = () => applyState();
+    collapseRangeMql.addEventListener("change", mqHandler);
+    mobileMql.addEventListener("change", mqHandler);
+
+    // logo click should toggle collapsed only on non-mobile
+    const logoEl = document.getElementById("logoImg");
+    const logoClickHandler = () => {
+      if (mobileMql.matches) return;
+      setCollapsed((s) => !s);
+    };
+    if (logoEl) logoEl.addEventListener("click", logoClickHandler);
 
     return () => {
-      if (logoImg) logoImg.removeEventListener("click", logoClickHandler);
-      window.removeEventListener("resize", handleSidebarCollapse);
+      collapseRangeMql.removeEventListener("change", mqHandler);
+      mobileMql.removeEventListener("change", mqHandler);
+      if (logoEl) logoEl.removeEventListener("click", logoClickHandler);
+    };
+  }, []);
+
+  /* -----------------------
+    Navbar auto-hide while scrolling down
+    ----------------------- */
+  useEffect(() => {
+    const mobileMql = window.matchMedia("(max-width: 30rem)");
+    mqlMobileRef.current = mobileMql;
+
+    let rafId = null;
+
+    const onScroll = () => {
+      if (!mobileMql.matches) return;
+
+      const current = window.scrollY;
+      const last = lastScrollRef.current;
+
+      if (Math.abs(current - last) < 12) return;
+
+      if (current > last && current > 80) {
+        setHideNavbar((prev) => (prev ? prev : true));
+      } else {
+        setHideNavbar((prev) => (prev ? false : prev));
+      }
+      lastScrollRef.current = current;
+    };
+
+    const handler = () => {
+      if (rafId === null) {
+        rafId = window.requestAnimationFrame(() => {
+          onScroll();
+          rafId = null;
+        });
+      }
+    };
+
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handler);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
 
@@ -400,28 +364,17 @@ export default function AdminDashboard() {
     function onKey(e) {
       if (e.key === "Escape") {
         if (showLearnMore) setShowLearnMore(false);
-        if (showLogoutModal) setShowLogoutModal(false);
-        if (overlay) closeOverlay();
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [showLearnMore, showLogoutModal, overlay, closeOverlay]);
-
-  /* -----------------------
-     Keep main body visible when returning to home
-     ----------------------- */
-  useEffect(() => {
-    if (activeSection === "home" && mainBodyRef.current) {
-      mainBodyRef.current.classList.remove("hidden");
-    }
-  }, [activeSection]);
+  }, [showLearnMore]);
 
   /* -----------------------
      Toggler auto-hide / inactivity detection
      ----------------------- */
   useEffect(() => {
-    if (activeSection === "home") {
+    if (isHome) {
       setTogglerVisible(false);
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
@@ -457,7 +410,7 @@ export default function AdminDashboard() {
       }
       events.forEach((ev) => document.removeEventListener(ev, activityHandler));
     };
-  }, [activeSection]);
+  }, [isHome]);
 
   /* -----------------------
      Helper: show/hide LearnMore modal
@@ -468,84 +421,56 @@ export default function AdminDashboard() {
   }, []);
 
   /* -----------------------
-     Render functions: nav links
+     NavLink Wrapperr
      ----------------------- */
-  const NavLink = ({ compName, label, iconClass }) => {
-    const htmlData = `${compName}.html`;
-    const isActive = activeSection === compName;
+  const NavLink = ({ to, label, iconClass }) => {
     return (
-      <li data-section={htmlData}>
-        <a
-          href="#"
-          data-section={htmlData}
-          onClick={(e) => handleNavClick(e, htmlData)}
-          onMouseEnter={() => preloadSection(compName)}
-          className={isActive ? cx("active") : ""}
+      <li>
+        <RouterNavLink
+          to={to}
+          className={({ isActive }) => (isActive ? cx("active") : "")}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            if (location.pathname === to) return;
+            showSpinner();
+            navigate(to);
+          }}
         >
           <i className={iconClass} aria-hidden="true" />
           <span className={cx("nav-item")}>{label}</span>
-        </a>
+        </RouterNavLink>
       </li>
     );
   };
 
-  /* -----------------------
-     Safe OnConfirm for Logout
-     ----------------------- */
-  const handleLogoutConfirm = useCallback(() => {
-    setShowLogoutModal(false);
-    logout();
-    navigate("/");
-  }, [logout, navigate]);
-
-  /* -----------------------
-     Which component to render for activeSection
-     ----------------------- */
-  const ActiveSectionComponent = activeSection !== "home" ? Sections[activeSection] : null;
-  const isHome = activeSection === "home";
   const stateClass = isHome ? "home-hidden" : togglerVisible ? "visible" : "hidden";
   const activeClass = togglerVisible ? "toggler-active" : "";
-  const className = cx("home-toggler", stateClass, activeClass);
-  const ActiveOverlayComponent = overlay ? OverlayComponents[overlay] : null;
+  const homeTogglerClassName = cx("home-toggler", stateClass, activeClass);
 
   /* -----------------------
      Render Dashboard JSX
-     - Render all sections (lazy) but toggle visibility via style to avoid remounts
      ----------------------- */
   return (
     <div className={cx("container")}>
-      {/* Spinner overlay used during lazy section loads */}
-      <SpinnerOverlay visible={spinnerVisible} />
-
       {/* Sidebar / Navigation */}
-      <nav aria-label="Main navigation" className={cx("sidebar-nav")} id="sidebarNav" ref={navRef}>
+      <nav
+        aria-label="Main navigation"
+        className={cx("nav", collapsed && "collapsed", hideNavbar && "hide-navbar")}
+        id="nav"
+        ref={navRef}
+      >
         <div className={cx("navbar")}>
           <div className={cx("logo")} id="logoImg">
-            <img src="/Logo.png" alt="Logo" />
+            <img src="/Menu.png" alt="Menu" />
             <h1>MENU</h1>
           </div>
           <ul className={cx("nav-links")}>
-            <NavLink compName="ProfileSection" label="PROFILE" iconClass="fas fa-user" />
-            <NavLink compName="QuestionSection" label="PYQs" iconClass="fas fa-chart-bar" />
-            <NavLink compName="SyllabusSection" label="SYLLABUS" iconClass="fas fa-tasks" />
-            <NavLink compName="OthersSection" label="OTHERS" iconClass="fas fa-briefcase" />
-            <NavLink compName="SettingsSection" label="SETTINGS" iconClass="fas fa-cog" />
-            <NavLink compName="FeedbackSection" label="FEEDBACK" iconClass="fas fa-comment" />
-            <li data-section="LogoutModal.html">
-              <a
-                href="#"
-                id="logoutBtn"
-                data-section="LogoutModal.html"
-                className={cx("logout")}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowLogoutModal(true);
-                }}
-              >
-                <i className="fas fa-sign-out-alt" aria-hidden="true" />
-                <span className={cx("nav-item")}>LOG OUT</span>
-              </a>
-            </li>
+            <NavLink to="/Admin/Dashboard/ProfileSection" label="Profile" iconClass="fas fa-user" />
+            <NavLink to="/Admin/Dashboard/ManageUsers" label="Tracking" iconClass="fas fa-search" />
+            <NavLink to="/Admin/Dashboard/UploadSection" label="Uploads" iconClass="fas fa-upload" />
+            <NavLink to="/Admin/Dashboard/UserFeedbacks" label="Feedbacks" iconClass="fas fa-comment" />
+            <NavLink to="/Admin/Dashboard/SettingsSection" label="Settings" iconClass="fas fa-cog" />
           </ul>
         </div>
       </nav>
@@ -556,153 +481,42 @@ export default function AdminDashboard() {
           <p>ADMIN DASHBOARD</p>
         </div>
 
-        {/* Home / Dashboard body (shown only when activeSection === 'home') */}
-        {isHome && (
-          <div className={cx("main-body")} id="dashboardHome" ref={mainBodyRef}>
-            <div className={cx("main-content")}>
-              <div className={cx("image-text-section")}>
-                <img src="/Welcome.svg" alt="Classroom Management" />
-                <div className={cx("text")}>
-                  <h2>{greetingText}</h2>
-                  <p>
-                    Turn Stress Into Your Strength! All You Need Just A Little Bit
-                    Motivation...<br />
-                    Let's Power Up Your Day With The Perfect Motivational Quote:
-                  </p>
-                  <p id="motivational-quote">{quoteText ? <em><br />“{quoteText}”</em> : ""}</p>
-                  <div className={cx("intro-buttons")}>
-                    <a href="#" id="learnMoreBtn" data-modal="learnMoreModal" onClick={openLearnMore}>
-                      What's New
-                    </a>
-                    <a href="#" data-section="FeedbackSection.html" onClick={(e) => handleNavClick(e, "FeedbackSection.html")}>
-                      Post Your Review
-                    </a>
-                  </div>
-                </div>
-              </div>
+        {/* Dynamic Section Loading Area (lazy loaded React components controlled by React Router) */}
+        <div className={cx("content-area")} id="content-area">
+          {/* Manual spinner (shows immediately on click) */}
+          {spinnerVisible && <SpinnerOverlay visible={true} />}
 
-              {/* Features */}
-              <section className={cx("features-section")} aria-label="Key Features">
-                <h2>Key Features</h2>
-                <p>
-                  A comprehensive online resource management software embedded
-                  with exceptional features required to deliver an extraordinary
-                  learning experience
-                </p>
-
-                <div className={cx("features-container")} id="features-container-dashboard">
-                  <div className={cx("feature-box")}>
-                    <img src="/Pdf.png" alt="PDF Access" />
-                    <h3>Instant PDF Access</h3>
-                    <p>
-                      View and download previous year question papers, syllabus,
-                      and other documents in PDF format with just a click
-                    </p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Share.png" alt="Share" />
-                    <h3>Easy Sharing</h3>
-                    <p>Share study materials with friends and classmates directly from the platform</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Smartphone.png" alt="Mobile Friendly" />
-                    <h3>Mobile Friendly</h3>
-                    <p>Access all features from any device - Desktop, Table or Smartphone</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Security.png" alt="Security" />
-                    <h3>Advanced Security</h3>
-                    <p>Your account and personal data are protected with robust security measures and encryption</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Database.png" alt="Frequent Updates" />
-                    <h3>Frequently Updated Database</h3>
-                    <p>The resource library is actively updated with the latest question papers, syllabus, and notes</p>
-                  </div>
-
-                  <div className={cx("feature-box")}>
-                    <img src="/Support.png" alt="Support" />
-                    <h3>Support & Feedback</h3>
-                    <p>Reach out for help or share feedback to help in improving user experience</p>
-                  </div>
-                </div>
-              </section>
-
-              {/* FAQ (React-based) */}
-              <FAQ />
-
-              <p className={cx("text-muted")}>
-                <i className="far fa-copyright" /> {new Date().getFullYear()} QNIT. All Rights Reserved.
-                <br />
-                <span className={cx("divider")}><i className="fas fa-lock" /> Secured Data</span>
-                <i className="fas fa-wrench" /> Made in India
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Home toggler (hidden on 'home' and auto-hidden by inactivity) */}
-        <button
-          id="homeToggler"
-          aria-label="Go to Home"
-          className={cx("home-toggler", isHome ? "home-hidden" : togglerVisible ? "visible" : "hidden")}
-          onClick={handleHomeClick}
-          ref={homeTogglerRef}
-          title="Return Home"
-        >
-          <span className="material-symbols-outlined">HOME</span>
-        </button>
-
-        {/* Dynamic Section Loading Area (lazy loaded React components) */}
-        <div className={cx("content-area")} id="content-area" ref={contentAreaRef}>
+          {/* Suspense fallback (shows when React suspends while loading a lazy import) */}
           <Suspense fallback={<SpinnerOverlay visible={true} />}>
-            {/* Render each section once and control visibility via CSS/style to avoid remounts */}
-            {Object.entries(Sections).map(([name, Component]) => (
-              <div
-                key={name}
-                aria-hidden={activeSection !== name}
-                style={{ display: activeSection === name ? "block" : "none" }}
-                className={cx("section-wrapper")}
-                data-section={`${name}.html`}
-              >
-                {name === "SettingsSection" ? (
-                  overlay && ActiveOverlayComponent ? (
-                    /* Render overlay over settings when requested */
-                    <ActiveOverlayComponent onCancel={closeOverlay} onClose={closeOverlay} {...overlayProps} />
-                  ) : (
-                    <Component openOverlay={openOverlay} closeOverlay={closeOverlay} />
-                  )
-                ) : (
-                  <Component />
-                )}
-              </div>
-            ))}
+            <Routes>
+              {/* Dashboard Home Route */}
+              <Route
+                index
+                element={<DashboardHomeContent greetingText={greetingText} openLearnMore={openLearnMore} handleNavClick={handleNavClick} />}
+              />
+              {/* Individual Dashboard Sections */}
+              <Route path="ProfileSection" element={<ProfileSection />} />
+              <Route path="ManageUsers" element={<ManageUsers />} />
+              <Route path="UploadSection" element={<UploadSection />} />
+              <Route path="UserFeedbacks" element={<UserFeedbacks />} />
+              <Route path="SettingsSection/*" element={<SettingsSection />} />
 
-            {/* If requested activeSection doesn't exist in map, show NotFound */}
-            {activeSection !== "home" && !Sections[activeSection] && (
-              <NotFoundSection name={activeSection} />
-            )}
+              {/* Catch-all for unknown dashboard routes */}
+              <Route path="*" element={<NotFoundSection />} />
+            </Routes>
           </Suspense>
         </div>
+
+        {/* Home toggler (hidden on 'home' and auto-hidden by inactivity) */}
+        <button id="homeToggler" aria-label="Go to Home" className={homeTogglerClassName} onClick={handleHomeClick} ref={homeTogglerRef} title="Return Home">
+          <i className="fas fa-home" style={{ fontSize: "1.25rem", color: "#fff" }}></i>
+        </button>
       </main>
 
       {/* Learn More modal (React controlled) */}
-        <div
-        id="learnMoreModal"
-        className={cx("learnMoreModal", showLearnMore && "show")}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="learnMoreModalTitle"
-        onClick={() => setShowLearnMore(false)}
-      >
+      <div id="learnMoreModal" className={cx("learnMoreModal", showLearnMore && "show")} role="dialog" aria-modal="true" aria-labelledby="learnMoreModalTitle" onClick={() => setShowLearnMore(false)}>
         <div className={cx("modal-content")} onClick={(e) => e.stopPropagation()}>
-          <button id="closeLearnMoreModal" data-close aria-label="Close" onClick={() => setShowLearnMore(false)}>
-            &times;
-          </button>
+          <button id="closeLearnMoreModal" data-close aria-label="Close" onClick={() => setShowLearnMore(false)}>&times;</button>
           <h2 id="learnMoreModalTitle">New in the System</h2>
           <ul>
             <li>
@@ -720,12 +534,8 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Logout modal area (React-driven). Lazy component is parent-controlled */}
-      {showLogoutModal && (
-        <Suspense fallback={null}>
-          <LogoutModalComponent isOpen={showLogoutModal} onClose={() => setShowLogoutModal(false)} onConfirm={handleLogoutConfirm} />
-        </Suspense>
-      )}
+      {/* Global manual spinner (keeps parity with previous placement) */}
+      {spinnerVisible && <SpinnerOverlay visible={spinnerVisible} />}
     </div>
   );
 }

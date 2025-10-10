@@ -47,27 +47,28 @@ export default function PasswordCreation() {
 
   // ------------------ helpers & validation ------------------
   useEffect(() => {
-    // derive password checks
     const checks = {
       length: password.length >= 12,
       upper: /[A-Z]/.test(password),
       lower: /[a-z]/.test(password),
       digit: /[0-9]/.test(password),
       special: /[^A-Za-z0-9]/.test(password),
-      noName: true,
+      noName: false,
     };
 
-    if (fullName && password.length > 0) {
+    if (password.length > 0) {
       const tokens = fullName
         .split(/\s+/)
         .map((t) => t.trim().toLowerCase())
         .filter((t) => t.length >= 2);
+      let ok = true;
       for (const tk of tokens) {
         if (tk && password.toLowerCase().includes(tk)) {
-          checks.noName = false;
+          ok = false;
           break;
         }
       }
+      checks.noName = ok;
     }
 
     setPasswordChecks(checks);
@@ -324,10 +325,8 @@ export default function PasswordCreation() {
           <div className={styles.panel}>
             {/* show short loading / error if session not ready */}
             {loading && (
-              <div className={styles.formNotice}>Processing reset link — please wait…</div>
+              <div className={styles.formNotice}>Please Wait…</div>
             )}
-
-            {formError && <div className={styles.formError}>{formError}</div>}
 
             {/* password */}
             <div className={styles.field}>
@@ -401,6 +400,9 @@ export default function PasswordCreation() {
                 </small>
               )}
             </div>
+            
+            {/* Error Message */}
+            {formError && <div className={styles.formError}>{formError}</div>}
 
             {/* Actions */}
             <div className={styles.actions}>
@@ -420,6 +422,7 @@ export default function PasswordCreation() {
                   "Create Password"
                 )}
               </button>
+              <button type="button" className={`${styles.btn} ${styles.cancel}`} onClick={() => navigate("/")}>Cancel Process</button>
             </div>
           </div>
         </form>

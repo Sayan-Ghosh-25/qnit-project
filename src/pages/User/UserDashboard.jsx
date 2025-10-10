@@ -32,8 +32,9 @@ function SpinnerOverlay({ visible = true }) {
   return (
     <div
       id="loading-spinner"
-      className={cx("loading-spinner", { show: visible })}
+      className={cx("loading-spinner", visible ? "show" : "")}
       aria-hidden={!visible}
+      style={{ zIndex: 9999 }}
     >
       <div className={cx("spinner")} />
     </div>
@@ -43,7 +44,7 @@ function SpinnerOverlay({ visible = true }) {
 /* Fallback for unknown routes within the dashboard */
 function NotFoundSection() {
   return (
-    <div style={{ padding: 24, color: "#fff", textAlign: "center"}}>
+    <div style={{ padding: 24, color: "#fff", textAlign: "center" }}>
       <h3>404 - Dashboard Section Not Found</h3>
       <p>The requested dashboard section does not exist</p>
     </div>
@@ -89,14 +90,14 @@ function DashboardHomeContent({ greetingText, quoteText, openLearnMore, handleNa
         </section>
 
         <p className={cx("text-muted")}>
-          <i className="far fa-copyright" style={{marginRight: "0.15rem"}}></i>{" "}
+          <i className="far fa-copyright" style={{ marginRight: "0.15rem" }}></i>{" "}
           {new Date().getFullYear()} QNIT. All Rights Reserved.
           <br />
           <span className={cx("divider")}>
-            <i className="fas fa-lock" style={{marginRight: "0.15rem"}}></i> Secured Data
+            <i className="fas fa-lock" style={{ marginRight: "0.15rem" }}></i> Secured Data
           </span>
-          <i className="fas fa-wrench" style={{marginRight: "0.15rem"}}></i> Made in India <br />
-          <i className="fas fa-envelope" style={{marginRight: "0.15rem"}}></i> Contact - devtruster@gmail.com
+          <i className="fas fa-wrench" style={{ marginRight: "0.15rem" }}></i> Made in India <br />
+          <i className="fas fa-envelope" style={{ marginRight: "0.15rem" }}></i> Contact - devtruster@gmail.com
         </p>
       </div>
     </div>
@@ -111,6 +112,8 @@ export default function UserDashboard() {
   const navRef = useRef(null);
   const inactivityTimerRef = useRef(null);
   const homeTogglerRef = useRef(null);
+  const spinnerTimerRef = useRef(null);
+  const spinnerShownAtRef = useRef(0);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -124,7 +127,6 @@ export default function UserDashboard() {
   const [greetingText, setGreetingText] = useState("");
   const [togglerVisible, setTogglerVisible] = useState(false);
   const [hideNavbar, setHideNavbar] = useState(false);
-  const [lastScroll, setLastScroll] = useState(0);
   const [userFirstName, setUserFirstName] = useState("");
 
   // Determine if current path is the dashboard home
@@ -149,7 +151,7 @@ export default function UserDashboard() {
       namePart = (auth.user.email || "").split("@")[0] || "User";
     }
     setGreetingText(`${greeting} ${namePart}`);
-  }, [profile?.full_name, auth?.user?.email]);
+  }, [profile?.full_name, auth?.user?.email, userFirstName]);
 
   /* -----------------------
      Load user first name from Database / Profiles
@@ -255,38 +257,79 @@ export default function UserDashboard() {
     };
   }, []);
 
-  // SpinnerVisible is only used when loading sections
+  // Ensure spinner is hidden on mount
   useEffect(() => {
     setSpinnerVisible(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* -----------------------
-     Navigation click handler (now uses react-router-dom navigate)
+     Loading Spinner Helpers
+     ----------------------- */
+  const MIN_SPINNER_MS = 220;
+
+  const showSpinner = useCallback(() => {
+    if (spinnerTimerRef.current) {
+      clearTimeout(spinnerTimerRef.current);
+      spinnerTimerRef.current = null;
+    }
+    spinnerShownAtRef.current = Date.now();
+    setSpinnerVisible(true);
+  }, []);
+
+  const hideSpinnerRespectingMinTime = useCallback(() => {
+    const shownAt = spinnerShownAtRef.current || 0;
+    const elapsed = Date.now() - shownAt;
+    const remaining = Math.max(0, MIN_SPINNER_MS - elapsed);
+    if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
+    spinnerTimerRef.current = setTimeout(() => {
+      spinnerTimerRef.current = null;
+      setSpinnerVisible(false);
+      spinnerShownAtRef.current = 0;
+    }, remaining);
+  }, []);
+
+  // hide spinner when route changes
+  useEffect(() => {
+    hideSpinnerRespectingMinTime();
+    return () => {
+      if (spinnerTimerRef.current) {
+        clearTimeout(spinnerTimerRef.current);
+        spinnerTimerRef.current = null;
+      }
+    };
+  }, [location.pathname, hideSpinnerRespectingMinTime]);
+
+  /* -----------------------
+     Navigation click handler
      ----------------------- */
   const handleNavClick = useCallback(
-    (e, sectionPath) => {
-      e?.preventDefault?.();
-      setSpinnerVisible(true);
-      navigate(`/User/Dashboard/${sectionPath}`);
-      setTimeout(() => setSpinnerVisible(false), 200);
-    },
-    [navigate]
-  );
+  (e, sectionPath) => {
+    e?.preventDefault?.();
+    const targetPath = `/User/Dashboard/${sectionPath}`;
+    
+    if (location.pathname === targetPath) {
+      return;
+    }
+
+    setSpinnerVisible(true);
+    navigate(targetPath);
+  },
+  [navigate, location.pathname]
+);
 
   /* -----------------------
      Home toggler click
      ----------------------- */
   const handleHomeClick = useCallback(() => {
+    showSpinner();
     navigate("/User/Dashboard");
     setShowLearnMore(false);
-  }, [navigate]);
+  }, [navigate, showSpinner]);
 
   /* -----------------------
   Sidebar collapse / Logo click behavior
   ----------------------- */
   const [collapsed, setCollapsed] = useState(() => {
-    // initial collapsed state based on width
     if (typeof window !== "undefined") {
       const collapseRangeMql = window.matchMedia("(min-width: 30.0625rem) and (max-width: 48rem)");
       return !!collapseRangeMql.matches;
@@ -295,16 +338,16 @@ export default function UserDashboard() {
   });
   const lastScrollRef = useRef(typeof window !== "undefined" ? window.scrollY : 0);
   const mqlMobileRef = useRef(null);
-  
+
   /* ---------- Collapse / Responsive Behavior ---------- */
   useEffect(() => {
     const navOuter = navRef.current;
     if (!navOuter) return;
-  
+
     const collapseRangeMql = window.matchMedia("(min-width: 30.0625rem) and (max-width: 48rem)");
     const mobileMql = window.matchMedia("(max-width: 30rem)");
     mqlMobileRef.current = mobileMql;
-  
+
     const applyState = () => {
       if (mobileMql.matches) {
         setCollapsed(false);
@@ -314,13 +357,13 @@ export default function UserDashboard() {
         setCollapsed(false);
       }
     };
-  
+
     applyState();
-  
+
     const mqHandler = () => applyState();
     collapseRangeMql.addEventListener("change", mqHandler);
     mobileMql.addEventListener("change", mqHandler);
-  
+
     // logo click should toggle collapsed only on non-mobile
     const logoEl = document.getElementById("logoImg");
     const logoClickHandler = () => {
@@ -328,42 +371,39 @@ export default function UserDashboard() {
       setCollapsed((s) => !s);
     };
     if (logoEl) logoEl.addEventListener("click", logoClickHandler);
-  
+
     return () => {
       collapseRangeMql.removeEventListener("change", mqHandler);
       mobileMql.removeEventListener("change", mqHandler);
       if (logoEl) logoEl.removeEventListener("click", logoClickHandler);
     };
   }, []);
-  
+
   /* -----------------------
     Navbar auto-hide while scrolling down
     ----------------------- */
   useEffect(() => {
     const mobileMql = window.matchMedia("(max-width: 30rem)");
     mqlMobileRef.current = mobileMql;
-  
+
     let rafId = null;
-  
+
     const onScroll = () => {
       if (!mobileMql.matches) return;
-  
+
       const current = window.scrollY;
       const last = lastScrollRef.current;
-  
-      // small threshold to avoid toggling on tiny scrolls
+
       if (Math.abs(current - last) < 12) return;
-  
+
       if (current > last && current > 80) {
-        // scrolling down => hide
         setHideNavbar((prev) => (prev ? prev : true));
       } else {
-        // scrolling up => show
         setHideNavbar((prev) => (prev ? false : prev));
       }
       lastScrollRef.current = current;
     };
-  
+
     const handler = () => {
       if (rafId === null) {
         rafId = window.requestAnimationFrame(() => {
@@ -372,14 +412,14 @@ export default function UserDashboard() {
         });
       }
     };
-  
+
     window.addEventListener("scroll", handler, { passive: true });
     return () => {
       window.removeEventListener("scroll", handler);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
-  
+
   /* -----------------------
      Global key handler for Escape (close modals)
      ----------------------- */
@@ -444,26 +484,36 @@ export default function UserDashboard() {
   }, []);
 
   /* -----------------------
-     Render functions: uses RouterNavLink
+     NavLink Wrapper
      ----------------------- */
   const NavLink = ({ to, label, iconClass }) => {
-    return (
-      <li>
-        <RouterNavLink
-          to={to}
-          className={({ isActive }) => (isActive ? cx("active") : "")}
-        >
-          <i className={iconClass} aria-hidden="true" />
-          <span className={cx("nav-item")}>{label}</span>
-        </RouterNavLink>
-      </li>
-    );
-  };
+  return (
+    <li>
+      <RouterNavLink
+        to={to}
+        className={({ isActive }) => (isActive ? cx("active") : "")}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          
+          if (location.pathname === to) {
+            return;
+          }
+
+          showSpinner();
+          navigate(to);
+        }}
+      >
+        <i className={iconClass} aria-hidden="true" />
+        <span className={cx("nav-item")}>{label}</span>
+      </RouterNavLink>
+    </li>
+  );
+};
 
   const stateClass = isHome ? "home-hidden" : togglerVisible ? "visible" : "hidden";
   const activeClass = togglerVisible ? "toggler-active" : "";
   const homeTogglerClassName = cx("home-toggler", stateClass, activeClass);
-
 
   /* -----------------------
      Render Dashboard JSX
@@ -471,9 +521,12 @@ export default function UserDashboard() {
   return (
     <div className={cx("container")}>
       {/* Sidebar / Navigation */}
-      <nav aria-label="Main navigation"
-      className={cx("nav", collapsed && "collapsed", hideNavbar && "hide-navbar")}
-      id="nav" ref={navRef}>
+      <nav
+        aria-label="Main navigation"
+        className={cx("nav", collapsed && "collapsed", hideNavbar && "hide-navbar")}
+        id="nav"
+        ref={navRef}
+      >
         <div className={cx("navbar")}>
           <div className={cx("logo")} id="logoImg">
             <img src="/Menu.png" alt="Menu" />
@@ -498,17 +551,25 @@ export default function UserDashboard() {
 
         {/* Dynamic Section Loading Area (lazy loaded React components controlled by React Router) */}
         <div className={cx("content-area")} id="content-area">
+          {/* Manual spinner (shows immediately on click) */}
+          {spinnerVisible && <SpinnerOverlay visible={true} />}
+
+          {/* Suspense fallback (shows when React suspends while loading a lazy import) */}
           <Suspense fallback={<SpinnerOverlay visible={true} />}>
             <Routes>
               {/* Dashboard Home Route */}
-              <Route index element={
-                <DashboardHomeContent
-                  greetingText={greetingText}
-                  quoteText={quoteText}
-                  openLearnMore={openLearnMore}
-                  handleNavClick={handleNavClick}
-                />
-              } />
+              <Route
+                index
+                element={
+                  <DashboardHomeContent
+                    greetingText={greetingText}
+                    quoteText={quoteText}
+                    openLearnMore={openLearnMore}
+                    handleNavClick={handleNavClick}
+                  />
+                }
+              />
+
               {/* Individual Dashboard Sections */}
               <Route path="ProfileSection" element={<ProfileSection />} />
               <Route path="QuestionSection" element={<QuestionSection />} />
@@ -532,19 +593,19 @@ export default function UserDashboard() {
           ref={homeTogglerRef}
           title="Return Home"
         >
-          <i className="fas fa-home" style={{ fontSize: "1.25rem", color: "#fff"}}></i>
+          <i className="fas fa-home" style={{ fontSize: "1.25rem", color: "#fff" }}></i>
         </button>
       </main>
 
       {/* Learn More modal (React controlled) */}
-        <div
-          id="learnMoreModal"
-          className={cx("learnMoreModal", showLearnMore && "show")}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="learnMoreModalTitle"
-          onClick={() => setShowLearnMore(false)}
-        >
+      <div
+        id="learnMoreModal"
+        className={cx("learnMoreModal", showLearnMore && "show")}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="learnMoreModalTitle"
+        onClick={() => setShowLearnMore(false)}
+      >
         <div className={cx("modal-content")} onClick={(e) => e.stopPropagation()}>
           <button id="closeLearnMoreModal" data-close aria-label="Close" onClick={() => setShowLearnMore(false)}>
             &times;
