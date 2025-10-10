@@ -1,8 +1,10 @@
 // src/pages/Authentication/components/NewPassword.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./NewPassword.module.css";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 /* Tick SVG for success modal */
 const TICK_SVG = (
@@ -40,12 +42,12 @@ export default function PasswordCreation() {
 
   // session & profile
   const [loading, setLoading] = useState(true);
-  const [sessionUser, setSessionUser] = useState(null); // supabase user obj
-  const [fullName, setFullName] = useState(""); // for `noName` check
+  const [sessionUser, setSessionUser] = useState(null);
+  const [fullName, setFullName] = useState("");
 
   // ------------------ helpers & validation ------------------
   useEffect(() => {
-    // derive password checks (keeps your original rules)
+    // derive password checks
     const checks = {
       length: password.length >= 12,
       upper: /[A-Z]/.test(password),
@@ -78,11 +80,23 @@ export default function PasswordCreation() {
   function canSubmit() {
     if (!allPasswordChecksPass()) return false;
     if (password !== confirmPassword) return false;
-    if (!sessionUser) return false; // must have a valid session from the recovery link
+    if (!sessionUser) return false;
     return true;
   }
 
-  // ------------------ process recovery link & session ------------------
+  // Helper: get current access token from supabase session
+  async function getAccessToken() {
+    try {
+      const sessionResp = await supabase.auth.getSession();
+      const token = sessionResp?.data?.session?.access_token || null;
+      return token;
+    } catch (e) {
+      console.warn("getAccessToken failed:", e);
+      return null;
+    }
+  }
+
+  // ------------------ Process recovery link & Session ------------------
   useEffect(() => {
     let mounted = true;
 
@@ -103,8 +117,7 @@ export default function PasswordCreation() {
               foundUser = data.session.user;
             }
           } catch (err) {
-            // Not fatal - continue
-            // console.debug("getSessionFromUrl failed:", err);
+            // ignore & continue
           }
         }
 
@@ -127,8 +140,7 @@ export default function PasswordCreation() {
             const url = new URL(window.location.href);
             const code = url.searchParams.get("code");
             if (code && supabase?.auth?.exchangeCodeForSession) {
-              const { data: exData, error: exErr } =
-                await supabase.auth.exchangeCodeForSession(code);
+              const { data: exData, error: exErr } = await supabase.auth.exchangeCodeForSession(code);
               if (!exErr && exData?.session?.user) {
                 foundUser = exData.session.user;
               }
@@ -167,13 +179,13 @@ export default function PasswordCreation() {
         } else {
           // no valid session -> show helpful message
           setFormError(
-            "Invalid or expired password reset link. Please request a fresh password reset from the Sign In dialog."
+            "Invalid or expired password reset link! Please make a fresh password reset request"
           );
         }
       } catch (err) {
         console.error("Error processing recovery:", err);
         setFormError(
-          "Unable to process password reset link. It may be expired or invalid."
+          "Unable to process password reset link! It may be expired or invalid"
         );
       } finally {
         if (mounted) setLoading(false);
@@ -192,7 +204,7 @@ export default function PasswordCreation() {
     setFormError("");
 
     if (!sessionUser) {
-      setFormError("Session missing. Use the password reset email link to arrive here.");
+      setFormError("Session missing! Use the password reset email link to arrive here");
       return;
     }
 
@@ -202,48 +214,88 @@ export default function PasswordCreation() {
     }
 
     if (!allPasswordChecksPass()) {
-      setFormError("Please satisfy all password requirements.");
+      setFormError("Please satisfy all password requirements");
       return;
     }
 
     if (password !== confirmPassword) {
-      setFormError("Passwords do not match.");
+      setFormError("Passwords do not match");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // call supabase updateUser (user must be signed-in via recovery link/session)
-      const { data, error } = await supabase.auth.updateUser({
-        password: password,
-      });
-
-      if (error) throw error;
-
-      // success
-      setSuccessModal(true);
-
-      // sign the user out to force a fresh login with new password
-      timeoutsRef.current.push(
-        setTimeout(async () => {
+      // If a backend API is configured, prefer server-side password update
+      if (API_BASE_URL) {
+        // ensure we have a valid access token
+        const token = (await getAccessToken());
+        if (!token) {
+          // Try to re-read session from URL again (bridging cases where SDK parsed it earlier)
           try {
-            await supabase.auth.signOut();
-          } catch (e) {
-            // ignore
-          }
-          setSuccessModal(false);
-          navigate("/"); // or /SignIn
-        }, 1400)
-      );
+            const { data } = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({}));
+            const t = data?.session?.access_token || null;
+            if (t) {
+              // noop
+            }
+          } catch (e) {}
+        }
+
+        const finalToken = (await getAccessToken()) || null;
+        if (!finalToken) throw new Error("Failed to obtain authentication token for password reset");
+
+        const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/password/update`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${finalToken}`,
+          },
+          body: JSON.stringify({ password }),
+        });
+
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+          throw new Error(j.error || j.message || "Password update failed on server");
+        }
+
+        // success
+        setSuccessModal(true);
+        timeoutsRef.current.push(
+          setTimeout(async () => {
+            try {
+              await supabase.auth.signOut();
+            } catch (e) {}
+            setSuccessModal(false);
+            navigate("/");
+          }, 1400)
+        );
+      } else {
+        // No backend: fallback to client-side update (session must be active from reset link)
+        const { data, error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+
+        setSuccessModal(true);
+        timeoutsRef.current.push(
+          setTimeout(async () => {
+            try {
+              await supabase.auth.signOut();
+            } catch (e) {}
+            setSuccessModal(false);
+            navigate("/");
+          }, 1400)
+        );
+      }
     } catch (err) {
       console.error("Update password failed:", err);
-      // show generic message; do not leak unnecessary details
       setFormError(
-        err?.message ?? "Unable to update password. Make sure the link is valid and try again."
+        err?.message ?? "Unable to update password! Make sure the link is valid and try again"
       );
     } finally {
       setIsSubmitting(false);
+
+      // clear sensitive fields
+      setPassword("");
+      setConfirmPassword("");
     }
   }
 
@@ -325,7 +377,7 @@ export default function PasswordCreation() {
                     setConfirmPassword(e.target.value.replace(/\s/g, ""));
                     if (e.target.value.length > 0) setConfirmPasswordTouched(true);
                   }}
-                  placeholder="Enter Password Again"
+                  placeholder="Re-Enter Your Password"
                   disabled={loading}
                 />
                 <button

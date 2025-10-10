@@ -1,9 +1,10 @@
-// src/common/ChangePassword.jsx
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./ChangePassword.module.css";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 /* Tick SVG for success modal */
 const TICK_SVG = (
@@ -74,8 +75,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
         } else {
           // No profile found - fallback to user metadata
           if (mounted) {
-            const metaName =
-              user.user_metadata?.full_name || user.user_metadata?.name || "";
+            const metaName = user.user_metadata?.full_name || user.user_metadata?.name || "";
             setFullName(metaName);
             setLastPasswordChange(null);
           }
@@ -155,6 +155,18 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
     };
   }, []);
 
+  // Helper: get current access token from supabase session
+  async function getAccessToken() {
+    try {
+      const sessionResp = await supabase.auth.getSession();
+      const token = sessionResp?.data?.session?.access_token || null;
+      return token;
+    } catch (e) {
+      console.warn("getAccessToken failed:", e);
+      return null;
+    }
+  }
+
   // main handler
   async function handleUpdatePassword(e) {
     e.preventDefault();
@@ -167,92 +179,115 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
 
     // enforce 30-day rule
     if (isWithinThirtyDays()) {
-      setFormError(
-        `Password was changed recently. Next change allowed on ${nextAllowedDateString()}.`
-      );
+      setFormError(`Password was changed recently! Next change allowed on ${nextAllowedDateString()}`);
       return;
     }
 
     if (!canSubmit()) {
-      setFormError("Please satisfy all validations before updating your password.");
+      setFormError("Please satisfy all validations before updating your password");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // 1) Re-authenticate: verify old password by signing in
-      // (this confirms ownership of the current email)
       const email = user.email;
-      if (!email) throw new Error("User email not available for re-authentication.");
+      if (!email) throw new Error("User email not available for re-authentication");
 
-      // Attempt sign-in with provided old password
+      // 1) Re-authenticate client-side to ensure old password is correct
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password: oldPassword,
       });
 
       if (signInError) {
-        // generic message to avoid user enumeration
-        throw new Error("Old password is incorrect.");
+        throw new Error("Old password is incorrect!");
       }
 
-      // 2) Update password securely
-      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
-        password,
-      });
+      // If a backend API is configured, prefer server-side password update
+      if (API_BASE_URL) {
+        // ensure we have a valid access token (from the session we just obtained)
+        const token = (signInData?.session?.access_token) || (await getAccessToken());
+        if (!token) throw new Error("Failed to obtain authentication token.");
 
-      if (updateError) {
-        throw updateError;
-      }
+        // call backend to perform password update using service-role on server
+        const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/password/update`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ password }),
+        });
 
-      // 3) Record the change in profiles.last_password_change (upsert if no profile row)
-      try {
-        const nowIso = new Date().toISOString();
-        // Try update first
-        const { error: updErr } = await supabase
-          .from("profiles")
-          .update({ last_password_change: nowIso })
-          .eq("id", user.id);
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+          throw new Error(j.error || j.message || "Password update failed on server");
+        }
 
-        if (updErr) {
-          // if update failed (e.g., row missing), upsert
-          const { error: upsertErr } = await supabase
-            .from("profiles")
-            .upsert({ id: user.id, last_password_change: nowIso }, { onConflict: "id" });
-          if (upsertErr) {
-            console.warn("Failed to update/upsert last_password_change:", upsertErr);
+        // success — sign the user out so they must re-login with new password
+        setSuccessModal(true);
+
+        timeoutRef.current = setTimeout(async () => {
+          setSuccessModal(false);
+          try {
+            // attempt to use app logout flow
+            if (typeof logout === "function") await logout();
+            // ensure session cleared client-side
+            try { await supabase.auth.signOut(); } catch (e) {}
+          } catch (e) {
+            try { await supabase.auth.signOut(); } catch (e) {}
           }
-        }
-      } catch (err) {
-        console.warn("Warning: unable to persist last_password_change to profiles:", err);
-      }
 
-      // 4) success UX
-      setSuccessModal(true);
+          if (typeof onSuccess === "function") {
+            try { onSuccess(); } catch (e) {}
+          } else {
+            navigate("/");
+          }
+        }, 1400);
+      } else {
+        // No backend: fallback to client-side update (will update auth via supabase client)
+        const { data: updateData, error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) throw updateError;
 
-      timeoutRef.current = setTimeout(async () => {
-        setSuccessModal(false);
+        // persist last_password_change to profiles table (best-effort)
         try {
-          // sign the user out to force re-login with new password
-          await logout();
+          const nowIso = new Date().toISOString();
+          const { error: updErr } = await supabase
+            .from("profiles")
+            .update({ last_password_change: nowIso })
+            .eq("id", user.id);
+          if (updErr) {
+            // upsert fallback
+            await supabase.from("profiles").upsert({ id: user.id, last_password_change: nowIso }, { onConflict: "id" });
+          }
         } catch (e) {
-          // fallback sign-out
-          try { await supabase.auth.signOut(); } catch (e) {}
+          console.warn("Failed to persist last_password_change locally:", e);
         }
 
-        if (typeof onSuccess === "function") {
-          try { onSuccess(); } catch (e) {}
-        } else {
-          navigate("/");
-        }
-      }, 1400);
+        setSuccessModal(true);
+        timeoutRef.current = setTimeout(async () => {
+          setSuccessModal(false);
+          try {
+            if (typeof logout === "function") await logout();
+            try { await supabase.auth.signOut(); } catch (e) {}
+          } catch (e) {
+            try { await supabase.auth.signOut(); } catch (e) {}
+          }
+          if (typeof onSuccess === "function") {
+            try { onSuccess(); } catch (e) {}
+          } else {
+            navigate("/");
+          }
+        }, 1400);
+      }
     } catch (err) {
       console.error("Password update failed:", err);
-      setFormError(err?.message || "Unable to update password. Try again later.");
+      setFormError(err?.message || "Unable to update password! Try again later");
     } finally {
       setIsSubmitting(false);
-      // clear oldPassword & confirm fields for safety
+
+      // clear sensitive fields
       setOldPassword("");
       setConfirmPassword("");
       setPassword("");
@@ -271,7 +306,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
             {/* Show helpful notice about 30-day rule */}
             {lastPasswordChange && (
               <div className={styles.formNotice}>
-                Last password change: {new Date(lastPasswordChange).toLocaleString()}.{" "}
+                Last password change: {new Date(lastPasswordChange).toLocaleString()}. {" "}
                 {isWithinThirtyDays() ? (
                   <strong>Next change allowed: {nextAllowedDateString()}</strong>
                 ) : (
@@ -352,7 +387,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
                     setConfirmPassword(e.target.value.replace(/\s/g, ""));
                     if (e.target.value.length > 0) setConfirmPasswordTouched(true);
                   }}
-                  placeholder="Enter New Password"
+                  placeholder="Re-Enter New Password"
                 />
                 <button
                   type="button"
