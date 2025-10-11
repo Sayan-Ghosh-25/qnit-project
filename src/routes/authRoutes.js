@@ -1,16 +1,6 @@
 // src/routes/authRoutes.js
 import express from "express";
-import {
-  generateOtp,
-  verifyOtp,
-  requestPrivateKey,
-  verifyPrivateKey,
-  checkUser,
-  registerUser,
-  updatePassword,
-  studentIdLookup,
-  signIn
-} from "../controllers/authController.js";
+import { requestPrivateKey, verifyPrivateKey, checkUser, registerUser, updatePassword, studentIdLookup, signIn, resetPassword, deleteAccount } from "../controllers/authController.js";
 import { rateLimitMiddleware } from "../middlewares/rateLimit.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 
@@ -22,13 +12,9 @@ router.get("/student-id-lookup", studentIdLookup);
 // Apply rate limiting to prevent brute-force
 router.post("/signin", rateLimitMiddleware, signIn);
 
-// OTP
-router.post("/otp/generate", rateLimitMiddleware, generateOtp);
-router.post("/otp/verify", verifyOtp);
-
 // Private key (admin)
 router.post("/private-key/generate", rateLimitMiddleware, requestPrivateKey);
-router.post("/private-key/verify", verifyPrivateKey);
+router.post("/private-key/verify", rateLimitMiddleware, verifyPrivateKey);
 
 // check user existence
 router.get("/check-user", checkUser);
@@ -36,7 +22,13 @@ router.get("/check-user", checkUser);
 // Register (create auth user + profile)
 router.post("/register", registerUser);
 
+// Reset password (server-side trigger to call Supabase to send reset link to your frontend)
+router.post("/reset-password", rateLimitMiddleware, resetPassword);
+
 // Password update (requires Authorization: Bearer <access_token>)
 router.post("/password/update", requireAuth, updatePassword);
+
+// DELETE /auth/delete-account
+router.delete("/delete-account", rateLimitMiddleware, requireAuth, deleteAccount);
 
 export default router;
