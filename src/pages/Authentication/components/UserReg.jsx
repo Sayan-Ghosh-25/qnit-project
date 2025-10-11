@@ -914,7 +914,7 @@ export default function UserReg() {
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
-                <div id="pwdGuide" className={styles.pwdChecks}>
+                <div id="pwdGuide" className={styles.pwdChecks} style={{ display: password.length > 0 ? "grid" : "none"}}>
                   <div className={`${styles.check} ${passwordChecks.length ? styles.ok : ""}`}>Minimum 12 Characters</div>
                   <div className={`${styles.check} ${passwordChecks.upper ? styles.ok : ""}`}>Contains One Uppercase</div>
                   <div className={`${styles.check} ${passwordChecks.lower ? styles.ok : ""}`}>Contains One Lowercase</div>

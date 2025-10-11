@@ -66,6 +66,9 @@ const VIEW = {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 
+// Use your public reset page URL
+const PASSWORD_RESET_REDIRECT = "https://qnit.vercel.app/ResetPassword";
+
 export default function AuthModal({
   isOpen = true,
   onClose = () => {},
@@ -261,8 +264,8 @@ export default function AuthModal({
       return;
     }
 
-    if (!captchaToken) {
-      // Try execute captcha once more (in case token expired)
+    // if using API backend, captchaToken must be present
+    if (API_BASE_URL && !captchaToken) {
       if (recaptchaRef.current) recaptchaRef.current.reset();
       setStatus("error");
       return;
@@ -364,7 +367,8 @@ export default function AuthModal({
       return;
     }
 
-    if (!captchaToken) {
+    // If using backend we require captcha; for direct supabase flow captcha not required
+    if (API_BASE_URL && !captchaToken) {
       if (recaptchaRef.current) recaptchaRef.current.reset();
       setStatus("error");
       return;
@@ -373,6 +377,7 @@ export default function AuthModal({
     setBusy(true);
     try {
       if (API_BASE_URL) {
+        // Call backend reset-password endpoint (backend should verify captcha)
         const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -384,7 +389,11 @@ export default function AuthModal({
         const payload = await res.json();
         if (!res.ok) throw new Error(payload?.error || "Reset failed");
 
+        // backend succeeded — show success UX
         setStatus("success");
+        if (recaptchaRef.current) recaptchaRef.current.reset();
+        setCaptchaToken(null);
+
         const navT = setTimeout(() => {
           if (typeof onNavigate === "function") onNavigate("reset");
           if (typeof onConfirm === "function") onConfirm("reset");
@@ -393,10 +402,13 @@ export default function AuthModal({
         timeoutsRef.current.push(navT);
       } else {
         // fallback: direct supabase call (no server-side captcha)
-        const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, {
-          redirectTo: `${window.location.origin}/reset-password`,
+        // Use your public redirect page
+        const { data, error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, {
+          redirectTo: PASSWORD_RESET_REDIRECT,
         });
+        // supabase returns { data, error } (older SDKs returned { error })
         if (error) throw error;
+
         setStatus("success");
         const navT = setTimeout(() => {
           if (typeof onNavigate === "function") onNavigate("reset");
@@ -426,8 +438,8 @@ export default function AuthModal({
 
   // derive enabled states
   const signValid =
-    !!identifier && !!password && !!signUserType && !busy && captchaToken && userExistsEmailStatus === true;
-  const forgotValid = !!identifier && !!signUserType && !busy && captchaToken;
+    !!identifier && !!password && !!signUserType && !busy && (API_BASE_URL ? !!captchaToken : true) && userExistsEmailStatus === true;
+  const forgotValid = !!identifier && !!signUserType && !busy && (API_BASE_URL ? !!captchaToken : true);
 
   if (!isOpen) return null;
 
@@ -576,9 +588,9 @@ export default function AuthModal({
           </div>
 
           <div className={styles.rowBetween}>
-            {/* ReCAPTCHA: only show if user email exists */}
+            {/* ReCAPTCHA: only show if user email exists and backend requires it */}
             <div className={styles.captchaContainer}
-            style={{ display: userExistsEmailStatus === true ? "block" : "none" }}>
+            style={{ display: API_BASE_URL && userExistsEmailStatus === true ? "block" : "none" }}>
               {RECAPTCHA_SITE_KEY ? (
                 <ReCAPTCHA
                   sitekey={RECAPTCHA_SITE_KEY}
@@ -586,7 +598,7 @@ export default function AuthModal({
                   ref={recaptchaRef} key ="dark" theme="dark"
                 />
               ) : (
-                <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small>
+                API_BASE_URL ? <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small> : null
               )}
             </div>
           </div>
@@ -662,9 +674,9 @@ export default function AuthModal({
           </div>
 
         <div className={styles.rowBetween}>
-          {/* ReCAPTCHA: only show if user email exists */}
+          {/* ReCAPTCHA: only show if backend requires it and user exists */}
           <div className={styles.captchaContainer}
-          style={{ display: userExistsEmailStatus === true ? "block" : "none" }}>
+          style={{ display: API_BASE_URL && userExistsEmailStatus === true ? "block" : "none" }}>
             {RECAPTCHA_SITE_KEY ? (
               <ReCAPTCHA
                 sitekey={RECAPTCHA_SITE_KEY}
@@ -672,7 +684,7 @@ export default function AuthModal({
                 ref={recaptchaRef} key ="dark" theme ="dark"
               />
             ) : (
-              <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small>
+              API_BASE_URL ? <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small> : null
             )}
           </div>
         </div>

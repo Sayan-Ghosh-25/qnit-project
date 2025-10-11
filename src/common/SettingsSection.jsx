@@ -1,6 +1,6 @@
 // src/common/SettingsSection.jsx
 import styles from "./SettingsSection.module.css";
-import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
+import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigate, Routes, Route, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -8,8 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 // Lazy load modals/components
 const LogoutModalComponent = lazy(() => import("@/common/LogoutModal.jsx"));
 const ChangePassword = lazy(() => import("@/common/ChangePassword.jsx"));
+const AccountDeleteComponent = lazy(() => import("@/common/AccountDelete.jsx"));
 
-// Skeleton Loader for ChangePassword lazy loading
 function ChangePasswordSkeleton() {
   return (
     <div className={styles.skeletonWrapper}>
@@ -34,17 +34,16 @@ export default function SettingsSection({ onAccountDelete }) {
     ? "/Admin/Dashboard/SettingsSection"
     : "/User/Dashboard/SettingsSection";
 
+  // Only keep the open/close state for the delete modal here.
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const modalRef = useRef(null);
-  const confirmBtnRef = useRef(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const isChangePasswordRoute = location.pathname.includes("/SettingsSection/ChangePassword");
 
+  // Manage global 'modal-open' class
   useEffect(() => {
     try {
-      if (deleteModalOpen || showLogoutModal || isChangePasswordRoute) {
+      if (showLogoutModal || isChangePasswordRoute) {
         document.body.classList.add("modal-open");
-        if (deleteModalOpen) setTimeout(() => confirmBtnRef.current?.focus?.(), 30);
       } else {
         document.body.classList.remove("modal-open");
       }
@@ -54,55 +53,22 @@ export default function SettingsSection({ onAccountDelete }) {
         document.body.classList.remove("modal-open");
       } catch {}
     };
-  }, [deleteModalOpen, showLogoutModal, isChangePasswordRoute]);
+  }, [showLogoutModal, isChangePasswordRoute]);
 
+  // Escape handling
   useEffect(() => {
     function onKey(e) {
       if (e.key === "Escape") {
-        if (deleteModalOpen) setDeleteModalOpen(false);
         if (showLogoutModal) setShowLogoutModal(false);
         if (isChangePasswordRoute) navigate(baseParentPath);
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [deleteModalOpen, showLogoutModal, isChangePasswordRoute, navigate, baseParentPath]);
-
-  const onBackdropClick = (e) => {
-    if (e.target === modalRef.current) setDeleteModalOpen(false);
-  };
-
-  const safeClearUserData = useCallback(() => {
-    try {
-      const keysToKeep = [];
-      const dangerousKeyPattern = /(profile|feedback|auth|token|session|user|credential|login)/i;
-      const toRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k) continue;
-        if (keysToKeep.includes(k)) continue;
-        if (dangerousKeyPattern.test(k)) toRemove.push(k);
-      }
-      toRemove.forEach((k) => localStorage.removeItem(k));
-    } catch {}
-  }, []);
-
-  const onConfirmDelete = useCallback(() => {
-    setDeleteModalOpen(false);
-    safeClearUserData();
-    try {
-      alert("Your Account Has Been Deleted!");
-    } catch {}
-    if (typeof onAccountDelete === "function") {
-      try {
-        onAccountDelete();
-        return;
-      } catch {}
-    }
-    navigate("/");
-  }, [onAccountDelete, safeClearUserData, navigate]);
+  }, [showLogoutModal, isChangePasswordRoute, navigate, baseParentPath]);
 
   const openLogoutModal = useCallback(() => setShowLogoutModal(true), []);
+
   const handleLogoutConfirm = useCallback(async () => {
     setShowLogoutModal(false);
     try {
@@ -248,30 +214,16 @@ export default function SettingsSection({ onAccountDelete }) {
         <Route path="*" element={<p>Settings Sub-Section Not Found</p>} />
       </Routes>
 
-      {/* Delete Modal */}
-      <div
-        id="delete-modal"
-        className={`${styles.deleteModal} ${deleteModalOpen ? styles.show : styles.hiddenDelete}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="delete-modal-title"
-        ref={modalRef}
-        onClick={onBackdropClick}
-      >
-        <div className={styles.deleteContent} onClick={(e) => e.stopPropagation()}>
-          <h2 id="delete-modal-title">Confirm Deletion</h2>
-          <p>Are you sure you want to delete your account?</p>
-
-          <div className={styles.deleteActions}>
-            <button id="confirm-delete" className={styles.deleteBtn} onClick={onConfirmDelete} ref={confirmBtnRef}>
-              Delete
-            </button>
-            <button id="cancel-delete" className={styles.cancelBtn} onClick={() => setDeleteModalOpen(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Account Delete Modal */}
+      {deleteModalOpen && (
+        <Suspense fallback={null}>
+          <AccountDeleteComponent
+            isOpen={deleteModalOpen}
+            onClose={() => setDeleteModalOpen(false)}
+            onAccountDelete={onAccountDelete}
+          />
+        </Suspense>
+      )}
 
       {/* Logout Modal */}
       {showLogoutModal && (

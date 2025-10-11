@@ -131,7 +131,6 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
     if (!allPasswordChecksPass()) return false;
     if (password !== confirmPassword) return false;
     if (password === oldPassword) return false;
-    if (!user) return false;
     return true;
   }
 
@@ -176,7 +175,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
     setFormError("");
 
     if (!user) {
-      setFormError("Unable to identify your account. Please sign in and try again.");
+      setFormError("Unable to identify your account! Please sign in and try again");
       return;
     }
 
@@ -204,14 +203,14 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
       });
 
       if (signInError) {
-        throw new Error("Old password is incorrect!");
+        throw new Error("Old password is Incorrect");
       }
 
       // If a backend API is configured, prefer server-side password update
       if (API_BASE_URL) {
         // ensure we have a valid access token (from the session we just obtained)
         const token = (signInData?.session?.access_token) || (await getAccessToken());
-        if (!token) throw new Error("Failed to obtain authentication token.");
+        if (!token) throw new Error("Failed to obtain authentication token");
 
         // call backend to perform password update using service-role on server
         const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/password/update`, {
@@ -301,20 +300,18 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
     <div className={`${styles.uregPage} ${styles.overlayInner}`}>
       <div className={styles.uregContainer}>
         <header className={styles.uregHeader}>
-          <h1 id="change-password-title">Create New Password</h1>
+          <h1 id="change-password-title">Change Password</h1>
         </header>
 
         <form className={styles.uregForm} onSubmit={handleUpdatePassword} noValidate>
           <div className={styles.panel}>
             {/* Show helpful notice about 30-day rule */}
             {lastPasswordChange && (
-              <div className={styles.formNotice}>
+              <div className={styles.formError}>
                 Last password change: {new Date(lastPasswordChange).toLocaleString()}. {" "}
                 {isWithinThirtyDays() ? (
                   <strong>Next change allowed: {nextAllowedDateString()}</strong>
-                ) : (
-                  <strong>You may update your password now.</strong>
-                )}
+                ) : ""}
               </div>
             )}
 
@@ -369,7 +366,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
                 </small>
               )}
 
-              <div id="pwdGuide" className={styles.pwdChecks}>
+              <div id="pwdGuide" className={styles.pwdChecks} style={{ display: password.length > 0 ? "grid" : "none"}}>
                 <div className={`${styles.check} ${passwordChecks.length ? styles.ok : ""}`}>Minimum 12 Characters</div>
                 <div className={`${styles.check} ${passwordChecks.upper ? styles.ok : ""}`}>Contains One Uppercase</div>
                 <div className={`${styles.check} ${passwordChecks.lower ? styles.ok : ""}`}>Contains One Lowercase</div>

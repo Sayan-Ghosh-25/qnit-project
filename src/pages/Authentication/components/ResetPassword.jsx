@@ -1,8 +1,8 @@
-// src/pages/Authentication/components/NewPassword.jsx
+// src/pages/Authentication/components/ResetPassword.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
-import styles from "./NewPassword.module.css";
+import styles from "./ResetPassword.module.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -313,7 +313,7 @@ export default function PasswordCreation() {
     <div className={`${styles.uregPage} ${styles.overlayInner}`}>
       <div className={styles.uregContainer}>
         <header className={styles.uregHeader}>
-          <h1 id="change-password-title">Create New Password</h1>
+          <h1 id="change-password-title">Reset Password</h1>
         </header>
 
         <form
@@ -355,7 +355,7 @@ export default function PasswordCreation() {
                 </button>
               </div>
 
-              <div id="pwdGuide" className={styles.pwdChecks}>
+              <div id="pwdGuide" className={styles.pwdChecks}  style={{ display: password.length > 0 ? "grid" : "none"}}>
                 <div className={`${styles.check} ${passwordChecks.length ? styles.ok : ""}`}>Minimum 12 Characters</div>
                 <div className={`${styles.check} ${passwordChecks.upper ? styles.ok : ""}`}>Contains One Uppercase</div>
                 <div className={`${styles.check} ${passwordChecks.lower ? styles.ok : ""}`}>Contains One Lowercase</div>
