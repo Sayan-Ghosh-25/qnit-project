@@ -1,6 +1,16 @@
 // src/routes/authRoutes.js
 import express from "express";
-import { studentIdLookup, signIn, generateOtp, verifyOtp, requestPrivateKey, verifyPrivateKey, checkUser, registerUser, resetPassword, updatePassword, deleteAccount } from "../controllers/authController.js";
+import {
+  generateOtp,
+  verifyOtp,
+  requestPrivateKey,
+  verifyPrivateKey,
+  checkUser,
+  registerUser,
+  updatePassword,
+  studentIdLookup,
+  signIn
+} from "../controllers/authController.js";
 import { rateLimitMiddleware } from "../middlewares/rateLimit.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 
@@ -26,13 +36,7 @@ router.get("/check-user", checkUser);
 // Register (create auth user + profile)
 router.post("/register", registerUser);
 
-// Reset update
-router.post("/reset-password", rateLimitMiddleware, resetPassword);
-
 // Password update (requires Authorization: Bearer <access_token>)
 router.post("/password/update", requireAuth, updatePassword);
-
-// DELETE /auth/delete-account
-router.delete("/delete-account", rateLimitMiddleware, requireAuth, deleteAccount);
 
 export default router;
