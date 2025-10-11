@@ -3,9 +3,7 @@ import fetch from "node-fetch";
 import crypto from "crypto";
 import { supabaseAdmin } from "../config/supabaseClient.js";
 import { signInUser } from "../services/authService.js";
-import { verifyCaptcha } from "../utils/captchaService.js";
-import { hashString, verifyHash } from "../utils/crypto.js";
-import { nowPlusMinutes } from "../utils/otpService.js";
+import { verifyCaptcha } from "../services/captchaService.js";
 
 const PRIVATE_KEY_LENGTH = parseInt(process.env.PRIVATE_KEY_LENGTH || "6", 10);
 const OTP_EXPIRE_MINUTES = parseInt(process.env.OTP_EXPIRE_MINUTES || "10", 10);
@@ -13,6 +11,33 @@ const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || null;
 
 // Optional edge function URL that will generate the private key and send email
 const PRIVATE_KEY_EDGE_FUNCTION = process.env.SUPABASE_PRIVATE_KEY_FUNCTION || null;
+
+/*** Local helper: hash a string with random salt (HMAC-SHA256)
+ ** Returns { salt: base64, hash: hex } **/
+async function hashString(input) {
+  const salt = crypto.randomBytes(16).toString("base64");
+  const hash = crypto.createHmac("sha256", salt).update(String(input)).digest("hex");
+  return { salt, hash };
+}
+
+/* Local helper: verify input against salt+hash using constant-time compare */
+async function verifyHash(input, salt, expectedHash) {
+  const hash = crypto.createHmac("sha256", String(salt)).update(String(input)).digest("hex");
+
+  try {
+    const a = Buffer.from(hash, "hex");
+    const b = Buffer.from(String(expectedHash), "hex");
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch (e) {
+    return false;
+  }
+}
+
+/* Local helper: return Date object now + Minutes */
+function nowPlusMinutes(mins = 10) {
+  return new Date(Date.now() + Number(mins) * 60 * 1000);
+}
 
 /** GET /auth/student-id-lookup?name=... */
 export async function studentIdLookup(req, res) {
@@ -89,6 +114,8 @@ export async function requestPrivateKey(req, res) {
           purpose,
           adminEmail: ADMIN_NOTIFY_EMAIL || null,
           expiresMinutes: OTP_EXPIRE_MINUTES,
+          email: email || null,
+          contact: contact || null,
         };
 
         // If your edge function requires Service Role auth, include SERVICE ROLE key
@@ -106,6 +133,7 @@ export async function requestPrivateKey(req, res) {
         if (!resp.ok) {
           console.error("requestPrivateKey: edge function failed:", resp.status, body);
         } else {
+          // edge function handled generation + notify
           return res.json({ ok: true, admin_notified: true });
         }
       } catch (e) {
@@ -114,7 +142,7 @@ export async function requestPrivateKey(req, res) {
       }
     }
 
-    // 2) Fallback: generate code server-side, store ONLY hashed form in admin_private_keys
+    // 2) Fallback: generate code server-side, store only hashed form in admin_private_keys
     const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     const buf = crypto.randomBytes(PRIVATE_KEY_LENGTH);
     let rawCode = "";
@@ -141,11 +169,12 @@ export async function requestPrivateKey(req, res) {
       return res.status(500).json({ ok: false, error: "Failed to generate private key request" });
     }
 
-    // Do not return or log rawCode, Admin email must be sent by Supabase
+    // Do not return or log rawCode, Admin email must be sent by your Edge function
     return res.json({
       ok: true,
       admin_notified: false,
-      admin_error: "edge-function-not-configured: insert created, please ensure a DB trigger or Edge Function sends the admin email",
+      admin_error:
+        "edge-function-not-configured: Edge Function uses the row to email the admin",
     });
   } catch (err) {
     console.error("requestPrivateKey:", err);
@@ -185,11 +214,18 @@ export async function verifyPrivateKey(req, res) {
     let matched = null;
     for (const row of data) {
       const ok = await verifyHash(privateKey, row.code_salt, row.code_hash);
-      if (ok) { matched = row; break; }
+      if (ok) {
+        matched = row;
+        break;
+      }
     }
     if (!matched) return res.status(400).json({ verified: false, message: "Invalid Code" });
 
-    await supabaseAdmin.from("admin_private_keys").update({ used: true, used_at: new Date().toISOString() }).eq("id", matched.id);
+    await supabaseAdmin
+      .from("admin_private_keys")
+      .update({ used: true, used_at: new Date().toISOString() })
+      .eq("id", matched.id);
+
     return res.json({ verified: true });
   } catch (err) {
     console.error("verifyPrivateKey:", err);
