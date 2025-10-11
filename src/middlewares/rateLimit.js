@@ -18,7 +18,8 @@ setInterval(() => {
 export function rateLimitMiddleware(req, res, next) {
   try {
     const { email = "", contact = "" } = req.body || {};
-    const key = (email || contact || req.ip).toLowerCase();
+    const rawKey = email || contact || req.ip || "";
+    const key = String(rawKey).toLowerCase();
     const now = Date.now();
 
     let entry = map.get(key);

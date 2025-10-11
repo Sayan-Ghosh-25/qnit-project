@@ -1,8 +1,6 @@
 import crypto from "crypto";
 
-/**
- * Create a random alphanumeric numeric OTP (length digits)
- */
+/*Create a random alphanumeric numeric OTP */
 export function genNumericOTP(n = 6) {
   const digits = "0123456789";
   let s = "";
@@ -11,9 +9,7 @@ export function genNumericOTP(n = 6) {
   return s;
 }
 
-/**
- * Hash input with random salt, return { salt, hash }
- */
+/* Hash input with random salt, return { salt, hash } */
 export async function hashString(input) {
   // salt as base64
   const salt = crypto.randomBytes(16).toString("base64");
@@ -21,9 +17,7 @@ export async function hashString(input) {
   return { salt, hash: h };
 }
 
-/**
- * Verify input + salt against expected hash
- */
+/* Verify input + salt against expected hash */
 export async function verifyHash(input, salt, expectedHash) {
   const h = crypto.createHash("sha256").update(salt + input).digest("hex");
   return h === expectedHash;

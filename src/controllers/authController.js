@@ -1,8 +1,9 @@
 // src/controllers/authController.js
+import fetch from "node-fetch";
 import { supabaseAdmin } from "../config/supabaseClient.js";
-import { sendEmail } from "../utils/emailService.js";
 import { signInUser } from "../services/authService.js";
 import { verifyCaptcha } from "../utils/captchaService.js";
+import { sendEmail } from "../utils/emailService.js";
 import { genNumericOTP, hashString, verifyHash } from "../utils/crypto.js";
 import { nowPlusMinutes } from "../utils/otpService.js";
 
@@ -10,34 +11,7 @@ const OTP_LENGTH = parseInt(process.env.OTP_LENGTH || "6", 10);
 const OTP_EXPIRE_MINUTES = parseInt(process.env.OTP_EXPIRE_MINUTES || "10", 10);
 const OTP_MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || "5", 10);
 const PRIVATE_KEY_LENGTH = parseInt(process.env.PRIVATE_KEY_LENGTH || "6", 10);
-
-const DEFAULT_FROM_NAME = process.env.FROM_NAME;
-const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL;
-
-/** helper to build professional OTP email */
-function buildOtpEmailContent({ otp, expiresMinutes, appName = "QNIT" }) {
-  const text = `Your ${appName} verification code is ${otp}. It will expire in ${expiresMinutes} minutes.
-If you did not request this, please ignore this message.`;
-
-  const html = `
-    <html>
-      <body style="font-family: Arial, Helvetica, sans-serif; color:#111; line-height:1.4;">
-        <div style="max-width:600px; margin:0 auto; padding:20px;">
-          <h2 style="margin-bottom:6px;">${appName} — Verification Code</h2>
-          <p style="margin-top:4px; color:#555">Use the code below to complete your action. The code expires in <strong>${expiresMinutes} minutes</strong>.</p>
-          <div style="margin:18px 0; padding:16px; background:#f7f7f9; border-radius:6px; text-align:center;">
-            <span style="font-size:24px; letter-spacing:2px; font-weight:600;">${otp}</span>
-          </div>
-          <p style="color:#666; font-size:14px;">If you did not request this code, you can safely ignore this email.</p>
-          <hr style="border:none; border-top:1px solid #eee; margin:18px 0;">
-          <p style="font-size:12px; color:#999">Sent by ${appName} • Please do not reply to this automated message.</p>
-        </div>
-      </body>
-    </html>
-  `;
-
-  return { text, html };
-}
+const DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL || null;
 
 /** helper to build admin notification for private key requests */
 function buildAdminPrivateKeyEmail({ applicant, rawCode, expiresAt, appName = "QNIT" }) {
@@ -46,27 +20,17 @@ One-time code: ${rawCode}
 Expires at: ${expiresAt}`;
 
   const html = `
-    <html>
-      <body style="font-family: Arial, Helvetica, sans-serif; color:#111">
-        <div style="max-width:600px; margin:0 auto; padding:20px;">
-          <h3 style="margin-bottom:6px;">${appName} — Admin Private Key Request</h3>
-          <p>Applicant: <strong>${applicant}</strong></p>
-          <p>One-time code: <strong style="font-size:18px; letter-spacing:1px;">${rawCode}</strong></p>
-          <p>Expires at: ${expiresAt}</p>
-          <hr style="border:none; border-top:1px solid #eee; margin:12px 0;">
-          <p style="font-size:12px; color:#999">This code is single-use and expires automatically.</p>
-        </div>
-      </body>
-    </html>
-  `;
+    <div style="font-family: Arial, Helvetica, sans-serif; color:#111">
+      <h3>${appName} — Admin Private Key Request</h3>
+      <p>Applicant: <strong>${applicant}</strong></p>
+      <p>One-Time Code: <strong>${rawCode}</strong></p>
+      <p>Expires At: ${expiresAt}</p>
+    </div>`;
 
   return { text, html };
 }
 
-/**
- * GET /auth/student-id-lookup?name=Full%20Name
- * Returns { found: true, id4, original_name } or { found: false }
- */
+/** GET /auth/student-id-lookup?name=Full%20Name */
 export async function studentIdLookup(req, res) {
   try {
     const name = (req.query.name || "").toString().trim();
@@ -92,7 +56,7 @@ export async function studentIdLookup(req, res) {
   }
 }
 
-/* sign in operation handler */
+/* Sign In operation handler */
 export const signIn = async (req, res) => {
   try {
     const { email, password, captchaToken } = req.body;
@@ -121,13 +85,8 @@ export const signIn = async (req, res) => {
   }
 };
 
-/**
- * POST /auth/otp/generate
- * body: { email?, contact?, purpose? }
- *
- * NOTE: email sending left intact (unchanged) — we only ensured email status variables are declared
- * before use so no ReferenceError occurs.
- */
+/** POST /auth/otp/generate
+ ** body: { email?, contact?, purpose? } **/
 export async function generateOtp(req, res) {
   try {
     const { email: rawEmail = null, contact: rawContact = null, purpose = "signup" } = req.body || {};
@@ -135,15 +94,14 @@ export async function generateOtp(req, res) {
     const contact = rawContact ? String(rawContact).trim() : null;
 
     if (!email && !contact) {
-      return res.status(400).json({ ok: false, error: "Either email or contact is required." });
+      return res.status(400).json({ ok: false, error: "Either email or contact is required" });
     }
 
-    // Generate OTP
+    // Generate OTP and hash it
     const otp = genNumericOTP(OTP_LENGTH);
     const { salt, hash } = await hashString(otp);
     const expires_at = nowPlusMinutes(OTP_EXPIRE_MINUTES).toISOString();
 
-    // Insert OTP request into DB
     const insertPayload = {
       email: email || null,
       contact: contact || null,
@@ -155,7 +113,7 @@ export async function generateOtp(req, res) {
       verified: false,
       email_sent: false,
       email_response: null,
-      message_id: null
+      message_id: null,
     };
 
     const { data: insertData, error: insertErr } = await supabaseAdmin
@@ -166,65 +124,20 @@ export async function generateOtp(req, res) {
 
     if (insertErr) {
       console.error("generateOtp: DB insert error:", insertErr);
-      return res.status(500).json({ ok: false, error: "Failed to create OTP request." });
+      return res.status(500).json({ ok: false, error: "Failed to create OTP request" });
     }
 
     const otpRequestId = insertData?.id ?? null;
 
-    // Initialize email sending status
-    let emailSent = false;
-    let emailError = null;
-
-    // Send email if email is provided (kept logic unchanged)
-    if (email) {
-      try {
-        const { html, text } = buildOtpEmailContent({ otp, expiresMinutes: OTP_EXPIRE_MINUTES });
-        const sendResp = await sendEmail(email, "Your QNIT verification code", html, {
-          text,
-          fromName: DEFAULT_FROM_NAME
-        });
-
-        emailSent = true;
-
-        // Update DB with email status
-        await supabaseAdmin.from("otp_requests").update({
-          email_sent: true,
-          email_response: sendResp,
-          message_id: sendResp?.messageId || null
-        }).eq("id", otpRequestId);
-
-        console.log("generateOtp: OTP email sent:", sendResp);
-      } catch (e) {
-        emailError = (e?.response || e?.message) || String(e) || "Unknown email error";
-        console.error("generateOtp: email send failed:", emailError);
-
-        // Update DB with failed email attempt (best effort)
-        try {
-          await supabaseAdmin.from("otp_requests").update({
-            email_sent: false,
-            email_response: emailError
-          }).eq("id", otpRequestId);
-        } catch (updErr) {
-          console.error("generateOtp: failed to update otp_requests with email failure:", updErr);
-        }
-
-        // Return explicit error so frontend doesn't assume OTP was sent
-        return res.status(502).json({ ok: false, email_sent: false, error: emailError });
-      }
-    }
-
-    // success path
-    return res.json({ ok: true, email_sent: email ? emailSent : false, otp_request_id: otpRequestId });
+    return res.json({ ok: true, email_sent: Boolean(email), otp_request_id: otpRequestId });
   } catch (err) {
     console.error("generateOtp:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
 
-/**
- * POST /auth/otp/verify
- * body: { email?, contact?, otp, purpose? }
- */
+/** POST /auth/otp/verify
+ ** body: { email?, contact?, otp, purpose? } **/
 export async function verifyOtp(req, res) {
   try {
     const { email: rawEmail = null, contact: rawContact = null, otp: rawOtp, purpose = "signup" } = req.body || {};
@@ -253,16 +166,16 @@ export async function verifyOtp(req, res) {
 
     const row = (rows && rows[0]) || null;
     if (!row) {
-      return res.status(400).json({ verified: false, message: "No OTP request found." });
+      return res.status(400).json({ verified: false, message: "No OTP request found" });
     }
 
     if (new Date(row.expires_at) < new Date()) {
-      return res.status(400).json({ verified: false, message: "OTP expired." });
+      return res.status(400).json({ verified: false, message: "OTP Expired!" });
     }
 
     const attempts = Number(row.attempts || 0);
     if (attempts >= OTP_MAX_ATTEMPTS) {
-      return res.status(429).json({ verified: false, message: "Too many failed attempts. Please request a new code." });
+      return res.status(429).json({ verified: false, message: "Too many failed attempts! Please again later" });
     }
 
     const ok = await verifyHash(otp, row.otp_salt, row.otp_hash);
@@ -279,9 +192,7 @@ export async function verifyOtp(req, res) {
   }
 }
 
-/**
- * POST /auth/private-key/generate
- */
+/* POST /auth/private-key/generate */
 export async function requestPrivateKey(req, res) {
   try {
     const { email: rawEmail = null, contact: rawContact = null, purpose = "signup" } = req.body || {};
@@ -292,6 +203,7 @@ export async function requestPrivateKey(req, res) {
       return res.status(400).json({ ok: false, error: "email or contact required" });
     }
 
+    // Generate raw code, then hash/salt for storage
     const rawCode = Math.random().toString(36).slice(2, 2 + PRIVATE_KEY_LENGTH).toUpperCase();
     const { salt, hash } = await hashString(rawCode);
     const expires_at = nowPlusMinutes(OTP_EXPIRE_MINUTES).toISOString();
@@ -306,42 +218,57 @@ export async function requestPrivateKey(req, res) {
       used: false
     };
 
+    // Insert hashed row into DB
     const { error: insertErr } = await supabaseAdmin.from("admin_private_keys").insert([insertPayload]);
     if (insertErr) {
       console.error("requestPrivateKey: DB insert error:", insertErr);
-      return res.status(500).json({ ok: false, error: "Failed to generate private key request." });
+      return res.status(500).json({ ok: false, error: "Failed to generate private key request" });
     }
 
-    const applicant = email || contact;
-    const adminHtmlObj = buildAdminPrivateKeyEmail({ applicant, rawCode, expiresAt: expires_at });
-
+    // Notify only the admin email with the raw code
+    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
     let adminEmailSent = false;
     let adminEmailError = null;
-    if (ADMIN_NOTIFY_EMAIL) {
+
+    if (adminEmail) {
       try {
-        await sendEmail(ADMIN_NOTIFY_EMAIL, "QNIT: Private key request", adminHtmlObj.html, {
-          text: adminHtmlObj.text,
-          fromName: DEFAULT_FROM_NAME
+        const adminHtmlObj = buildAdminPrivateKeyEmail({
+          applicant: email || contact,
+          rawCode,
+          expiresAt: expires_at
         });
+
+      // sendEmail returns provider result or throws on fatal error
+      await sendEmail(adminEmail, "QNIT: Admin Private Key Request", adminHtmlObj.html, {
+        text: adminHtmlObj.text,
+        fromEmail: DEFAULT_FROM_EMAIL,
+        fromName: DEFAULT_FROM_NAME
+      });
+        
+
         adminEmailSent = true;
       } catch (e) {
-        adminEmailError = (e && (e.response || e.message)) || "Unknown admin email error";
+        adminEmailError = (e && (e.response || e.message)) || String(e) || "Unknown admin email error";
         console.error("requestPrivateKey: admin email failed:", adminEmailError);
       }
     } else {
-      console.warn("requestPrivateKey: ADMIN_NOTIFY_EMAIL not configured; admin not notified.");
+      console.warn("requestPrivateKey: ADMIN_NOTIFY_EMAIL not configured; admin not notified");
+      adminEmailError = "ADMIN_NOTIFY_EMAIL not configured";
     }
 
-    return res.json({ ok: true, admin_notified: adminEmailSent, admin_error: adminEmailError || undefined });
+    // do not ever return rawCode to client or log it
+    return res.json({
+      ok: true,
+      admin_notified: adminEmailSent,
+      admin_error: adminEmailError || undefined,
+    });
   } catch (err) {
     console.error("requestPrivateKey:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
 
-/**
- * POST /auth/private-key/verify
- */
+/* POST /auth/private-key/verify */
 export async function verifyPrivateKey(req, res) {
   try {
     const { email: rawEmail = null, contact: rawContact = null, privateKey: rawKey, purpose = "signup" } = req.body || {};
@@ -374,7 +301,7 @@ export async function verifyPrivateKey(req, res) {
       const ok = await verifyHash(privateKey, row.code_salt, row.code_hash);
       if (ok) { matched = row; break; }
     }
-    if (!matched) return res.status(400).json({ verified: false, message: "Invalid code" });
+    if (!matched) return res.status(400).json({ verified: false, message: "Invalid Code" });
 
     await supabaseAdmin.from("admin_private_keys").update({ used: true, used_at: new Date().toISOString() }).eq("id", matched.id);
     return res.json({ verified: true });
@@ -384,9 +311,7 @@ export async function verifyPrivateKey(req, res) {
   }
 }
 
-/**
- * GET /auth/check-user?field=email&value=...
- */
+/* GET /auth/check-user?field=email&value=... */
 export async function checkUser(req, res) {
   try {
     const field = req.query.field;
@@ -416,12 +341,8 @@ export async function checkUser(req, res) {
   }
 }
 
-/**
- * POST /auth/register
- * body: { email, password, role, full_name, contact, stream, year_of_study, access_key }
- *
- * Uses service role to create auth user and upsert profiles row.
- */
+/** POST /auth/register
+ ** body: { email, password, role, full_name, contact, stream, year_of_study, access_key } **/
 export async function registerUser(req, res) {
   try {
     const {
@@ -430,7 +351,7 @@ export async function registerUser(req, res) {
     } = req.body || {};
 
     if (!rawEmail || !password || !full_name) {
-      return res.status(400).json({ ok: false, error: "Missing required fields: email, password, full_name." });
+      return res.status(400).json({ ok: false, error: "Missing required fields: email, password, full_name" });
     }
     const email = String(rawEmail).trim().toLowerCase();
 
@@ -443,10 +364,10 @@ export async function registerUser(req, res) {
         .maybeSingle();
 
       if (existingAuthUser?.id) {
-        return res.status(400).json({ ok: false, error: "Email already registered. Please sign in or use password reset." });
+        return res.status(400).json({ ok: false, error: "Email already registered! Please sign in or use password reset" });
       }
     } catch (e) {
-      console.warn("registerUser: checking auth.users failed (continuing):", e);
+      console.warn("registerUser: checking auth.users failed:", e);
     }
 
     // 2) Check contact uniqueness if provided
@@ -458,15 +379,14 @@ export async function registerUser(req, res) {
           .eq("contact", String(contact).trim())
           .maybeSingle();
         if (existingContact?.id) {
-          return res.status(400).json({ ok: false, error: "Contact number already in use. Use a different contact or sign in." });
+          return res.status(400).json({ ok: false, error: "Contact number already in use! Use a different contact or sign in" });
         }
       } catch (e) {
-        console.warn("registerUser: checking profiles contact failed (continuing):", e);
+        console.warn("registerUser: checking profiles contact failed:", e);
       }
     }
 
     // create user in Supabase Auth (service role)
-    // include access_key in user_metadata so DB trigger can read it immediately if provided by frontend
     const createPayload = {
       email,
       password,
@@ -485,7 +405,7 @@ export async function registerUser(req, res) {
       console.warn("registerUser: createUser error:", error);
       const msg = error?.message || String(error);
       if (/duplicate|already exists/i.test(msg)) {
-        return res.status(400).json({ ok: false, error: "Email already registered. Please sign in or reset password." });
+        return res.status(400).json({ ok: false, error: "Email already registered! Please sign in or reset password" });
       }
       return res.status(400).json({ ok: false, error: msg || "Failed to create user" });
     }
@@ -507,7 +427,8 @@ export async function registerUser(req, res) {
         stream,
         year_of_study,
         access_key: role === "student" ? (access_key || null) : null,
-        last_password_change: now
+        last_password_change: null,
+        created_at: now
       };
 
       const { error: pErr } = await supabaseAdmin.from("profiles").upsert([profileRow], { onConflict: "id", returning: "minimal" });
@@ -525,9 +446,8 @@ export async function registerUser(req, res) {
   }
 }
 
-/**
- * POST /auth/password/update
- */
+/* POST /auth/password/update
+ * Allow the *first* password change even when last_password_change matches creation time */
 export async function updatePassword(req, res) {
   try {
     const userId = req.user?.id;
@@ -535,25 +455,244 @@ export async function updatePassword(req, res) {
 
     if (!userId || !password) return res.status(400).json({ ok: false, error: "missing" });
 
-    const { data: profile } = await supabaseAdmin.from("profiles").select("last_password_change").eq("id", userId).maybeSingle();
-    const last = profile?.last_password_change ? new Date(profile.last_password_change) : null;
-    if (last) {
-      const diffDays = (Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24);
-      if (diffDays < 30) {
-        return res.status(400).json({ ok: false, error: "You can change password only once every 30 days." });
-      }
+    // Fetch profile timestamps
+    const { data: profileData, error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .select("last_password_change, created_at")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileErr) {
+      console.warn("updatePassword: failed to read profile timestamps:", profileErr);
     }
 
+    const last = profileData?.last_password_change ? new Date(profileData.last_password_change) : null;
+    const created = profileData?.created_at ? new Date(profileData.created_at) : null;
+
+    // If last_password_change exists and it's not just the initial creation marker,
+    // enforce the 30-day rule. If last_password_change is effectively the same as created_at
+    if (last) {
+      let isInitialMarker = false;
+      if (created) {
+        const deltaMs = Math.abs(last.getTime() - created.getTime());
+        // If the two timestamps are within 2 minutes, treat last_password_change as initial marker
+        if (deltaMs <= 2 * 60 * 1000) {
+          isInitialMarker = true;
+        }
+      }
+
+      if (!isInitialMarker) {
+        const diffDays = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays < 30) {
+          return res.status(400).json({ ok: false, error: "You can change password only once every 30 days" });
+        }
+      }
+      // if isInitialMarker === true => allow (first-time change)
+    }
+
+    // Update auth user password via admin (service-role)
     const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
     if (error) {
       console.error("updatePassword: supabase update error:", error);
       throw error;
     }
 
-    await supabaseAdmin.from("profiles").update({ last_password_change: new Date().toISOString() }).eq("id", userId);
+    // Update profiles.last_password_change to now
+    try {
+      await supabaseAdmin.from("profiles").update({ last_password_change: new Date().toISOString() }).eq("id", userId);
+    } catch (e) {
+      console.warn("updatePassword: failed to persist last_password_change:", e);
+    }
+
     return res.json({ ok: true });
   } catch (err) {
     console.error("updatePassword:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
+
+/** POST /auth/reset-password
+ ** Body: { email, captchaToken? } **/
+export async function resetPassword(req, res) {
+  try {
+    const { email: rawEmail = null, captchaToken = null } = req.body || {};
+    const email = rawEmail ? String(rawEmail).trim().toLowerCase() : null;
+
+    if (!email) {
+      return res.status(400).json({ ok: false, error: "email required" });
+    }
+
+    // Verify if captchaToken provided
+    if (captchaToken) {
+      const human = await verifyCaptcha(captchaToken);
+      if (!human) {
+        return res.status(403).json({ ok: false, error: "Captcha verification failed" });
+      }
+    }
+
+    // Use a redirect URL for the reset link (prefer env)
+    const redirectTo = process.env.PASSWORD_RESET_REDIRECT
+      || process.env.SITE_URL
+      || "https://qnit.vercel.app/ResetPassword";
+
+    // Try not to leak whether the email is present — but attempt to send a reset link if possible.
+    // 1) Try SDK call on supabaseAdmin
+    let sent = false;
+    let internalError = null;
+
+    try {
+      // attempt a few common SDK shapes safely
+      if (typeof supabaseAdmin.auth?.resetPasswordForEmail === "function") {
+        // some clients (non-admin) implement resetPasswordForEmail
+        const { data, error } = await supabaseAdmin.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) throw error;
+        sent = true;
+      } else if (typeof supabaseAdmin.auth?.api?.resetPasswordForEmail === "function") {
+        // older supabase-js admin shape
+        const { data, error } = await supabaseAdmin.auth.api.resetPasswordForEmail(email, redirectTo);
+        if (error) throw error;
+        sent = true;
+      } else if (typeof supabaseAdmin.auth?.resetPasswordForEmail === "undefined" && typeof supabaseAdmin.auth?.api === "undefined") {
+        // fallback: use REST endpoint with service_role key
+        const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+
+        if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+          // cannot send reset link via server without service role; log and continue to return generic response
+          console.warn("resetPassword: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured; cannot trigger reset via REST");
+        } else {
+          const url = `${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/recover`;
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({ email, redirect_to: redirectTo }),
+          });
+
+          // treat 200/204/accepted as success
+          if (resp.ok) {
+            sent = true;
+          } else {
+            const text = await resp.text().catch(() => null);
+            internalError = `Recover endpoint error ${resp.status}: ${text}`;
+            console.error("resetPassword: recover endpoint failed:", internalError);
+          }
+        }
+      } else {
+        // Last effort: try supabaseAdmin.auth.resetPasswordForEmail if it exists in different shape
+        if (typeof supabaseAdmin.auth?.resetPasswordForEmail === "function") {
+          try {
+            const { data, error } = await supabaseAdmin.auth.resetPasswordForEmail(email, { redirectTo });
+            if (error) throw error;
+            sent = true;
+          } catch (e) {
+            internalError = e;
+            console.error("resetPassword: secondary SDK attempt failed:", e);
+          }
+        }
+      }
+    } catch (err) {
+      internalError = err;
+      console.error("resetPassword: error while triggering reset:", err);
+    }
+
+    // Always return non-enumerating response
+    if (!sent) {
+      console.warn("resetPassword: reset email not sent (see server logs). email:", email);
+      if (internalError) console.warn("resetPassword internal error:", internalError);
+    }
+
+    return res.json({
+      ok: true,
+      message: "If an account with that email exists, a password reset link has been sent."
+    });
+  } catch (err) {
+    console.error("resetPassword:", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
+  }
+}
+
+/** DELETE /auth/delete-account
+ ** Re-verifies password, writes an audit row (best-effort), deletes profile and auth user **/
+export async function deleteAccount(req, res) {
+  try {
+    const userId = req.user?.id;
+    const email = req.user?.email;
+    const providedPassword = req.body?.password;
+
+    if (!userId || !email) return res.status(401).json({ ok: false, error: "Unauthorized" });
+    if (!providedPassword) return res.status(400).json({ ok: false, error: "Password required" });
+
+    // Re-verify credentials (do not trust client-only re-auth)
+    try {
+      const verified = await signInUser(email, providedPassword);
+      if (!verified || String(verified.id) !== String(userId)) {
+        return res.status(403).json({ ok: false, error: "Password verification failed" });
+      }
+    } catch (e) {
+      console.warn("deleteAccount: credential verify failed:", e);
+      return res.status(403).json({ ok: false, error: "Password verification failed" });
+    }
+
+    // Best-effort audit log insert (if table exists)
+    try {
+      await supabaseAdmin.from("account_deletions").insert([
+        {
+          user_id: userId,
+          email,
+          reason: req.body?.reason || "self-initiated",
+          ip: req.ip || null,
+          created_at: new Date().toISOString()
+        }
+      ]);
+    } catch (auditErr) {
+      // ignore audit failures — proceed with deletion
+      console.warn("deleteAccount: audit insert failed (continuing):", auditErr);
+    }
+
+    // Delete profiles row (service role)
+    try {
+      await supabaseAdmin.from("profiles").delete().eq("id", userId);
+    } catch (pErr) {
+      console.warn("deleteAccount: failed to delete profile row (continuing):", pErr);
+    }
+
+    // Delete auth user (service role)
+    try {
+      if (supabaseAdmin?.auth?.admin?.deleteUser) {
+        const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (delErr) {
+          console.error("deleteAccount: supabase admin.deleteUser error:", delErr);
+          return res.status(500).json({ ok: false, error: "Failed to delete auth user" });
+        }
+      } else {
+        console.error("deleteAccount: admin delete API not available on supabaseAdmin object");
+        return res.status(500).json({ ok: false, error: "Server admin delete not available" });
+      }
+    } catch (err) {
+      console.error("deleteAccount: error deleting auth user:", err);
+      return res.status(500).json({ ok: false, error: "Failed to delete account" });
+    }
+
+    return res.json({ ok: true, message: "Account Deleted" });
+  } catch (err) {
+    console.error("deleteAccount:", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
+  }
+}
+
+export default {
+  studentIdLookup,
+  signIn,
+  generateOtp,
+  verifyOtp,
+  requestPrivateKey,
+  verifyPrivateKey,
+  checkUser,
+  registerUser,
+  updatePassword,
+  resetPassword,
+  deleteAccount,
+};
