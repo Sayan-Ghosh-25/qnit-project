@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./ResetPassword.module.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-
 /* Tick SVG for success modal */
 const TICK_SVG = (
   <svg className={styles.tickSvg} viewBox="0 0 52 52" aria-hidden="true">
@@ -13,6 +11,47 @@ const TICK_SVG = (
     <path className={styles.tickCheck} fill="none" d="M14 27 l7 7 l17 -17" />
   </svg>
 );
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+// Helper: parse an access token or token from URL fragment or query
+// Supports: #access_token=... or ?access_token=... or ?token=...
+function parseAccessTokenFromUrl() {
+  try {
+    // 1) Check hash fragment first (common for Supabase links)
+    if (window.location.hash) {
+      const hash = window.location.hash.replace(/^#/, "");
+      const params = new URLSearchParams(hash);
+      const access_token = params.get("access_token") || params.get("token");
+      if (access_token) return access_token;
+    }
+
+    // 2) Check query params
+    const url = new URL(window.location.href);
+    const access_token = url.searchParams.get("access_token") || url.searchParams.get("token");
+    if (access_token) return access_token;
+  } catch (e) {
+    // ignore parsing errors
+  }
+  return null;
+}
+
+// Clear token params from URL (to avoid leaking sensitive token)
+function clearTokenFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    // remove known params from query
+    u.searchParams.delete("access_token");
+    u.searchParams.delete("token");
+    // clear hash entirely (it may contain session tokens)
+    window.history.replaceState({}, document.title, u.pathname + u.search);
+  } catch (e) {
+    // best-effort: replaceState fallback
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch {}
+  }
+}
 
 export default function PasswordCreation() {
   const navigate = useNavigate();
@@ -44,6 +83,9 @@ export default function PasswordCreation() {
   const [loading, setLoading] = useState(true);
   const [sessionUser, setSessionUser] = useState(null);
   const [fullName, setFullName] = useState("");
+
+  // If the SDK didn't produce a session, we may have an access token in URL
+  const [accessTokenFromUrl, setAccessTokenFromUrl] = useState(null);
 
   // ------------------ helpers & validation ------------------
   useEffect(() => {
@@ -79,9 +121,10 @@ export default function PasswordCreation() {
   }
 
   function canSubmit() {
+    // Accept if we have a sessionUser OR an accessTokenFromUrl fallback
     if (!allPasswordChecksPass()) return false;
     if (password !== confirmPassword) return false;
-    if (!sessionUser) return false;
+    if (!sessionUser && !accessTokenFromUrl) return false;
     return true;
   }
 
@@ -89,10 +132,10 @@ export default function PasswordCreation() {
   async function getAccessToken() {
     try {
       const sessionResp = await supabase.auth.getSession();
-      const token = sessionResp?.data?.session?.access_token || null;
+      // supabase v2 returns { data: { session } }
+      const token = sessionResp?.data?.session?.access_token || sessionResp?.session?.access_token || null;
       return token;
     } catch (e) {
-      console.warn("getAccessToken failed:", e);
       return null;
     }
   }
@@ -107,18 +150,15 @@ export default function PasswordCreation() {
 
       try {
         let foundUser = null;
-
-        // 1) Try to process a session from the URL (SDK helper)
+        // 1) Try SDK helper that parses session from the URL and stores it
         if (supabase?.auth?.getSessionFromUrl) {
           try {
-            const { data, error } = await supabase.auth.getSessionFromUrl({
-              storeSession: true,
-            });
-            if (!error && data?.session?.user) {
-              foundUser = data.session.user;
+            const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({}));
+            if (!error && (data?.session?.user || data?.user)) {
+              foundUser = data.session?.user || data.user;
             }
           } catch (err) {
-            // ignore & continue
+            // ignore: proceed to other strategies
           }
         }
 
@@ -135,13 +175,13 @@ export default function PasswordCreation() {
           }
         }
 
-        // 3) Fallback: if a `code` param exists (PKCE flow), attempt exchange
+        // 3) Fallback: exchange code (PKCE) if present and SDK has exchangeCodeForSession
         if (!foundUser) {
           try {
             const url = new URL(window.location.href);
             const code = url.searchParams.get("code");
             if (code && supabase?.auth?.exchangeCodeForSession) {
-              const { data: exData, error: exErr } = await supabase.auth.exchangeCodeForSession(code);
+              const { data: exData, error: exErr } = await supabase.auth.exchangeCodeForSession(code).catch(() => ({}));
               if (!exErr && exData?.session?.user) {
                 foundUser = exData.session.user;
               }
@@ -151,12 +191,20 @@ export default function PasswordCreation() {
           }
         }
 
-        // 4) If we have a user, set state and fetch profile full_name (if exists)
-        if (foundUser) {
+        // 4) If not found, look for access_token/token in URL (hash or query)
+        if (!foundUser) {
+          const tok = parseAccessTokenFromUrl();
+          if (tok) {
+            // We have a recovery token; keep it and let submit handler use it
+            setAccessTokenFromUrl(tok);
+            // Clear the token from URL right away to avoid leaking it
+            clearTokenFromUrl();
+          }
+        } else {
+          // we have an authenticated user via SDK -> fetch profile's full_name if present
           if (!mounted) return;
           setSessionUser(foundUser);
 
-          // try to fetch full_name from profiles table (recommended)
           try {
             const { data: profile, error: profileErr } = await supabase
               .from("profiles")
@@ -167,27 +215,23 @@ export default function PasswordCreation() {
             if (!profileErr && profile?.full_name) {
               if (mounted) setFullName(profile.full_name);
             } else {
-              // fallback to metadata
-              const nameFromMeta =
-                foundUser.user_metadata?.full_name ||
-                foundUser.user_metadata?.name ||
-                "";
+              const nameFromMeta = foundUser.user_metadata?.full_name || foundUser.user_metadata?.name || "";
               if (mounted) setFullName(nameFromMeta || "");
             }
           } catch (err) {
-            // ignore — fullName may remain empty
+            // ignore — optional
           }
-        } else {
-          // no valid session -> show helpful message
-          setFormError(
-            "Invalid or expired password reset link! Please make a fresh password reset request"
-          );
+        }
+
+        // If neither session nor token exists, show helpful message (but still allow user to request a fresh reset)
+        if (!foundUser && !parseAccessTokenFromUrl() && !accessTokenFromUrl) {
+          // Do not treat this strictly as failure — many flows redirect without attaching tokens
+          // Show a friendly message instead.
+          setFormError("No active session found on this page! If you just clicked a recovery email, wait a moment or request a fresh reset");
         }
       } catch (err) {
         console.error("Error processing recovery:", err);
-        setFormError(
-          "Unable to process password reset link! It may be expired or invalid"
-        );
+        setFormError("Unable to process password reset link! It may be expired or invalid");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -204,8 +248,8 @@ export default function PasswordCreation() {
     e.preventDefault();
     setFormError("");
 
-    if (!sessionUser) {
-      setFormError("Session missing! Use the password reset email link to arrive here");
+    if (!sessionUser && !accessTokenFromUrl) {
+      setFormError("Session missing or invalid! Request a fresh password reset email");
       return;
     }
 
@@ -227,42 +271,16 @@ export default function PasswordCreation() {
     setIsSubmitting(true);
 
     try {
-      // If a backend API is configured, prefer server-side password update
-      if (API_BASE_URL) {
-        // ensure we have a valid access token
-        const token = (await getAccessToken());
-        if (!token) {
-          // Try to re-read session from URL again (bridging cases where SDK parsed it earlier)
-          try {
-            const { data } = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({}));
-            const t = data?.session?.access_token || null;
-            if (t) {
-              // noop
-            }
-          } catch (e) {}
-        }
-
-        const finalToken = (await getAccessToken()) || null;
-        if (!finalToken) throw new Error("Failed to obtain authentication token for password reset");
-
-        const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/password/update`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${finalToken}`,
-          },
-          body: JSON.stringify({ password }),
-        });
-
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok || !j.ok) {
-          throw new Error(j.error || j.message || "Password update failed on server");
-        }
+      // 1) If we have an SDK-managed session, use supabase.auth.updateUser
+      if (sessionUser) {
+        const { data, error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
 
         // success
         setSuccessModal(true);
         timeoutsRef.current.push(
           setTimeout(async () => {
+            // sign out and navigate
             try {
               await supabase.auth.signOut();
             } catch (e) {}
@@ -270,14 +288,38 @@ export default function PasswordCreation() {
             navigate("/");
           }, 1400)
         );
-      } else {
-        // No backend: fallback to client-side update (session must be active from reset link)
-        const { data, error } = await supabase.auth.updateUser({ password });
-        if (error) throw error;
+        return;
+      }
 
+      // 2) Fallback: we have an access token captured from the URL -> call /auth/v1/user
+      if (accessTokenFromUrl) {
+        if (!SUPABASE_URL) throw new Error("SUPABASE_URL not configured");
+
+        const url = `${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`;
+        const resp = await fetch(url, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessTokenFromUrl}`,
+          },
+          body: JSON.stringify({ password }),
+        });
+
+        const j = await resp.json().catch(() => null);
+        if (!resp.ok) {
+          const errMsg = (j && (j.message || j.error_description || j.error)) || `Password update failed (${resp.status})`;
+          throw new Error(errMsg);
+        }
+
+        // success
         setSuccessModal(true);
+        // clear the token variable so we don't reuse it
+        setAccessTokenFromUrl(null);
+        clearTokenFromUrl();
+
         timeoutsRef.current.push(
           setTimeout(async () => {
+            // best-effort: signOut the client-side SDK (there's no session yet)
             try {
               await supabase.auth.signOut();
             } catch (e) {}
@@ -285,12 +327,13 @@ export default function PasswordCreation() {
             navigate("/");
           }, 1400)
         );
+        return;
       }
+
+      throw new Error("No session or token available to update password");
     } catch (err) {
       console.error("Update password failed:", err);
-      setFormError(
-        err?.message ?? "Unable to update password! Make sure the link is valid and try again"
-      );
+      setFormError(err?.message ?? "Unable to update password! Make sure the link is valid and try again");
     } finally {
       setIsSubmitting(false);
 
@@ -316,17 +359,9 @@ export default function PasswordCreation() {
           <h1 id="change-password-title">Reset Password</h1>
         </header>
 
-        <form
-          className={styles.uregForm}
-          onSubmit={handleUpdatePassword}
-          noValidate
-          aria-live="polite"
-        >
+        <form className={styles.uregForm} onSubmit={handleUpdatePassword} noValidate aria-live="polite">
           <div className={styles.panel}>
-            {/* show short loading / error if session not ready */}
-            {loading && (
-              <div className={styles.formNotice}>Please Wait…</div>
-            )}
+            {loading && <div className={styles.formNotice}>Please wait…</div>}
 
             {/* password */}
             <div className={styles.field}>
@@ -355,7 +390,7 @@ export default function PasswordCreation() {
                 </button>
               </div>
 
-              <div id="pwdGuide" className={styles.pwdChecks}  style={{ display: password.length > 0 ? "grid" : "none"}}>
+              <div id="pwdGuide" className={styles.pwdChecks} style={{ display: password.length > 0 ? "grid" : "none" }}>
                 <div className={`${styles.check} ${passwordChecks.length ? styles.ok : ""}`}>Minimum 12 Characters</div>
                 <div className={`${styles.check} ${passwordChecks.upper ? styles.ok : ""}`}>Contains One Uppercase</div>
                 <div className={`${styles.check} ${passwordChecks.lower ? styles.ok : ""}`}>Contains One Lowercase</div>
@@ -400,17 +435,20 @@ export default function PasswordCreation() {
                 </small>
               )}
             </div>
-            
+
+            {/* Helpful message when there's no session/token */}
+            {(!sessionUser && !accessTokenFromUrl) && (
+              <div className={styles.formNotice} role="status" aria-live="polite">
+                If you've just clicked a recovery email and this page shows no active session, try requesting a fresh password reset or open the reset email link again in the same browser.
+              </div>
+            )}
+
             {/* Error Message */}
             {formError && <div className={styles.formError}>{formError}</div>}
 
             {/* Actions */}
             <div className={styles.actions}>
-              <button
-                type="submit"
-                className={`${styles.btn} ${styles.primary}`}
-                disabled={!canSubmit() || isSubmitting || loading}
-              >
+              <button type="submit" className={`${styles.btn} ${styles.primary}`} disabled={!canSubmit() || isSubmitting || loading}>
                 {isSubmitting ? (
                   <>
                     <span className={styles.spinnerInline} aria-hidden="true">
@@ -422,7 +460,9 @@ export default function PasswordCreation() {
                   "Create Password"
                 )}
               </button>
-              <button type="button" className={`${styles.btn} ${styles.cancel}`} onClick={() => navigate("/")}>Cancel Process</button>
+              <button type="button" className={`${styles.btn} ${styles.cancel}`} onClick={() => navigate("/")}>
+                Cancel Process
+              </button>
             </div>
           </div>
         </form>
@@ -432,11 +472,7 @@ export default function PasswordCreation() {
       {successModal && (
         <div className={styles.successPop}>
           {TICK_SVG}
-          <p>
-            Password Created
-            <br />
-            Successfully
-          </p>
+          <p>Password Created<br />Successfully</p>
         </div>
       )}
     </div>
