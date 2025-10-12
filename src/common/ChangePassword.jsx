@@ -87,49 +87,53 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
         }
         return;
       }
-
-      // Prefer backend API for profile retrieval
+    
       if (API_BASE_URL) {
         try {
           const token = await getAccessToken();
-          // If token missing, fall back to metadata only
           if (!token) throw new Error("No session token available");
-
-          const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/profile`, {
+    
+          const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/user/me/profile`, {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
           });
-
+    
           if (!res.ok) {
-            // If backend rejects (401/403), gracefully fallback to metadata
             throw new Error(`Profile fetch failed (${res.status})`);
           }
-
+    
           const data = await res.json().catch(() => null);
-          if (mounted && data) {
-            // expecting { full_name, last_password_change } shape
-            setFullName(data.full_name || (user?.user_metadata?.full_name || user?.user_metadata?.name || ""));
-            setLastPasswordChange(data.last_password_change ? new Date(data.last_password_change) : null);
+          if (mounted && data?.profile) {
+            const profile = data.profile;
+    
+            setFullName(
+              profile.full_name ||
+                user?.user_metadata?.full_name ||
+                user?.user_metadata?.name || "");
+    
+            setLastPasswordChange(
+              profile.last_password_change
+                ? new Date(profile.last_password_change) : null);
+    
             setLoadingProfile(false);
             return;
           }
         } catch (err) {
-          // fallback to user metadata when backend/profile fetch fails
           console.warn("fetchProfile (backend) failed, falling back to metadata:", err);
         }
       }
-
-      // Fallback: use user metadata only (no time info)
+    
       if (mounted) {
-        const metaName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+        const metaName =
+          user.user_metadata?.full_name || user.user_metadata?.name || "";
         setFullName(metaName);
         setLastPasswordChange(null);
         setLoadingProfile(false);
       }
-    }
+    }    
 
     fetchProfile();
     return () => {
