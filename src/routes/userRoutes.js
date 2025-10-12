@@ -43,22 +43,10 @@ function normalizeDob(input) {
 router.get("/me", requireAuth, getProfile);
 
 /* GET /user/me/firstname */
-router.get("/me/firstname", async (req, res) => {
+router.get("/me/firstname", requireAuth, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization || req.headers.Authorization || "";
-    const token = (authHeader.startsWith("Bearer ") && authHeader.split(" ")[1]) || null;
-
-    if (!token) {
-      return res.status(401).json({ error: "Missing authorization token" });
-    }
-
-    // Verify token and obtain user
-    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
-    if (userErr || !userData?.user) {
-      return res.status(401).json({ error: userErr?.message || "Invalid token" });
-    }
-    const user = userData.user;
-    const userId = user.id;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
     // Fetch from profiles using Supabase admin client
     const { data, error } = await supabaseAdmin
@@ -106,7 +94,7 @@ router.get("/me/profile", requireAuth, async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .select("full_name,stream,year_of_study,semester,email,contact,dob")
+      .select("full_name,stream,year_of_study,semester,email,contact,dob,last_password_change")
       .eq("id", userId)
       .maybeSingle();
 
@@ -124,6 +112,7 @@ router.get("/me/profile", requireAuth, async (req, res) => {
       email: req.user.email || "",
       contact: "",
       dob: null,
+      last_password_change: null,
     };
 
     return res.json({ profile });

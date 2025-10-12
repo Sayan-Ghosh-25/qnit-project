@@ -8,12 +8,11 @@ export async function getProfile(req, res) {
 
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, full_name, stream, year_of_study, semester, contact, dob")
+      .select("id, email, full_name, stream, year_of_study, semester, contact, dob, last_password_change")
       .eq("id", userId)
       .maybeSingle();
 
     if (error) throw error;
-
     if (!data) return res.status(404).json({ error: "Profile not found" });
 
     return res.json({
@@ -25,6 +24,7 @@ export async function getProfile(req, res) {
         email: data.email || "",
         contact: data.contact || "",
         dob: data.dob || null,
+        last_password_change: data.last_password_change || null,
       },
     });
   } catch (err) {
