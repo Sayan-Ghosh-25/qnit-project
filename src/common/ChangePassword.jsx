@@ -15,6 +15,17 @@ const TICK_SVG = (
   </svg>
 );
 
+/** Helper: format Date to DD-MM-YYYY */
+function formatDateToDDMMYYYY(d) {
+  if (!d) return "";
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "";
+  const dd = String(dt.getDate()).padStart(2, "0");
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const yyyy = dt.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
 export default function PasswordUpdate({ onCancel, onSuccess }) {
   const navigate = useNavigate();
   const timeoutRef = useRef(null);
@@ -44,47 +55,79 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
   const [formError, setFormError] = useState("");
   const [successModal, setSuccessModal] = useState(false);
 
-  // profile data from DB
+  // profile data from backend
   const [fullName, setFullName] = useState("");
   const [lastPasswordChange, setLastPasswordChange] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-  // fetch profile (full_name & last_password_change) if user exists
+  // Helper: get current access token from supabase session
+  async function getAccessToken() {
+    try {
+      const sessionResp = await supabase.auth.getSession();
+      const token = sessionResp?.data?.session?.access_token || null;
+      return token;
+    } catch (e) {
+      console.warn("getAccessToken failed:", e);
+      return null;
+    }
+  }
+
+  // fetch profile (full_name & last_password_change) from backend API
   useEffect(() => {
     let mounted = true;
 
     async function fetchProfile() {
       if (!user?.id) {
-        setLoadingProfile(false);
+        if (mounted) {
+          setFullName("");
+          setLastPasswordChange(null);
+          setLoadingProfile(false);
+        }
         return;
       }
 
-      try {
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("full_name, last_password_change")
-          .eq("id", user.id)
-          .maybeSingle();
+      // Prefer backend API for profile retrieval
+      if (API_BASE_URL) {
+        try {
+          const token = await getAccessToken();
+          // If token missing, fall back to metadata only
+          if (!token) throw new Error("No session token available");
 
-        if (!error && profile) {
-          if (mounted) {
-            setFullName(profile.full_name || "");
-            setLastPasswordChange(profile.last_password_change ? new Date(profile.last_password_change) : null);
+          const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/profile`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!res.ok) {
+            // If backend rejects (401/403), gracefully fallback to metadata
+            throw new Error(`Profile fetch failed (${res.status})`);
           }
-        } else {
-          // No profile found - fallback to user metadata
-          if (mounted) {
-            const metaName = user.user_metadata?.full_name || user.user_metadata?.name || "";
-            setFullName(metaName);
-            setLastPasswordChange(null);
+
+          const data = await res.json().catch(() => null);
+          if (mounted && data) {
+            // expecting { full_name, last_password_change } shape
+            setFullName(data.full_name || (user?.user_metadata?.full_name || user?.user_metadata?.name || ""));
+            setLastPasswordChange(data.last_password_change ? new Date(data.last_password_change) : null);
+            setLoadingProfile(false);
+            return;
           }
+        } catch (err) {
+          // fallback to user metadata when backend/profile fetch fails
+          console.warn("fetchProfile (backend) failed, falling back to metadata:", err);
         }
-      } catch (err) {
-        console.error("Failed to fetch profile:", err);
-      } finally {
-        if (mounted) setLoadingProfile(false);
+      }
+
+      // Fallback: use user metadata only (no time info)
+      if (mounted) {
+        const metaName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+        setFullName(metaName);
+        setLastPasswordChange(null);
+        setLoadingProfile(false);
       }
     }
 
@@ -106,7 +149,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
     };
 
     if (password.length > 0) {
-      const tokens = fullName
+      const tokens = (fullName || "")
         .split(/\s+/)
         .map((t) => t.trim().toLowerCase())
         .filter((t) => t.length >= 2);
@@ -141,10 +184,10 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
     return diff < THIRTY_DAYS_MS;
   }
 
-  function nextAllowedDateString() {
+  function nextAllowedDate() {
     if (!lastPasswordChange) return null;
     const next = new Date(new Date(lastPasswordChange).getTime() + THIRTY_DAYS_MS);
-    return next.toLocaleString();
+    return next;
   }
 
   // cleanup timeout on unmount
@@ -156,18 +199,6 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
       }
     };
   }, []);
-
-  // Helper: get current access token from supabase session
-  async function getAccessToken() {
-    try {
-      const sessionResp = await supabase.auth.getSession();
-      const token = sessionResp?.data?.session?.access_token || null;
-      return token;
-    } catch (e) {
-      console.warn("getAccessToken failed:", e);
-      return null;
-    }
-  }
 
   // main handler
   async function handleUpdatePassword(e) {
@@ -181,7 +212,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
 
     // enforce 30-day rule
     if (isWithinThirtyDays()) {
-      setFormError(`Password was changed recently! Next change allowed on ${nextAllowedDateString()}`);
+      setFormError(`Password was changed recently! Next change allowed on ${formatDateToDDMMYYYY(nextAllowedDate())}`);
       return;
     }
 
@@ -196,23 +227,21 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
       const email = user.email;
       if (!email) throw new Error("User email not available for re-authentication");
 
-      // 1) Re-authenticate client-side to ensure old password is correct
+      // Re-authenticate client-side to ensure old password is correct and to get fresh token
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password: oldPassword,
       });
 
       if (signInError) {
-        throw new Error("Old password is Incorrect");
+        throw new Error("Old password is incorrect");
       }
 
-      // If a backend API is configured, prefer server-side password update
+      // If backend API is configured, prefer server-side password update
       if (API_BASE_URL) {
-        // ensure we have a valid access token (from the session we just obtained)
-        const token = (signInData?.session?.access_token) || (await getAccessToken());
+        const token = (signInData?.data?.session?.access_token) || (await getAccessToken());
         if (!token) throw new Error("Failed to obtain authentication token");
 
-        // call backend to perform password update using service-role on server
         const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/password/update`, {
           method: "POST",
           headers: {
@@ -224,6 +253,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
 
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) {
+          // Keep server error message if present
           throw new Error(j.error || j.message || "Password update failed on server");
         }
 
@@ -233,9 +263,7 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
         timeoutRef.current = setTimeout(async () => {
           setSuccessModal(false);
           try {
-            // attempt to use app logout flow
             if (typeof logout === "function") await logout();
-            // ensure session cleared client-side
             try { await supabase.auth.signOut(); } catch (e) {}
           } catch (e) {
             try { await supabase.auth.signOut(); } catch (e) {}
@@ -248,11 +276,11 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
           }
         }, 1400);
       } else {
-        // No backend: fallback to client-side update (will update auth via supabase client)
+        // Fallback: if backend not configured, attempt client-side update
         const { data: updateData, error: updateError } = await supabase.auth.updateUser({ password });
         if (updateError) throw updateError;
 
-        // persist last_password_change to profiles table (best-effort)
+        // Best-effort: request backendless persist of last_password_change via supabase client
         try {
           const nowIso = new Date().toISOString();
           const { error: updErr } = await supabase
@@ -305,15 +333,6 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
 
         <form className={styles.uregForm} onSubmit={handleUpdatePassword} noValidate>
           <div className={styles.panel}>
-            {/* Show helpful notice about 30-day rule */}
-            {lastPasswordChange && (
-              <div className={styles.formError}>
-                Last password change: {new Date(lastPasswordChange).toLocaleString()}. {" "}
-                {isWithinThirtyDays() ? (
-                  <strong>Next change allowed: {nextAllowedDateString()}</strong>
-                ) : ""}
-              </div>
-            )}
 
             {/* Old Password */}
             <div className={styles.field}>
@@ -411,6 +430,17 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
 
             {/* Error Message */}
             {formError && <div className={styles.formError}>{formError}</div>}
+            
+            {/* Show helpful notice about 30-day rule (date only) */}
+            {lastPasswordChange && (
+              <div className={styles.formError}>
+                Last password change on: {formatDateToDDMMYYYY(lastPasswordChange)}.
+                {" "}
+                {isWithinThirtyDays() ? (
+                  <strong>Next change allowed on: {formatDateToDDMMYYYY(nextAllowedDate())}</strong>
+                ) : null}
+              </div>
+            )}
 
             {/* Actions */}
             <div className={styles.actions}>

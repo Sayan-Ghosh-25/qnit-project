@@ -53,14 +53,7 @@
     margin-bottom: 1.25rem;
     transition: var(--transition-med);
   }
-  
-  .deleteContent p {
-    font-size: clamp(1rem, 2vw, 1.1rem);
-    font-weight: 500;
-    margin-bottom: 20px;
-    color: #fff;
-  }
-  
+
   .deleteActions {
     display: flex;
     justify-content: center;
@@ -222,6 +215,22 @@
   :global(.light-theme) .field input::placeholder {
     color: #898989
   }
+
+/* Responsive Media Queries */
+@media (max-width: 480px) {
+  .deleteContent h2 {
+    font-size: 1.25rem;
+  }
+
+  .field label {
+    font-size: 0.95rem;
+  }  
+
+  .field input, .field select {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
 
 /* Prevents Autofilling Service From Changing Input Field Background */
 input:-webkit-autofill,

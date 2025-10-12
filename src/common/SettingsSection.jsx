@@ -5,9 +5,9 @@ import { useTheme } from "@/context/ThemeContext";
 import { useNavigate, Routes, Route, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
-// Lazy load modals/components
-const LogoutModalComponent = lazy(() => import("@/common/LogoutModal.jsx"));
-const ChangePassword = lazy(() => import("@/common/ChangePassword.jsx"));
+// Load modals/components
+const LogoutModalComponent =  import("@/common/LogoutModal.jsx");
+const ChangePassword =  import("@/common/ChangePassword.jsx");
 const AccountDeleteComponent = lazy(() => import("@/common/AccountDelete.jsx"));
 
 function ChangePasswordSkeleton() {
