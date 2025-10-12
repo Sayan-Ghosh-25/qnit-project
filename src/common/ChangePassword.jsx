@@ -438,8 +438,8 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
             {/* Show helpful notice about 30-day rule (date only) */}
             {lastPasswordChange && (
               <div className={styles.formError}>
-                Last password change on: {formatDateToDDMMYYYY(lastPasswordChange)}.
-                {" "}
+                Last password change on: {formatDateToDDMMYYYY(lastPasswordChange)}
+                <br />
                 {isWithinThirtyDays() ? (
                   <strong>Next change allowed on: {formatDateToDDMMYYYY(nextAllowedDate())}</strong>
                 ) : null}
