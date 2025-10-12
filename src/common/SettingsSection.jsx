@@ -6,8 +6,8 @@ import { useNavigate, Routes, Route, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 // Load modals/components
-const LogoutModalComponent =  import("@/common/LogoutModal.jsx");
-const ChangePassword =  import("@/common/ChangePassword.jsx");
+import LogoutModalComponent from "@/common/LogoutModal.jsx";
+import ChangePassword from "@/common/ChangePassword.jsx";
 const AccountDeleteComponent = lazy(() => import("@/common/AccountDelete.jsx"));
 
 function ChangePasswordSkeleton() {
