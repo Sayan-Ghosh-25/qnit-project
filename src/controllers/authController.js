@@ -4,26 +4,22 @@ import crypto from "crypto";
 import { supabaseAdmin } from "../config/supabaseClient.js";
 import { signInUser } from "../services/authService.js";
 import { verifyCaptcha } from "../services/captchaService.js";
+import { sendAdminPrivateKeyEmail } from "../services/emailService.js";
 
+/* Config */
 const PRIVATE_KEY_LENGTH = parseInt(process.env.PRIVATE_KEY_LENGTH || "6", 10);
 const OTP_EXPIRE_MINUTES = parseInt(process.env.OTP_EXPIRE_MINUTES || "10", 10);
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || null;
 
-// Optional edge function URL that will generate the private key and send email
-const PRIVATE_KEY_EDGE_FUNCTION = process.env.SUPABASE_PRIVATE_KEY_FUNCTION || null;
-
-/*** Local helper: hash a string with random salt (HMAC-SHA256)
- ** Returns { salt: base64, hash: hex } **/
+/*** Crypto Helpers ***/
 async function hashString(input) {
   const salt = crypto.randomBytes(16).toString("base64");
   const hash = crypto.createHmac("sha256", salt).update(String(input)).digest("hex");
   return { salt, hash };
 }
 
-/* Local helper: verify input against salt+hash using constant-time compare */
 async function verifyHash(input, salt, expectedHash) {
   const hash = crypto.createHmac("sha256", String(salt)).update(String(input)).digest("hex");
-
   try {
     const a = Buffer.from(hash, "hex");
     const b = Buffer.from(String(expectedHash), "hex");
@@ -34,9 +30,9 @@ async function verifyHash(input, salt, expectedHash) {
   }
 }
 
-/* Local helper: return Date object now + Minutes */
-function nowPlusMinutes(mins = 10) {
-  return new Date(Date.now() + Number(mins) * 60 * 1000);
+/** OTP Timer Helper **/
+export function nowPlusMinutes(mins = 10) {
+  return new Date(Date.now() + mins * 60 * 1000);
 }
 
 /** GET /auth/student-id-lookup?name=... */
@@ -105,49 +101,13 @@ export async function requestPrivateKey(req, res) {
       return res.status(400).json({ ok: false, error: "email or contact required" });
     }
 
-    // 1) If edge function is configured, delegate generation + sending to it
-    if (PRIVATE_KEY_EDGE_FUNCTION) {
-      try {
-        const fnUrl = PRIVATE_KEY_EDGE_FUNCTION;
-        const payload = {
-          applicant: email || contact,
-          purpose,
-          adminEmail: ADMIN_NOTIFY_EMAIL || null,
-          expiresMinutes: OTP_EXPIRE_MINUTES,
-          email: email || null,
-          contact: contact || null,
-        };
-
-        // If your edge function requires Service Role auth, include SERVICE ROLE key
-        const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || null;
-        const headers = { "Content-Type": "application/json" };
-        if (SERVICE_ROLE_KEY) headers.Authorization = `Bearer ${SERVICE_ROLE_KEY}`;
-
-        const resp = await fetch(fnUrl, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-        });
-
-        const body = await resp.text().catch(() => null);
-        if (!resp.ok) {
-          console.error("requestPrivateKey: edge function failed:", resp.status, body);
-        } else {
-          // edge function handled generation + notify
-          return res.json({ ok: true, admin_notified: true });
-        }
-      } catch (e) {
-        console.error("requestPrivateKey: error calling edge function:", e);
-        // continue to fallback behavior
-      }
-    }
-
-    // 2) Fallback: generate code server-side, store only hashed form in admin_private_keys
+    // Generate Raw Code (alphanumeric uppercase)
     const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     const buf = crypto.randomBytes(PRIVATE_KEY_LENGTH);
     let rawCode = "";
     for (let i = 0; i < PRIVATE_KEY_LENGTH; i++) rawCode += charset[buf[i] % charset.length];
 
+    // Hash & Store
     const { salt, hash } = await hashString(rawCode);
     const expires_at = nowPlusMinutes(OTP_EXPIRE_MINUTES).toISOString();
 
@@ -160,22 +120,48 @@ export async function requestPrivateKey(req, res) {
       expires_at,
       used: false,
       created_at: new Date().toISOString(),
-      notify_admin: true,
     };
 
-    const { error: insertErr } = await supabaseAdmin.from("admin_private_keys").insert([insertPayload]);
-    if (insertErr) {
+    // Insert row and retrieve id
+    const { data: insertData, error: insertErr } = await supabaseAdmin
+      .from("admin_private_keys")
+      .insert([insertPayload])
+      .select("id")
+      .maybeSingle();
+
+    if (insertErr || !insertData) {
       console.error("requestPrivateKey: DB insert error:", insertErr);
       return res.status(500).json({ ok: false, error: "Failed to generate private key request" });
     }
 
-    // Do not return or log rawCode, Admin email must be sent by your Edge function
-    return res.json({
-      ok: true,
-      admin_notified: false,
-      admin_error:
-        "edge-function-not-configured: Edge Function uses the row to email the admin",
-    });
+    const rowId = insertData.id;
+
+    // Send admin email via emailService — do not expose rawCode in API response
+    const applicant = email || contact;
+    let adminEmailSent = false;
+    let adminEmailError = null;
+
+    if (ADMIN_NOTIFY_EMAIL) {
+      try {
+        const sendResp = await sendAdminPrivateKeyEmail({
+          adminEmail: ADMIN_NOTIFY_EMAIL,
+          applicant,
+          rawCode,
+          expiresAtIso: expires_at,
+        });
+
+        adminEmailSent = true;
+
+        console.log("requestPrivateKey: admin email sendResp:", sendResp);
+      } catch (e) {
+        adminEmailError = (e && (e.response || e.message)) || String(e);
+        console.error("requestPrivateKey: admin email failed:", adminEmailError);
+      }
+    } else {
+      console.warn("requestPrivateKey: ADMIN_NOTIFY_EMAIL not configured");
+    }
+
+    return res.json({ ok: true, admin_notified: adminEmailSent, admin_error: adminEmailError || undefined });
   } catch (err) {
     console.error("requestPrivateKey:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
@@ -463,7 +449,6 @@ export async function resetPassword(req, res) {
         if (error) throw error;
         sent = true;
       } else {
-        // fallback to REST endpoint with service_role key
         const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
         const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 
