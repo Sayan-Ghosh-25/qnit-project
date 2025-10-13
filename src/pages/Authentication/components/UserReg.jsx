@@ -304,55 +304,37 @@ export default function UserReg() {
   // ========== PRIVATE KEY REQUEST (Admin) ==========
   async function handleRequestPrivateKeyInput() {
     setPrivateKeyMessage("");
-    if (
-      !(
-        (email && validateEmail(email)) ||
-        (contactNumber && validateContact(contactNumber))
-      )
-    ) {
-      setPrivateKeyMessage(
-        "Enter valid email & contact before requesting a private key"
-      );
+    if (!((email && validateEmail(email)) || (contactNumber && validateContact(contactNumber)))) {
+      setPrivateKeyMessage("Enter your valid email & contact first");
       return;
-    }
+     }
 
     try {
-      setPrivateKeyMessage("Requesting Private Key...");
-      // Try first: backend endpoint (preferred)
+      setPrivateKeyMessage("Requesting for private key...");
       if (API_BASE_URL) {
         const res = await fetch(`${API_BASE_URL}/auth/private-key/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            userType: userType.toLowerCase(),
             email: email?.trim()?.toLowerCase() || null,
             contact: contactNumber?.trim() || null,
             purpose: "signup",
           }),
         });
 
-        const j = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const msg = j.error || j.message || "Private key generation failed";
-          throw new Error(msg);
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.message || "Private key generation failed");
         }
 
-        // server responds { ok:true, admin_notified: boolean, admin_error?: ... }
+        const data = await res.json();
         setPrivateKeyGenerated(true);
         setPrivateKeyVerified(false);
-        if (j.admin_notified) {
-          setPrivateKeyMessage("Request Sent! Contact Super-Admin For The Key");
-        } else {
-          setPrivateKeyMessage(
-            j.admin_error
-              ? `Stored! Admin notification not completed: ${j.admin_error}`
-              : "Stored! Admin will be notified by server/edge function"
-          );
-        }
+        setPrivateKeyMessage("Request Sent! Contact Super-Admin To Receive Your Private Key");
 
-        // start visual-only timer
         setPrivateKeyTimer(PRIVATE_KEY_TIMEOUT_SECONDS);
-        if (privateKeyIntervalRef.current)
-          clearInterval(privateKeyIntervalRef.current);
+        if (privateKeyIntervalRef.current) clearInterval(privateKeyIntervalRef.current);
         privateKeyIntervalRef.current = setInterval(() => {
           setPrivateKeyTimer((t) => {
             if (t <= 1) {
@@ -364,96 +346,36 @@ export default function UserReg() {
           });
         }, 1000);
 
-        return;
+      } else {
+        throw new Error(
+          "Server-side Error"
+        );
       }
-
-      // Fallback: call Supabase Edge Function (public client can call it if it's exposed)
-      if (typeof supabase.functions?.invoke === "function") {
-        const payload = {
-          email: email?.trim()?.toLowerCase() || null,
-          contact: contactNumber?.trim() || null,
-          purpose: "signup",
-          expiresMinutes: Math.floor(PRIVATE_KEY_TIMEOUT_SECONDS / 60),
-        };
-
-        const fnRes = await supabase.functions.invoke("private-key", {
-          body: payload,
-        });
-
-        // supabase.functions.invoke returns either { data, error } or a Response-like object depending on SDK version.
-        // Normalize:
-        const fnError =
-          fnRes?.error ||
-          (fnRes?.status && fnRes.status >= 400
-            ? new Error("Edge function error")
-            : null);
-        const fnData = fnRes?.data ?? fnRes;
-
-        if (fnError) {
-          throw new Error(fnError.message || "Edge function returned an error");
-        }
-
-        // Expected fnData: { ok:true, admin_notified: boolean, ... } OR { ok:true, admin_notified:false, message: ... }
-        setPrivateKeyGenerated(true);
-        setPrivateKeyVerified(false);
-        if (fnData?.admin_notified) {
-          setPrivateKeyMessage("Request Sent! Contact Super-Admin For The Key");
-        } else {
-          setPrivateKeyMessage(fnData?.message || "Hashed request stored!");
-        }
-
-        setPrivateKeyTimer(PRIVATE_KEY_TIMEOUT_SECONDS);
-        if (privateKeyIntervalRef.current)
-          clearInterval(privateKeyIntervalRef.current);
-        privateKeyIntervalRef.current = setInterval(() => {
-          setPrivateKeyTimer((t) => {
-            if (t <= 1) {
-              clearInterval(privateKeyIntervalRef.current);
-              privateKeyIntervalRef.current = null;
-              return 0;
-            }
-            return t - 1;
-          });
-        }, 1000);
-
-        return;
-      }
-
-      // If we reach here: no API_BASE_URL and no functions.invoke available
-      setPrivateKeyMessage(
-        "No server endpoint configured! Please contact the administrator"
-      );
     } catch (err) {
       console.error("private key gen error", err);
-      setPrivateKeyMessage(err?.message || "Failed to generate private key");
-      setPrivateKeyGenerated(false);
+      setPrivateKeyMessage(err.message || "Failed to generate private key");
     }
   }
 
   async function handleVerifyPrivateKeyInput() {
     setPrivateKeyMessage("");
     if (!privateKeyGenerated) {
-      setPrivateKeyMessage("Request a private key first before verifying");
+      setPrivateKeyMessage("Request private key first");
       return;
     }
-    if (!privateKey || privateKey.trim().length < 3) {
-      setPrivateKeyMessage("Enter the private key to verify");
+    if (!privateKey || privateKey.trim().length < 5) {
+      setPrivateKeyMessage("Enter your private key");
       return;
     }
 
     try {
-      // Verification must happen on the server (service role) because the DB stores only hashes
-      if (!API_BASE_URL) {
-        setPrivateKeyMessage(
-          "Verification requires server endpoint. Please contact admin."
-        );
-        return;
-      }
+      if (!API_BASE_URL) throw new Error("Server-side Error");
 
       const res = await fetch(`${API_BASE_URL}/auth/private-key/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userType: userType.toLowerCase(),
           email: email?.trim()?.toLowerCase() || null,
           contact: contactNumber?.trim() || null,
           privateKey: privateKey.trim(),
@@ -461,27 +383,22 @@ export default function UserReg() {
         }),
       });
 
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok)
-        throw new Error(
-          j.error || j.message || j || "Private key verification failed"
-        );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.message || "Private key verification failed");
+      }
 
-      setPrivateKeyVerified(Boolean(j.verified));
-      setPrivateKeyMessage(
-        j.verified
-          ? "Private key verified successfully!"
-          : "Verification failed"
-      );
-      if (j.verified && privateKeyIntervalRef.current) {
+      const data = await res.json();
+      setPrivateKeyVerified(data.verified || false);
+      setPrivateKeyMessage(data.verified ? "Private Key Verified Successfully!" : "Verification failed");
+      if (privateKeyIntervalRef.current) {
         clearInterval(privateKeyIntervalRef.current);
         privateKeyIntervalRef.current = null;
-      }
-      if (j.verified) setPrivateKeyTimer(0);
+      } setPrivateKeyTimer(0);      
+
     } catch (err) {
       console.error("private key verify error", err);
-      setPrivateKeyMessage(err?.message || "Failed to verify private key");
-      setPrivateKeyVerified(false);
+      setPrivateKeyMessage(err.message || "Failed to verify private key");
     }
   }
 
