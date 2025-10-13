@@ -183,15 +183,14 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
 
   // compute if user can change password now
   function isWithinThirtyDays() {
-    if (!lastPasswordChange) return false;
-    const diff = Date.now() - new Date(lastPasswordChange).getTime();
+    if (!(lastPasswordChange instanceof Date) || isNaN(lastPasswordChange)) return false;
+    const diff = Date.now() - lastPasswordChange.getTime();
     return diff < THIRTY_DAYS_MS;
   }
 
   function nextAllowedDate() {
-    if (!lastPasswordChange) return null;
-    const next = new Date(new Date(lastPasswordChange).getTime() + THIRTY_DAYS_MS);
-    return next;
+    if (!(lastPasswordChange instanceof Date) || isNaN(lastPasswordChange)) return null;
+    return new Date(lastPasswordChange.getTime() + THIRTY_DAYS_MS);
   }
 
   // cleanup timeout on unmount
@@ -436,13 +435,12 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
             {formError && <div className={styles.formError}>{formError}</div>}
             
             {/* Show helpful notice about 30-day rule (date only) */}
-            {lastPasswordChange && (
+            {lastPasswordChange instanceof Date && !isNaN(lastPasswordChange) && (
               <div className={styles.formError}>
-                Last password change on: {formatDateToDDMMYYYY(lastPasswordChange)}
-                <br />
-                {isWithinThirtyDays() ? (
-                  <strong>Next change allowed on: {formatDateToDDMMYYYY(nextAllowedDate())}</strong>
-                ) : null}
+              <div>Last password change on: {formatDateToDDMMYYYY(lastPasswordChange)}</div>
+              {isWithinThirtyDays() && (
+                <div><strong>Next change allowed on: {formatDateToDDMMYYYY(nextAllowedDate())}
+                </strong></div>)}
               </div>
             )}
 
