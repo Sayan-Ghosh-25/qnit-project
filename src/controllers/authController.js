@@ -249,7 +249,7 @@ export async function checkUser(req, res) {
   }
 }
 
-/** POST /auth/register */
+/** POST /auth/register **/
 export async function registerUser(req, res) {
   try {
     const {
@@ -257,27 +257,31 @@ export async function registerUser(req, res) {
       contact = null, stream = null, year_of_study = null, access_key = null
     } = req.body || {};
 
+    // Minimal required fields for client-side signUp flow
     if (!rawEmail || !password || !full_name) {
       return res.status(400).json({ ok: false, error: "Missing required fields: email, password, full_name" });
     }
     const email = String(rawEmail).trim().toLowerCase();
 
-    // 1) Check auth.users for existing email (friendly error)
+    // 1) Email uniqueness check
     try {
-      const { data: existingAuthUser } = await supabaseAdmin
+      const { data: existingAuthUser, error: authErr } = await supabaseAdmin
         .from("auth.users")
-        .select("id")
+        .select("id, email_confirmed_at")
         .eq("email", email)
         .maybeSingle();
 
-      if (existingAuthUser?.id) {
+      if (authErr) {
+        console.warn("registerUser: checking auth.users failed:", authErr);
+      } else if (existingAuthUser?.id) {
+        // if a record exists at auth.users -> stop here (prevent duplicate signup)
         return res.status(400).json({ ok: false, error: "Email already registered! Please sign in or use password reset" });
       }
     } catch (e) {
-      console.warn("registerUser: checking auth.users failed:", e);
+      console.warn("registerUser: auth.users check threw:", e);
     }
 
-    // 2) Check contact uniqueness if provided
+    // 2) Contact uniqueness check
     if (contact) {
       try {
         const { data: existingContact } = await supabaseAdmin
@@ -293,60 +297,75 @@ export async function registerUser(req, res) {
       }
     }
 
-    // create user in Supabase Auth (service role)
-    const createPayload = {
-      email,
-      password,
-      user_metadata: {
-        role,
-        full_name: String(full_name).trim(),
-        contact,
-        stream,
-        year_of_study,
-        access_key: access_key || null
+    // 3) If student, validate access_key strictly against student_ids table
+    if (role === "student") {
+      const access = access_key ? String(access_key).trim() : null;
+      if (!access || access.length === 0) {
+        return res.status(400).json({ ok: false, error: "Access key required for student registration" });
       }
-    };
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser(createPayload);
-    if (error) {
-      console.warn("registerUser: createUser error:", error);
-      const msg = error?.message || String(error);
-      if (/duplicate|already exists/i.test(msg)) {
-        return res.status(400).json({ ok: false, error: "Email already registered! Please sign in or reset password" });
+      // Try direct id4 match first
+      let match = null;
+      try {
+        const { data: byId4, error: id4Err } = await supabaseAdmin
+          .from("student_ids")
+          .select("id4, original_name, normalized_name")
+          .eq("id4", access)
+          .maybeSingle();
+
+        if (id4Err) {
+          console.warn("registerUser: student_ids id4 lookup failed:", id4Err);
+        } else if (byId4 && byId4.id4) {
+          match = byId4;
+        }
+      } catch (e) {
+        console.warn("registerUser: student_ids id4 lookup threw:", e);
       }
-      return res.status(400).json({ ok: false, error: msg || "Failed to create user" });
+
+      // If not found by id4, try normalized name match (user may paste name instead)
+      if (!match) {
+        const normalizedInput = String(access).toLowerCase().replace(/\s+/g, "");
+        try {
+          const { data: byNorm, error: normErr } = await supabaseAdmin
+            .from("student_ids")
+            .select("id4, original_name, normalized_name")
+            .eq("normalized_name", normalizedInput)
+            .maybeSingle();
+
+          if (normErr) {
+            console.warn("registerUser: student_ids normalized lookup failed:", normErr);
+          } else if (byNorm && byNorm.id4) {
+            match = byNorm;
+          }
+        } catch (e) {
+          console.warn("registerUser: student_ids normalized lookup threw:", e);
+        }
+      }
+
+      if (!match) {
+        return res.status(400).json({ ok: false, error: "Invalid Key! No matching student record found" });
+      }
+
+      // Also ensure that this access_key is not already used in profiles
+      try {
+        const { data: existingAccess, error: exErr } = await supabaseAdmin
+          .from("profiles")
+          .select("id, email")
+          .eq("access_key", match.id4)
+          .maybeSingle();
+
+        if (exErr) {
+          console.warn("registerUser: profiles access_key lookup failed:", exErr);
+        } else if (existingAccess && existingAccess.id) {
+          return res.status(400).json({ ok: false, error: "This access key is associated with another student" });
+        }
+      } catch (e) {
+        console.warn("registerUser: profiles access_key lookup threw:", e);
+      }
     }
 
-    const userId = data.user?.id ?? data?.id ?? null;
-    if (!userId) {
-      console.warn("registerUser: user created but id missing:", data);
-    }
-
-    // Best-effort upsert to profiles
-    try {
-      const now = new Date().toISOString();
-      const profileRow = {
-        id: userId,
-        full_name: String(full_name).trim(),
-        email,
-        contact,
-        role,
-        stream,
-        year_of_study,
-        access_key: role === "student" ? (access_key || null) : null,
-        last_password_change: null,
-        created_at: now
-      };
-
-      const { error: pErr } = await supabaseAdmin.from("profiles").upsert([profileRow], { onConflict: "id", returning: "minimal" });
-      if (pErr) {
-        console.warn("registerUser: profiles upsert warning:", pErr);
-      }
-    } catch (err) {
-      console.warn("registerUser: profiles upsert failed (continuing):", err);
-    }
-
-    return res.json({ ok: true, userId });
+    // All validations passed — Do not create auth user here; let client call supabase.auth.signUp()
+    return res.json({ ok: true, validated: true, message: "Validation Successful! Proceed to Next Step" });
   } catch (err) {
     console.error("registerUser:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
