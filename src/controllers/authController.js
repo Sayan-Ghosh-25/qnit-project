@@ -64,7 +64,7 @@ export async function studentIdLookup(req, res) {
 /* Sign In operation handler */
 export const signIn = async (req, res) => {
   try {
-    const { email, password, captchaToken } = req.body;
+    const { email, password, captchaToken, role } = req.body;
 
     if (!email || !password || !captchaToken) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -76,17 +76,24 @@ export const signIn = async (req, res) => {
       return res.status(403).json({ error: "Captcha verification failed" });
     }
 
-    const user = await signInUser(email, password);
+    // Expected role may be undefined/null
+    let user;
+    try {
+      user = await signInUser(email, password, role || null);
+    } catch (err) {
+      return res.status(401).json({ error: err.message || "Invalid Credentials" });
+    }
 
     return res.status(200).json({
-      message: "Sign in Successful",
+      message: "Sign In Successful",
       user: {
         id: user.id,
         email: user.email,
       },
     });
   } catch (err) {
-    return res.status(401).json({ error: err.message });
+    console.error("signIn controller error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
