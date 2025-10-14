@@ -436,13 +436,6 @@ export default function PasswordCreation() {
               )}
             </div>
 
-            {/* Helpful message when there's no session/token */}
-            {(!sessionUser && !accessTokenFromUrl) && (
-              <div className={styles.formNotice} role="status" aria-live="polite">
-                If you've just clicked a recovery email and this page shows no active session, try requesting a fresh password reset or open the reset email link again in the same browser.
-              </div>
-            )}
-
             {/* Error Message */}
             {formError && <div className={styles.formError}>{formError}</div>}
 

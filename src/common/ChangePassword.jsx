@@ -333,6 +333,16 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
         <header className={styles.uregHeader}>
           <h1 id="change-password-title">Change Password</h1>
         </header>
+        
+        {/* Show helpful notice about 30-day rule */}
+        {lastPasswordChange instanceof Date && !isNaN(lastPasswordChange) && (
+          <div className={styles.formNotice}>
+          <div>Last password change on: {formatDateToDDMMYYYY(lastPasswordChange)}</div>
+          {isWithinThirtyDays() && (
+            <div><strong>Next change allowed on: {formatDateToDDMMYYYY(nextAllowedDate())}
+            </strong></div>)}
+          </div>
+        )}
 
         <form className={styles.uregForm} onSubmit={handleUpdatePassword} noValidate>
           <div className={styles.panel}>
@@ -433,16 +443,6 @@ export default function PasswordUpdate({ onCancel, onSuccess }) {
 
             {/* Error Message */}
             {formError && <div className={styles.formError}>{formError}</div>}
-            
-            {/* Show helpful notice about 30-day rule (date only) */}
-            {lastPasswordChange instanceof Date && !isNaN(lastPasswordChange) && (
-              <div className={styles.formError}>
-              <div>Last password change on: {formatDateToDDMMYYYY(lastPasswordChange)}</div>
-              {isWithinThirtyDays() && (
-                <div><strong>Next change allowed on: {formatDateToDDMMYYYY(nextAllowedDate())}
-                </strong></div>)}
-              </div>
-            )}
 
             {/* Actions */}
             <div className={styles.actions}>
