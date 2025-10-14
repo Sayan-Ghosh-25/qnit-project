@@ -6,8 +6,7 @@ import styles from "./UserReg.module.css";
 
 // ---------------- CONFIG ----------------
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const OTP_TIMEOUT_SECONDS = 10 * 60; // 10 minutes
-const PRIVATE_KEY_TIMEOUT_SECONDS = 10 * 60; // 10 minutes
+const WELCOME_REDIRECT = import.meta.env.VITE_WELCOME_REDIRECT;
 // ----------------------------------------
 
 const TICK_SVG = (
@@ -42,6 +41,10 @@ export default function UserReg() {
   const [accessKeyDisabled, setAccessKeyDisabled] = useState(false);
   const [accessAutoFoundFor, setAccessAutoFoundFor] = useState(null);
 
+  // accessKey validation state: null | "checking" | true | false
+  const [accessKeyStatus, setAccessKeyStatus] = useState(null);
+  const [accessKeyMessage, setAccessKeyMessage] = useState("");
+
   // password
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -63,18 +66,7 @@ export default function UserReg() {
     noName: false,
   });
 
-  // OTP flow (Supabase-backed)
-  const [otp, setOtp] = useState("");
-  const [otpGenerated, setOtpGenerated] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [otpTimer, setOtpTimer] = useState(0);
-  const otpIntervalRef = useRef(null);
-  const [otpMessage, setOtpMessage] = useState("");
-  const [otpRequestsCount, setOtpRequestsCount] = useState(0);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
-  const [sendOtpLabel, setSendOtpLabel] = useState("Send OTP");
-
-  // ---------- Private Key state ----------
+  // ---------- Private Key state (admin) ----------
   const [privateKey, setPrivateKey] = useState("");
   const [privateKeyGenerated, setPrivateKeyGenerated] = useState(false);
   const [privateKeyVerified, setPrivateKeyVerified] = useState(false);
@@ -91,21 +83,12 @@ export default function UserReg() {
   const debounceEmailRef = useRef(null);
   const debounceContactRef = useRef(null);
   const debounceNameRef = useRef(null);
-
-  // helper: format seconds
-  function formatHMS(s) {
-    const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-    const ss = String(s % 60).padStart(2, "0");
-    return `${hh}:${mm}:${ss}`;
-  }
+  const debounceAccessRef = useRef(null);
 
   // ---------- VALIDATORS ----------
   function validateEmail(em) {
     if (!em) return false;
-    const cleaned = String(em)
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .trim();
+    const cleaned = String(em).replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned);
   }
   function validateContact(c) {
@@ -301,13 +284,102 @@ export default function UserReg() {
     };
   }, [fullName]);
 
+  // ---------- ACCESS KEY LIVE VALIDATION (client-side best-effort) ----------
+  useEffect(() => {
+    // Only validate for Student role; if disabled (auto found) still validate existence/usage
+    const isStudent = userType === "Student";
+    if (!isStudent) {
+      setAccessKeyStatus(null);
+      setAccessKeyMessage("");
+      return;
+    }
+
+    // if empty, clear
+    if (!accessKey || accessKey.trim().length === 0) {
+      setAccessKeyStatus(null);
+      setAccessKeyMessage("");
+      return;
+    }
+
+    // debounce
+    if (debounceAccessRef.current) clearTimeout(debounceAccessRef.current);
+    setAccessKeyStatus("checking");
+    setAccessKeyMessage("Checking...");
+
+    debounceAccessRef.current = setTimeout(async () => {
+      try {
+        const keyRaw = String(accessKey).trim();
+        let found = null;
+
+        // try id4 lookup (exact)
+        const { data: byId4, error: id4Err } = await supabase
+          .from("student_ids")
+          .select("id4, original_name, normalized_name")
+          .eq("id4", keyRaw)
+          .maybeSingle();
+
+        if (!id4Err && byId4 && byId4.id4) {
+          found = byId4;
+        } else {
+          const normalized = keyRaw.toLowerCase().replace(/\s+/g, "");
+          const { data: byNorm, error: normErr } = await supabase
+            .from("student_ids")
+            .select("id4, original_name, normalized_name")
+            .eq("normalized_name", normalized)
+            .maybeSingle();
+
+          if (!normErr && byNorm && byNorm.id4) {
+            found = byNorm;
+          }
+        }
+
+        if (!found && !password.length > 0) {
+          setAccessKeyStatus(false);
+          setAccessKeyMessage("Invalid Key! No matching student record found");
+          return;
+        }
+
+        // check if profiles already use this access_key
+        const { data: usedBy, error: usedErr } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .eq("access_key", found.id4)
+          .maybeSingle();
+
+        if (usedErr) {
+          console.warn("accessKey validation: profiles lookup error", usedErr);
+        }
+
+        if (usedBy && usedBy.id) {
+          setAccessKeyStatus(false);
+          setAccessKeyMessage("This access key is associated with another student");
+          return;
+        }
+
+        // success
+        setAccessKeyStatus(true);
+        setAccessKeyMessage("Access Key Is Valid");
+        // if it was auto-found, keep disabled flag as-is
+      } catch (err) {
+        console.error("accessKey validation failed:", err);
+        setAccessKeyStatus(null);
+        setAccessKeyMessage("Unable to validate access key right now");
+      }
+    }, 420);
+
+    return () => {
+      if (debounceAccessRef.current) clearTimeout(debounceAccessRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessKey, userType]);
+
   // ========== PRIVATE KEY REQUEST (Admin) ==========
   async function handleRequestPrivateKeyInput() {
     setPrivateKeyMessage("");
     if (!((email && validateEmail(email)) || (contactNumber && validateContact(contactNumber)))) {
       setPrivateKeyMessage("Enter your valid email & contact first");
       return;
-     }
+    }
 
     try {
       setPrivateKeyMessage("Requesting for private key...");
@@ -328,12 +400,12 @@ export default function UserReg() {
           throw new Error(j.message || "Private key generation failed");
         }
 
-        const data = await res.json();
+        // don't expose server response; just show success message
         setPrivateKeyGenerated(true);
         setPrivateKeyVerified(false);
-        setPrivateKeyMessage("Request Sent! Contact Super-Admin To Receive Your Private Key");
+        setPrivateKeyMessage("Request Sent! Contact Super Admin To Receive Your Private Key");
 
-        setPrivateKeyTimer(PRIVATE_KEY_TIMEOUT_SECONDS);
+        setPrivateKeyTimer(600);
         if (privateKeyIntervalRef.current) clearInterval(privateKeyIntervalRef.current);
         privateKeyIntervalRef.current = setInterval(() => {
           setPrivateKeyTimer((t) => {
@@ -345,11 +417,8 @@ export default function UserReg() {
             return t - 1;
           });
         }, 1000);
-
       } else {
-        throw new Error(
-          "Server-side Error"
-        );
+        throw new Error("Server-side Error");
       }
     } catch (err) {
       console.error("private key gen error", err);
@@ -394,108 +463,15 @@ export default function UserReg() {
       if (privateKeyIntervalRef.current) {
         clearInterval(privateKeyIntervalRef.current);
         privateKeyIntervalRef.current = null;
-      } setPrivateKeyTimer(0);      
-
+      }
+      setPrivateKeyTimer(0);
     } catch (err) {
       console.error("private key verify error", err);
       setPrivateKeyMessage(err.message || "Failed to verify private key");
     }
   }
 
-  // OTP generation & verify (Supabase-backed: OTP token via email template with {{ .Token }})
-  async function handleGenerateOtp() {
-    setOtpMessage("");
-    if (!email || !validateEmail(email)) {
-      setOtpMessage("Enter valid email to receive the OTP");
-      return;
-    }
-
-    try {
-      setOtpMessage("Sending OTP...");
-
-      // call signInWithOtp to send the OTP. Supabase email template should include {{ .Token }}
-      const attempt = await supabase.auth.signInWithOtp({
-        email: String(email).trim().toLowerCase(),
-      });
-
-      // Normalize errors across SDK versions:
-      const error =
-        attempt?.error ||
-        attempt?.data?.error ||
-        (attempt?.error && attempt.error.message);
-      if (error) throw error;
-
-      setOtpGenerated(true);
-      setOtpVerified(false);
-      setOtpMessage("OTP Sent! Check Your Inbox/Spam Folder");
-      setOtpRequestsCount((c) => c + 1);
-
-      // visual-only countdown
-      setOtpTimer(OTP_TIMEOUT_SECONDS);
-      if (otpIntervalRef.current) clearInterval(otpIntervalRef.current);
-      otpIntervalRef.current = setInterval(() => {
-        setOtpTimer((t) => {
-          if (t <= 1) {
-            clearInterval(otpIntervalRef.current);
-            otpIntervalRef.current = null;
-            return 0;
-          }
-          return t - 1;
-        });
-      }, 1000);
-    } catch (err) {
-      console.error("otp gen error", err);
-      setOtpMessage(err?.message || String(err) || "Failed To Send OTP!");
-    }
-  }
-
-  async function handleVerifyOtp() {
-    setOtpMessage("");
-    if (!otpGenerated) {
-      setOtpMessage("Request OTP first");
-      return;
-    }
-    if (!otp || otp.trim().length < 3) {
-      setOtpMessage("Enter the OTP from your email");
-      return;
-    }
-
-    setVerifyingOtp(true);
-    setOtpMessage("Verifying OTP...");
-
-    try {
-      // Use Supabase client verifyOtp method (verifies numeric OTP)
-      const result = await supabase.auth.verifyOtp({
-        email: String(email).trim().toLowerCase(),
-        token: String(otp).trim(),
-        type: "email",
-      });
-
-      const err = result?.error || result?.data?.error;
-      if (err) throw err;
-
-      // On success, result.data may contain session/user depending on your settings
-      setOtpVerified(true);
-      setOtpMessage("OTP Verified Successfully!");
-      // clear timer
-      if (otpIntervalRef.current) {
-        clearInterval(otpIntervalRef.current);
-        otpIntervalRef.current = null;
-      }
-      setOtpTimer(0);
-    } catch (err) {
-      console.error("verify otp err", err);
-      setOtpMessage(
-        err?.message ||
-          "OTP Verification Failed! Ensure you typed the Correct OTP"
-      );
-      setOtpVerified(false);
-    } finally {
-      setVerifyingOtp(false);
-    }
-  }
-
-  // ---------- Final registration ----------
+  // ---------- Final Registration (With Email Auth) ----------
   async function handleCreateAccount(e) {
     e.preventDefault();
     setFormError("");
@@ -523,6 +499,16 @@ export default function UserReg() {
       }
       if (!(email || contactNumber)) {
         setFormError("Provide your email or contact");
+        return;
+      }
+      // ensure accessKey validation passed (client-side best-effort)
+      if (!accessKey || accessKey.trim().length < 1) {
+        setFormError("Access key is required");
+        return;
+      }
+      if (accessKeyStatus !== true && !API_BASE_URL) {
+        // if server API exists we will re-validate on server; otherwise block if client-side check failed
+        setFormError(accessKeyMessage || "Invalid access key");
         return;
       }
     }
@@ -562,13 +548,33 @@ export default function UserReg() {
     setIsSubmitting(true);
 
     try {
-      // Use Supabase signUp (email/password)
-      if (!email) {
-        throw new Error(
-          "Registration requires an email address! Please enter your email"
-        );
-      }
+      // 1) If API backend exists, run full validation on server (preferred)
+      if (API_BASE_URL) {
+        const payload = {
+          email: email?.trim().toLowerCase() || null,
+          password,
+          role: isAdmin ? "admin" : "student",
+          full_name: fullName.trim(),
+          contact: contactNumber ? contactNumber.trim() : null,
+          stream: isStudent ? stream.trim() : null,
+          year_of_study: isStudent ? yearOfStudy.trim() : null,
+          access_key: isStudent ? (accessKey && accessKey.trim().length ? accessKey.trim() : null) : null,
+        };
 
+        const res = await fetch(`${API_BASE_URL}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || j.ok !== true) {
+          const em = (j && (j.error || j.message)) || "Validation failed on server";
+          throw new Error(em);
+        }
+      } else {}
+
+      // 2) signUp via supabase client (triggers confirmation email)
       const signPayload = {
         email: email.trim().toLowerCase(),
         password,
@@ -579,82 +585,47 @@ export default function UserReg() {
             contact: contactNumber ? contactNumber.trim() : null,
             stream: isStudent ? stream.trim() : null,
             year_of_study: isStudent ? yearOfStudy.trim() : null,
-            access_key: isStudent
-              ? accessKey && accessKey.trim().length
-                ? accessKey.trim()
-                : null
-              : null,
+            access_key: isStudent ? (accessKey && accessKey.trim().length ? accessKey.trim() : null) : null,
           },
+          emailRedirectTo: WELCOME_REDIRECT,
         },
       };
 
-      const { data: signData, error: signErr } = await supabase.auth.signUp(
-        signPayload
-      );
+      const result = await supabase.auth.signUp(signPayload);
+      const signErr = result?.error || result?.data?.error || null;
       if (signErr) throw signErr;
 
-      const userId = signData?.user?.id ?? null;
-      try {
-        if (userId) {
-          const nowIso = new Date().toISOString();
-          const { error: profileErr } = await supabase.from("profiles").upsert(
-            [
-              {
-                id: userId,
-                full_name: fullName.trim(),
-                email: email.trim().toLowerCase(),
-                contact: contactNumber ? contactNumber.trim() : null,
-                role: isAdmin ? "admin" : "student",
-                stream: isStudent ? stream.trim() : null,
-                year_of_study: isStudent ? yearOfStudy.trim() : null,
-                last_password_change: nowIso,
-                access_key: isStudent ? accessKey || null : null,
-              },
-            ],
-            { onConflict: "id", returning: "minimal" }
-          );
-          if (profileErr) console.warn("profiles upsert failed:", profileErr);
-        } else {
-          console.info(
-            "User id not returned immediately! Ensure server-side profile creation on signup confirmation"
-          );
-        }
-      } catch (err) {
-        console.warn("profile creation error", err);
-      }
-
-      // Show success
+      // success - show helpful modal and clear sensitive fields
       setSuccessModal(true);
-      setTimeout(async () => {
+      setPassword("");
+      setConfirmPassword("");
+
+      // Hide modal and return to landing (Welcome page will be used when user clicks confirmation link)
+      setTimeout(() => {
         setSuccessModal(false);
         try {
-          if (signData?.user) {
-            navigate(isAdmin ? "/Admin/Dashboard" : "/User/Dashboard", {
-              replace: true,
-            });
-          } else {
-            navigate("/", { replace: true });
-          }
-        } catch (navErr) {
-          console.warn("navigate after signup failed", navErr);
           navigate("/", { replace: true });
+        } catch (e) {
+          // fallback
+          window.location.href = "/";
         }
-      }, 1300);
+      }, 3000);
     } catch (err) {
       console.error("register error", err);
-      setFormError(err?.message || "Registration Failed! Try Again...");
+      const msg = err?.message || String(err) || "Registration Failed! Try Again...";
+      if (/already exists|duplicate|user exists/i.test(msg)) {
+        setFormError("An account with this email already exists! Try signing in or use password reset");
+      } else {
+        setFormError(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  // cleanup intervals
+  // cleanup intervals & timers
   useEffect(() => {
     return () => {
-      if (otpIntervalRef.current) {
-        clearInterval(otpIntervalRef.current);
-        otpIntervalRef.current = null;
-      }
       if (privateKeyIntervalRef.current) {
         clearInterval(privateKeyIntervalRef.current);
         privateKeyIntervalRef.current = null;
@@ -662,6 +633,7 @@ export default function UserReg() {
       if (debounceEmailRef.current) clearTimeout(debounceEmailRef.current);
       if (debounceContactRef.current) clearTimeout(debounceContactRef.current);
       if (debounceNameRef.current) clearTimeout(debounceNameRef.current);
+      if (debounceAccessRef.current) clearTimeout(debounceAccessRef.current);
     };
   }, []);
 
@@ -671,11 +643,12 @@ export default function UserReg() {
   const signUpEnabled = (() => {
     if (!isStudent && !isAdmin) return false;
     if (isStudent) {
-      if (!fullName.trim() || !stream.trim() || !yearOfStudy.trim())
-        return false;
+      if (!fullName.trim() || !stream.trim() || !yearOfStudy.trim()) return false;
       if (!allPasswordChecksPass()) return false;
       if (password !== confirmPassword) return false;
       if (!accessKey || accessKey.trim().length < 1) return false;
+      // if no API backend and client-side accessKey check failed -> disable
+      if (!API_BASE_URL && accessKeyStatus !== true) return false;
     }
     if (isAdmin) {
       if (!fullName.trim() || !email.trim()) return false;
@@ -693,33 +666,24 @@ export default function UserReg() {
           <h1>New User Registration</h1>
         </header>
 
-        <form
-          className={styles.uregForm}
-          onSubmit={handleCreateAccount}
-          noValidate
-        >
+        <form className={styles.uregForm} onSubmit={handleCreateAccount} noValidate>
           <div className={styles.field}>
             <label>User Type</label>
             <select
               value={userType}
               onChange={(e) => {
                 setUserType(e.target.value);
-                // Reset OTP & related flags on switching
-                setOtpGenerated(false);
-                setOtpVerified(false);
-                setOtpMessage("");
-                setOtpTimer(0);
-                setOtp("");
-
+                // Reset related flags on switching
                 setPrivateKey("");
                 setPrivateKeyGenerated(false);
                 setPrivateKeyVerified(false);
                 setPrivateKeyMessage("");
                 setPrivateKeyTimer(0);
-
                 setAccessKey("");
                 setAccessKeyDisabled(false);
                 setAccessAutoFoundFor(null);
+                setAccessKeyStatus(null);
+                setAccessKeyMessage("");
               }}
               required
             >
@@ -735,12 +699,7 @@ export default function UserReg() {
             <div className={styles.panel}>
               <div className={styles.field}>
                 <label>Name</label>
-                <input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter Your Full Name"
-                  required
-                />
+                <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Enter Your Full Name" required />
               </div>
 
               {isStudent && (
@@ -748,21 +707,11 @@ export default function UserReg() {
                   <div className={styles.row2}>
                     <div className={styles.field}>
                       <label>Stream</label>
-                      <input
-                        value={stream}
-                        onChange={(e) => setStream(e.target.value)}
-                        placeholder="Enter Your Stream"
-                        required
-                      />
+                      <input value={stream} onChange={(e) => setStream(e.target.value)} placeholder="Enter Your Stream" required />
                     </div>
                     <div className={styles.field}>
                       <label>Academic Year</label>
-                      <input
-                        value={yearOfStudy}
-                        onChange={(e) => setYearOfStudy(e.target.value)}
-                        placeholder="Enter Your Year of Study"
-                        required
-                      />
+                      <input value={yearOfStudy} onChange={(e) => setYearOfStudy(e.target.value)} placeholder="Enter Your Year of Study" required />
                     </div>
                   </div>
                 </>
@@ -780,33 +729,11 @@ export default function UserReg() {
                     placeholder="Enter Your Contact Number"
                     aria-describedby="contactHelp"
                   />
-                  <div
-                    className={styles.statusRow}
-                    style={{ marginTop: "4px", marginLeft: "6px" }}
-                  >
-                    {contactNumber && !validateContact(contactNumber) && (
-                      <span className={`${styles.note} ${styles.error}`}>
-                        Phone must be exactly 10 digits
-                      </span>
-                    )}
-                    {userExistsContactStatus === "checking" && (
-                      <span className={styles.note}>
-                        Checking availability...
-                      </span>
-                    )}
-                    {userExistsContactStatus === true &&
-                      validateContact(contactNumber) && (
-                        <span className={`${styles.note} ${styles.error}`}>
-                          Contact already exists! Use different contact or try
-                          signing in
-                        </span>
-                      )}
-                    {userExistsContactStatus === false &&
-                      validateContact(contactNumber) && (
-                        <span className={`${styles.note} ${styles.success}`}>
-                          Contact not registered yet
-                        </span>
-                      )}
+                  <div className={styles.statusRow} style={{ marginTop: "4px", marginLeft: "6px" }}>
+                    {contactNumber && !validateContact(contactNumber) && <span className={`${styles.note} ${styles.error}`}>Contact must be exactly 10 digits</span>}
+                    {userExistsContactStatus === "checking" && <span className={styles.note}>Checking availability...</span>}
+                    {userExistsContactStatus === true && validateContact(contactNumber) && <span className={`${styles.note} ${styles.error}`}>Contact already exists! Use different contact or try signing in</span>}
+                    {userExistsContactStatus === false && validateContact(contactNumber) && <span className={`${styles.note} ${styles.success}`}>Contact not registered yet</span>}
                   </div>
                 </div>
 
@@ -814,104 +741,20 @@ export default function UserReg() {
                   <label>Email ID</label>
                   <input
                     value={email}
-                    onChange={(e) =>
-                      setEmail(
-                        e.target.value.replace(/[\u200B-\u200D\uFEFF]/g, "")
-                      )
-                    }
+                    onChange={(e) => setEmail(e.target.value.replace(/[\u200B-\u200D\uFEFF]/g, ""))}
                     onBlur={() => setEmail((v) => String(v || "").trim())}
                     placeholder="Enter Your Email ID"
                   />
-                  <div
-                    className={styles.statusRow}
-                    style={{ marginTop: "4px", marginLeft: "6px" }}
-                  >
-                    {email && !validateEmail(email) && (
-                      <span className={`${styles.note} ${styles.error}`}>
-                        Invalid email format
-                      </span>
-                    )}
-                    {userExistsEmailStatus === "checking" && (
-                      <span className={styles.note}>
-                        Checking availability...
-                      </span>
-                    )}
-                    {userExistsEmailStatus === true && validateEmail(email) && (
-                      <span className={`${styles.note} ${styles.error}`}>
-                        Email already exists! Use different email or try signing
-                        in
-                      </span>
-                    )}
-                    {userExistsEmailStatus === false &&
-                      validateEmail(email) && (
-                        <span className={`${styles.note} ${styles.success}`}>
-                          Email not registered yet
-                        </span>
-                      )}
+                  <div className={styles.statusRow} style={{ marginTop: "4px", marginLeft: "6px" }}>
+                    {email && !validateEmail(email) && <span className={`${styles.note} ${styles.error}`}>Invalid email format</span>}
+                    {userExistsEmailStatus === "checking" && <span className={styles.note}>Checking availability...</span>}
+                    {userExistsEmailStatus === true && validateEmail(email) && <span className={`${styles.note} ${styles.error}`}>Email already exists! Use different email or try signing in</span>}
+                    {userExistsEmailStatus === false && validateEmail(email) && <span className={`${styles.note} ${styles.success}`}>Email not registered yet</span>}
                   </div>
                 </div>
               </div>
 
-              {/* OTP area (Supabase email-based OTP using {{ .Token }} in template) */}
-              <div className={styles.otpRow}>
-                <div className={`${styles.field} ${styles.otpField}`}>
-                  <label>OTP Verification</label>
-                  <div className={styles.otpControls}>
-                    <input
-                      value={otp}
-                      onChange={(e) =>
-                        setOtp(e.target.value.replace(/[^0-9]/g, ""))
-                      }
-                      placeholder="Enter The OTP"
-                      readOnly={otpVerified}
-                      disabled={otpVerified}
-                    />
-                    <div className={styles.otpButtons}>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.small} ${styles.outline}`}
-                        onClick={handleGenerateOtp}
-                        disabled={otpVerified || (otpGenerated && otpTimer > 0)}
-                      >
-                        {!otpGenerated ? sendOtpLabel : "Resend OTP"}
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.small} ${styles.outline}`}
-                        onClick={handleVerifyOtp}
-                        disabled={!otpGenerated || otpVerified || verifyingOtp}
-                      >
-                        Verify
-                      </button>
-                    </div>
-                  </div>
-                  <div className={styles.noteRow}>
-                    {otpMessage && (
-                      <small
-                        className={`${styles.hint} ${
-                          otpVerified
-                            ? styles.success
-                            : otpMessage.toLowerCase().includes("failed") ||
-                              otpMessage.toLowerCase().includes("wrong")
-                            ? styles.error
-                            : ""
-                        }`}
-                        style={{ marginTop: "-4px" }}
-                      >
-                        {otpMessage}
-                      </small>
-                    )}
-                    {otpGenerated && otpTimer > 0 && (
-                      <small className={styles.hint}>
-                        Resend in {formatHMS(otpTimer)}
-                      </small>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* access key (student) */}
+              {/* Access Key (Student) */}
               {isStudent && (
                 <div className={styles.field}>
                   <label>Access Key</label>
@@ -919,229 +762,93 @@ export default function UserReg() {
                     value={accessKey}
                     onChange={(e) => {
                       if (accessKeyDisabled) return;
-                      setAccessKey(
-                        e.target.value.replace(/\D/g, "").slice(0, 4)
-                      );
+                      setAccessKey(e.target.value.replace(/\D/g, "").slice(0, 4));
                     }}
                     placeholder="E.g. NIT/2023/XXXX"
                     disabled={accessKeyDisabled}
                   />
-                  {accessAutoFoundFor && (
-                    <small className={styles.hint} style={{ color: "#2ecc71" }}>
-                      System Auto-filled, No Edit Needed
-                    </small>
-                  )}
+                  <div>
+                    {accessAutoFoundFor && <small className={styles.hint} style={{ color: "#2ecc71" }}>System Auto-filled, No Change Needed</small>}
+                    {accessKeyStatus === "checking" && <small className={styles.hint}>Validating Access Key...</small>}
+                    {accessKeyStatus === true && <small className={`${styles.hint} ${styles.success}`}>{accessKeyMessage}</small>}
+                    {accessKeyStatus === false && <small className={`${styles.hint} ${styles.error}`}>{accessKeyMessage}</small>}
+                  </div>
                 </div>
               )}
 
-              {/* private key (admin) */}
+              {/* Private Key (Admin) */}
               {isAdmin && (
                 <div className={styles.keyRow}>
                   <div className={`${styles.field} ${styles.keyField}`}>
                     <label>Private Key</label>
                     <div className={styles.keyControls}>
-                      <input
-                        value={privateKey}
-                        onChange={(e) => setPrivateKey(e.target.value.trim())}
-                        placeholder="Enter The Private Key"
-                        disabled={privateKeyVerified}
-                      />
+                      <input value={privateKey} onChange={(e) => setPrivateKey(e.target.value.trim())} placeholder="Enter The Private Key" disabled={privateKeyVerified} />
                       <div className={styles.keyButtons}>
-                        <button
-                          type="button"
-                          className={`${styles.btn} ${styles.small} ${styles.outline}`}
-                          onClick={handleRequestPrivateKeyInput}
-                          disabled={
-                            privateKeyVerified ||
-                            (privateKeyGenerated && privateKeyTimer > 0)
-                          }
-                        >
+                        <button type="button" className={`${styles.btn} ${styles.small} ${styles.outline}`} onClick={handleRequestPrivateKeyInput} disabled={privateKeyVerified || (privateKeyGenerated && privateKeyTimer > 0)}>
                           {!privateKeyGenerated ? "Request" : "Request Again"}
                         </button>
-                        <button
-                          type="button"
-                          className={`${styles.btn} ${styles.small} ${styles.outline}`}
-                          onClick={handleVerifyPrivateKeyInput}
-                          disabled={!privateKeyGenerated || privateKeyVerified}
-                        >
+                        <button type="button" className={`${styles.btn} ${styles.small} ${styles.outline}`} onClick={handleVerifyPrivateKeyInput} disabled={!privateKeyGenerated || privateKeyVerified}>
                           Verify
                         </button>
                       </div>
                     </div>
                     <div className={styles.noteRow}>
-                      {privateKeyMessage && (
-                        <small
-                          className={`${styles.hint} ${
-                            privateKeyVerified
-                              ? styles.success
-                              : privateKeyMessage
-                                  .toLowerCase()
-                                  .includes("failed") ||
-                                privateKeyMessage
-                                  .toLowerCase()
-                                  .includes("wrong")
-                              ? styles.error
-                              : ""
-                          }`}
-                          style={{ marginTop: "-4px" }}
-                        >
-                          {privateKeyMessage}
-                        </small>
-                      )}
-                      {privateKeyGenerated && privateKeyTimer > 0 && (
-                        <small className={styles.hint}>
-                          Resend in {formatHMS(privateKeyTimer)}
-                        </small>
-                      )}
+                      {privateKeyMessage && <small className={`${styles.hint} ${privateKeyVerified ? styles.success : privateKeyMessage.toLowerCase().includes("failed") || privateKeyMessage.toLowerCase().includes("wrong") ? styles.error : ""}`} style={{ marginTop: "-4px" }}>{privateKeyMessage}</small>}
+                      {privateKeyGenerated && privateKeyTimer > 0 && <small className={styles.hint}>Resend in 00:{String(Math.floor(privateKeyTimer / 60)).padStart(2, "0")}:{String(privateKeyTimer % 60).padStart(2, "0")}</small>}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* password */}
+              {/*Password */}
               <div className={styles.field}>
                 <label>Create Password</label>
                 <div className={styles.pwdWrap}>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => {
-                      const cleaned = e.target.value.replace(/\s/g, "");
-                      setPassword(cleaned);
-                    }}
-                    placeholder="Enter Your Password"
-                    aria-describedby="pwdGuide"
-                  />
-                  <button
-                    type="button"
-                    className={styles.eye}
-                    onClick={() => setShowPassword((s) => !s)}
-                    aria-label="Toggle password visibility"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
+                  <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => { const cleaned = e.target.value.replace(/\s/g, ""); setPassword(cleaned); }} placeholder="Enter Your Password" aria-describedby="pwdGuide" />
+                  <button type="button" className={styles.eye} onClick={() => setShowPassword((s) => !s)} aria-label="Toggle password visibility">{showPassword ? "Hide" : "Show"}</button>
                 </div>
-                <div
-                  id="pwdGuide"
-                  className={styles.pwdChecks}
-                  style={{ display: password.length > 0 ? "grid" : "none" }}
-                >
-                  <div
-                    className={`${styles.check} ${
-                      passwordChecks.length ? styles.ok : ""
-                    }`}
-                  >
-                    Minimum 12 Characters
-                  </div>
-                  <div
-                    className={`${styles.check} ${
-                      passwordChecks.upper ? styles.ok : ""
-                    }`}
-                  >
-                    Contains One Uppercase
-                  </div>
-                  <div
-                    className={`${styles.check} ${
-                      passwordChecks.lower ? styles.ok : ""
-                    }`}
-                  >
-                    Contains One Lowercase
-                  </div>
-                  <div
-                    className={`${styles.check} ${
-                      passwordChecks.digit ? styles.ok : ""
-                    }`}
-                  >
-                    Contains One Digit
-                  </div>
-                  <div
-                    className={`${styles.check} ${
-                      passwordChecks.special ? styles.ok : ""
-                    }`}
-                  >
-                    Contains One Special Character
-                  </div>
-                  <div
-                    className={`${styles.check} ${
-                      passwordChecks.noName ? styles.ok : ""
-                    }`}
-                  >
-                    Does Not Include Your Name
-                  </div>
+                <div id="pwdGuide" className={styles.pwdChecks} style={{ display: password.length > 0 ? "grid" : "none" }}>
+                  <div className={`${styles.check} ${passwordChecks.length ? styles.ok : ""}`}>Minimum 12 Characters</div>
+                  <div className={`${styles.check} ${passwordChecks.upper ? styles.ok : ""}`}>Contains One Uppercase</div>
+                  <div className={`${styles.check} ${passwordChecks.lower ? styles.ok : ""}`}>Contains One Lowercase</div>
+                  <div className={`${styles.check} ${passwordChecks.digit ? styles.ok : ""}`}>Contains One Digit</div>
+                  <div className={`${styles.check} ${passwordChecks.special ? styles.ok : ""}`}>Contains One Special Character</div>
+                  <div className={`${styles.check} ${passwordChecks.noName ? styles.ok : ""}`}>Does Not Include Your Name</div>
                 </div>
               </div>
 
               <div className={styles.field}>
                 <label>Confirm Password</label>
                 <div className={styles.pwdWrap}>
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) =>
-                      setConfirmPassword(e.target.value.replace(/\s/g, ""))
-                    }
-                    placeholder="Re-Enter Your Password"
-                  />
-                  <button
-                    type="button"
-                    className={styles.eye}
-                    onClick={() => setShowConfirmPassword((s) => !s)}
-                  >
-                    {showConfirmPassword ? "Hide" : "Show"}
-                  </button>
+                  <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value.replace(/\s/g, ""))} placeholder="Re-Enter Your Password" />
+                  <button type="button" className={styles.eye} onClick={() => setShowConfirmPassword((s) => !s)}>{showConfirmPassword ? "Hide" : "Show"}</button>
                 </div>
-                {confirmPassword && confirmPassword !== password && (
-                  <small className={`${styles.hint} ${styles.error}`}>
-                    Passwords do not match
-                  </small>
-                )}
-                {confirmPassword && confirmPassword === password && (
-                  <small className={`${styles.hint} ${styles.success}`}>
-                    Passwords matched
-                  </small>
-                )}
+                {confirmPassword && confirmPassword !== password && <small className={`${styles.hint} ${styles.error}`}>Passwords do not match</small>}
+                {confirmPassword && confirmPassword === password && <small className={`${styles.hint} ${styles.success}`}>Passwords matched</small>}
               </div>
 
               {formError && <div className={styles.formError}>{formError}</div>}
 
               <div className={styles.actions}>
-                <button
-                  type="submit"
-                  className={`${styles.btn} ${styles.primary}`}
-                  disabled={!signUpEnabled || isSubmitting}
-                >
+                <button type="submit" className={`${styles.btn} ${styles.primary}`} disabled={!signUpEnabled || isSubmitting}>
                   {isSubmitting ? (
                     <>
-                      <span className={styles.spinnerInline} aria-hidden="true">
-                        <i className="fas fa-hourglass-start"></i>
-                      </span>
+                      <span className={styles.spinnerInline} aria-hidden="true"><i className="fas fa-hourglass-start"></i></span>
                       Processing...
                     </>
                   ) : (
                     "Create Account"
                   )}
                 </button>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.cancel}`}
-                  onClick={() => navigate("/")}
-                >
-                  Cancel Process
-                </button>
+                <button type="button" className={`${styles.btn} ${styles.cancel}`} onClick={() => navigate("/")}>Cancel Process</button>
               </div>
             </div>
           )}
         </form>
 
         <footer className={styles.uregFooter}>
-          Already have an account?{" "}
-          <button
-            onClick={() => {
-              try {
-                navigate("/SignIn");
-              } catch (e) {}
-            }}
-          >
+          Already have an account?{' '}
+          <button onClick={() => { try { navigate('/SignIn'); } catch (e) {} }}>
             Sign In
           </button>
         </footer>
@@ -1151,11 +858,7 @@ export default function UserReg() {
       {successModal && (
         <div className={styles.successPop} aria-hidden={false}>
           {TICK_SVG}
-          <p>
-            Registration Successful
-            <br />
-            Redirecting To Your Dashboard
-          </p>
+          <p>Congratulations! <br/> Verify Your Email To <br/> Complete The Registration</p>
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import HomeLander from "../pages/Authentication/HomeLander";
 import AuthModal from "../pages/Authentication/components/AuthModal";
 import UserReg from "../pages/Authentication/components/UserReg";
+import WelcomePage from "../pages/Authentication/components/WelcomePage";
 import PasswordCreation from "../pages/Authentication/components/ResetPassword";
 import UserDashboard from "../pages/User/UserDashboard";
 import AdminDashboard from "../pages/Admin/AdminDashboard";
@@ -16,6 +17,7 @@ export default function AppRoutes() {
       <Route path="/" element={<HomeLander />} />
       <Route path="/SignIn" element={<AuthModal />} />
       <Route path="/SignUp" element={<UserReg />} />
+      <Route path="/WelcomePage" element={<WelcomePage />} />
       <Route path="/ResetPassword" element={<PasswordCreation />} />
 
       {/* Private/User Routes */}

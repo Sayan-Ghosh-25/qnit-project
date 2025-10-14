@@ -1,4 +1,4 @@
-/* UserReg.css - Modern Enhanced Version */
+/* UserReg - Modern Enhanced Version */
 :root {
   --navy-900: #031026;
   --navy-800: #07203a;
@@ -186,7 +186,6 @@
   color: var(--success);
 }
 
-.otpRow .otpControls,
 .keyRow .keyControls {
   display: flex;
   gap: 0.8rem;
@@ -194,12 +193,10 @@
   flex-wrap: wrap;
 }
 
-.otpControls input,
 .keyControls input {
   width: 50% !important;
 }
 
-.otpField .otpButtons,
 .keyField .keyButtons {
   display: flex;
   gap: 0.8rem;
@@ -508,12 +505,10 @@
     font-size: 0.9rem;
   }
   
-  .otpControls input,
   .keyControls input {
     width: 100% !important;
   }
   
-  .otpField .otpButtons,
   .keyField .keyButtons {
     width: 100%;
     gap: 0.1rem;
@@ -524,6 +519,10 @@
   .uregFooter {
     margin-top: 1.3rem;
     font-size: 0.95rem;
+  }
+  
+  .successPop {
+    width: 14rem;
   }
 }
 
