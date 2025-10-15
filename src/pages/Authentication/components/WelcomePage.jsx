@@ -151,10 +151,14 @@ export default function WelcomePage() {
 
         // If we still don't have a user, verification failed
         if (!resolvedUser) {
-          setStatus("failed");
-          setMessage("Unable to verify your request! The confirmation link may be expired or invalid");
-          return;
-        }
+          await new Promise(res => setTimeout(res, 500));
+
+          if (!resolvedUser) {
+            setStatus("failed");
+            setMessage("Unable to verify your request! The confirmation link may be expired or invalid");
+            return;
+          }
+        }        
 
         // We have a resolvedUser. Try to refresh the user via SDK getUser() if possible to get freshest metadata
         try {
@@ -189,6 +193,7 @@ export default function WelcomePage() {
 
         // Attempt upsert — best-effort
         try {
+          await new Promise(res => setTimeout(res, 300));
           await tryUpsertProfile(resolvedUser, resolvedRole);
         } catch (e) {
           console.warn("WelcomePage: profile upsert attempt threw:", e);
@@ -248,7 +253,9 @@ export default function WelcomePage() {
 
   return (
     <div className={styles.welcomePage}>
-      <div className={styles.container}>
+      {status === "pending" ?
+      <p className={styles.wait} style={{fontSize: "1.25rem"}}>Verifying...</p> :
+        (<div className={styles.container}>
         <header className={styles.header}>
           <h1 className={styles.title}>{status === "success" ? "Welcome To QNIT" : "Confirmation Issue"}</h1>
         </header>
@@ -263,8 +270,6 @@ export default function WelcomePage() {
           </div>
 
           <div className={styles.messageBox}>
-            {status === "pending" && <p className={styles.hint}>Verifying Your Account, Please Wait…</p>}
-
             {status === "success" && (
               <>
                 <p className={styles.lead}>Congratulations — Account Verification Successful</p>
@@ -296,7 +301,7 @@ export default function WelcomePage() {
         <footer className={styles.footer}>
           <small>{new Date().getFullYear()} QNIT. All Rights Reserved.</small>
         </footer>
-      </div>
+      </div> )}
     </div>
   );
 }

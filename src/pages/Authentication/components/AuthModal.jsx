@@ -65,9 +65,7 @@ const VIEW = {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
-
-// Use your public reset page URL
-const PASSWORD_RESET_REDIRECT = "https://qnit.vercel.app/ResetPassword";
+const PASSWORD_RESET_REDIRECT = import.meta.env.VITE_PASSWORD_RESET_REDIRECT || "";
 
 export default function AuthModal({
   isOpen = true,
@@ -436,6 +434,13 @@ export default function AuthModal({
     }
   }, [status]);
 
+  // Clear transient error status as soon as user edits inputs so button re-validates
+  useEffect(() => {
+    if (status === "error") {
+      setStatus(null);
+    }
+  }, [identifier, password, signUserType, captchaToken]);
+
   // derive enabled states
   const signValid =
     !!identifier && !!password && !!signUserType && !busy && (API_BASE_URL ? !!captchaToken : true) && userExistsEmailStatus === true;
@@ -467,9 +472,9 @@ export default function AuthModal({
           <div className={styles.errorPop}>
             {CROSS_SVG}
             <p>
-              Wrong
+              Wrong Credentials
               <br />
-              Credentials
+              Or Server Error
             </p>
           </div>
         )}
@@ -547,7 +552,10 @@ export default function AuthModal({
                 type="email"
                 placeholder="Enter Your Email"
                 value={identifier}
-                onChange={(e) => setIdentifier(trimEnds(e.target.value))}
+                onChange={(e) => {
+                  setStatus(null);
+                  setIdentifier(trimEnds(e.target.value));
+                }}
                 required
                 disabled={!signUserType}
               />
@@ -571,7 +579,10 @@ export default function AuthModal({
                 type={showPass ? "text" : "password"}
                 placeholder="Enter your Password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setStatus(null);
+                  setPassword(e.target.value);
+                }}
                 required
                 disabled={!signUserType}
               />

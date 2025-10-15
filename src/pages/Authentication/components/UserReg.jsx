@@ -216,9 +216,12 @@ export default function UserReg() {
   // ---------- STUDENT ACCESS KEY AUTO-FILL ----------
   useEffect(() => {
     if (!fullName || fullName.trim().length < 2) {
+      // clear any autofill state when name is empty / too short
       setAccessKey("");
       setAccessKeyDisabled(false);
       setAccessAutoFoundFor(null);
+      setAccessKeyStatus(null);
+      setAccessKeyMessage("");
       return;
     }
 
@@ -229,6 +232,8 @@ export default function UserReg() {
         setAccessKey("");
         setAccessKeyDisabled(false);
         setAccessAutoFoundFor(null);
+        setAccessKeyStatus(null);
+        setAccessKeyMessage("");
         return;
       }
 
@@ -240,18 +245,23 @@ export default function UserReg() {
           if (!res.ok) throw new Error("lookup failed");
           const j = await res.json();
           if (j && j.found && j.id4) {
+            // Auto-fill and mark valid immediately - avoid running the validation effect
             setAccessKey(String(j.id4));
             setAccessKeyDisabled(true);
-            setAccessAutoFoundFor(j.original_name || null);
+            setAccessAutoFoundFor(j.original_name || "(matched)");
+            setAccessKeyStatus(true);
+            setAccessKeyMessage("System Auto-filled, No Change Needed");
           } else {
             setAccessKey("");
             setAccessKeyDisabled(false);
             setAccessAutoFoundFor(null);
+            setAccessKeyStatus(null);
+            setAccessKeyMessage("");
           }
         } else {
           const { data, error } = await supabase
             .from("student_ids")
-            .select("id4, original_name")
+            .select("id4, original_name, normalized_name")
             .eq("normalized_name", normalized)
             .maybeSingle();
 
@@ -259,23 +269,31 @@ export default function UserReg() {
             console.warn("student id lookup error", error);
             setAccessKeyDisabled(false);
             setAccessAutoFoundFor(null);
+            setAccessKeyStatus(null);
+            setAccessKeyMessage("");
             return;
           }
 
           if (data && data.id4) {
             setAccessKey(String(data.id4));
             setAccessKeyDisabled(true);
-            setAccessAutoFoundFor(data.original_name || null);
+            setAccessAutoFoundFor(data.original_name || "(matched)");
+            setAccessKeyStatus(true);
+            setAccessKeyMessage("System Auto-filled, No Change Needed");
           } else {
             setAccessKey("");
             setAccessKeyDisabled(false);
             setAccessAutoFoundFor(null);
+            setAccessKeyStatus(null);
+            setAccessKeyMessage("");
           }
         }
       } catch (err) {
         console.warn("student lookup err", err);
         setAccessKeyDisabled(false);
         setAccessAutoFoundFor(null);
+        setAccessKeyStatus(null);
+        setAccessKeyMessage("");
       }
     }, 450);
 
@@ -284,13 +302,18 @@ export default function UserReg() {
     };
   }, [fullName]);
 
-  // ---------- ACCESS KEY LIVE VALIDATION (client-side best-effort) ----------
+  // ---------- ACCESS KEY LIVE VALIDATION ----------
   useEffect(() => {
-    // Only validate for Student role; if disabled (auto found) still validate existence/usage
+    // Only validate for Student role
     const isStudent = userType === "Student";
     if (!isStudent) {
       setAccessKeyStatus(null);
       setAccessKeyMessage("");
+      return;
+    }
+
+    if (accessKeyDisabled && accessAutoFoundFor) {
+      // keep existing 'auto-filled' success state (do not overwrite)
       return;
     }
 
@@ -311,55 +334,69 @@ export default function UserReg() {
         const keyRaw = String(accessKey).trim();
         let found = null;
 
-        // try id4 lookup (exact)
-        const { data: byId4, error: id4Err } = await supabase
-          .from("student_ids")
-          .select("id4, original_name, normalized_name")
-          .eq("id4", keyRaw)
-          .maybeSingle();
-
-        if (!id4Err && byId4 && byId4.id4) {
-          found = byId4;
-        } else {
-          const normalized = keyRaw.toLowerCase().replace(/\s+/g, "");
-          const { data: byNorm, error: normErr } = await supabase
+        // try id4 lookup
+        try {
+          const { data: byId4, error: id4Err } = await supabase
             .from("student_ids")
             .select("id4, original_name, normalized_name")
-            .eq("normalized_name", normalized)
+            .eq("id4", keyRaw)
             .maybeSingle();
 
-          if (!normErr && byNorm && byNorm.id4) {
-            found = byNorm;
+          if (!id4Err && byId4 && byId4.id4) {
+            found = byId4;
+          }
+        } catch (e) {
+          console.warn("accessKey validation id4 lookup failed:", e);
+        }
+
+        // fallback to normalized_name if exact id4 not found
+        if (!found) {
+          const normalized = keyRaw.toLowerCase().replace(/\s+/g, "");
+          try {
+            const { data: byNorm, error: normErr } = await supabase
+              .from("student_ids")
+              .select("id4, original_name, normalized_name")
+              .eq("normalized_name", normalized)
+              .maybeSingle();
+
+            if (!normErr && byNorm && byNorm.id4) {
+              found = byNorm;
+            }
+          } catch (e) {
+            console.warn("accessKey validation normalized lookup failed:", e);
           }
         }
 
-        if (!found && !password.length > 0) {
+        if (!found) {
           setAccessKeyStatus(false);
           setAccessKeyMessage("Invalid Key! No matching student record found");
           return;
         }
 
         // check if profiles already use this access_key
-        const { data: usedBy, error: usedErr } = await supabase
-          .from("profiles")
-          .select("id, email")
-          .eq("access_key", found.id4)
-          .maybeSingle();
+        try {
+          const { data: usedBy, error: usedErr } = await supabase
+            .from("profiles")
+            .select("id, email")
+            .eq("access_key", found.id4)
+            .maybeSingle();
 
-        if (usedErr) {
-          console.warn("accessKey validation: profiles lookup error", usedErr);
-        }
+          if (usedErr) {
+            console.warn("accessKey validation: profiles lookup error", usedErr);
+          }
 
-        if (usedBy && usedBy.id) {
-          setAccessKeyStatus(false);
-          setAccessKeyMessage("This access key is associated with another student");
-          return;
+          if (usedBy && usedBy.id) {
+            setAccessKeyStatus(false);
+            setAccessKeyMessage("This access key is associated with another student");
+            return;
+          }
+        } catch (e) {
+          console.warn("accessKey validation profiles check threw:", e);
         }
 
         // success
         setAccessKeyStatus(true);
         setAccessKeyMessage("Access Key Is Valid");
-        // if it was auto-found, keep disabled flag as-is
       } catch (err) {
         console.error("accessKey validation failed:", err);
         setAccessKeyStatus(null);
@@ -371,7 +408,7 @@ export default function UserReg() {
       if (debounceAccessRef.current) clearTimeout(debounceAccessRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessKey, userType]);
+  }, [accessKey, userType, accessKeyDisabled, accessAutoFoundFor]);
 
   // ========== PRIVATE KEY REQUEST (Admin) ==========
   async function handleRequestPrivateKeyInput() {
@@ -763,15 +800,21 @@ export default function UserReg() {
                     onChange={(e) => {
                       if (accessKeyDisabled) return;
                       setAccessKey(e.target.value.replace(/\D/g, "").slice(0, 4));
+                      setAccessAutoFoundFor(null);
                     }}
                     placeholder="E.g. NIT/2023/XXXX"
                     disabled={accessKeyDisabled}
                   />
                   <div>
-                    {accessAutoFoundFor && <small className={styles.hint} style={{ color: "#2ecc71" }}>System Auto-filled, No Change Needed</small>}
-                    {accessKeyStatus === "checking" && <small className={styles.hint}>Validating Access Key...</small>}
-                    {accessKeyStatus === true && <small className={`${styles.hint} ${styles.success}`}>{accessKeyMessage}</small>}
-                    {accessKeyStatus === false && <small className={`${styles.hint} ${styles.error}`}>{accessKeyMessage}</small>}
+                    {accessAutoFoundFor ? (
+                      <small className={styles.hint} style={{ color: "#2ecc71" }}>System Auto-filled, No Change Needed</small>
+                    ) : accessKeyStatus === "checking" ? (
+                      <small className={styles.hint}>Validating Access Key...</small>
+                    ) : accessKeyStatus === true ? (
+                      <small className={`${styles.hint} ${styles.success}`}>{accessKeyMessage}</small>
+                    ) : accessKeyStatus === false ? (
+                      <small className={`${styles.hint} ${styles.error}`}>{accessKeyMessage}</small>
+                    ) : null}
                   </div>
                 </div>
               )}
