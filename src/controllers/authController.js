@@ -306,32 +306,70 @@ export async function registerUser(req, res) {
 
     // 3) If student, validate access_key strictly against student_ids table
     if (role === "student") {
-      const access = access_key ? String(access_key).trim() : null;
-      if (!access || access.length === 0) {
+      const accessRaw = access_key ? String(access_key).trim() : null;
+      if (!accessRaw || accessRaw.length === 0) {
         return res.status(400).json({ ok: false, error: "Access key required for student registration" });
       }
 
-      // Try direct id4 match first
+      // Normalize helpers
+      const normalizedInput = String(accessRaw).toLowerCase().replace(/\s+/g, "");
+      const alnumInput = String(accessRaw).replace(/[^A-Za-z0-9]/g, "");
       let match = null;
+
+      // 1) exact id4 (as provided)
       try {
         const { data: byId4, error: id4Err } = await supabaseAdmin
           .from("student_ids")
           .select("id4, original_name, normalized_name")
-          .eq("id4", access)
+          .eq("id4", accessRaw)
           .maybeSingle();
 
-        if (id4Err) {
-          console.warn("registerUser: student_ids id4 lookup failed:", id4Err);
-        } else if (byId4 && byId4.id4) {
+        if (!id4Err && byId4 && byId4.id4) {
           match = byId4;
         }
       } catch (e) {
-        console.warn("registerUser: student_ids id4 lookup threw:", e);
+        console.warn("registerUser: student_ids id4 exact lookup threw:", e);
       }
 
-      // If not found by id4, try normalized name match (user may paste name instead)
+      // 2) case-insensitive exact match on id4 (ILike). Works if only case differs
       if (!match) {
-        const normalizedInput = String(access).toLowerCase().replace(/\s+/g, "");
+        try {
+          const { data: byId4Ilike, error: ilikeErr } = await supabaseAdmin
+            .from("student_ids")
+            .select("id4, original_name, normalized_name")
+            .ilike("id4", accessRaw)
+            .maybeSingle();
+
+          if (!ilikeErr && byId4Ilike && byId4Ilike.id4) {
+            match = byId4Ilike;
+          }
+        } catch (e) {
+          // Some supabase clients may not support ilike on the JS wrapper; ignore and continue
+          console.warn("registerUser: student_ids id4 ilike lookup threw:", e);
+        }
+      }
+
+      // 3) substring match (useful if client submits only the 4-digit portion or removes delimiters)
+      if (!match && alnumInput && alnumInput.length >= 2) {
+        try {
+          const likePattern = `%${alnumInput}%`;
+          const { data: bySubstring, error: subErr } = await supabaseAdmin
+            .from("student_ids")
+            .select("id4, original_name, normalized_name")
+            .ilike("id4", likePattern)
+            .limit(1)
+            .maybeSingle();
+
+          if (!subErr && bySubstring && bySubstring.id4) {
+            match = bySubstring;
+          }
+        } catch (e) {
+          console.warn("registerUser: student_ids substring lookup threw:", e);
+        }
+      }
+
+      // 4) fallback to normalized_name match (user may have pasted name or normalized identifier)
+      if (!match) {
         try {
           const { data: byNorm, error: normErr } = await supabaseAdmin
             .from("student_ids")
@@ -339,9 +377,7 @@ export async function registerUser(req, res) {
             .eq("normalized_name", normalizedInput)
             .maybeSingle();
 
-          if (normErr) {
-            console.warn("registerUser: student_ids normalized lookup failed:", normErr);
-          } else if (byNorm && byNorm.id4) {
+          if (!normErr && byNorm && byNorm.id4) {
             match = byNorm;
           }
         } catch (e) {
