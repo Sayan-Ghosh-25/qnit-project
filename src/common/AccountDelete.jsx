@@ -1,5 +1,6 @@
 // src/common/AccountDelete.jsx
 import { useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -14,16 +15,28 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [verifyHint, setVerifyHint] = useState("");
   const [formError, setFormError] = useState("");
+
   const confirmBtnRef = useRef(null);
+  const isMountedRef = useRef(true);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // When modal opens: lock body and focus the confirm button
   useEffect(() => {
     if (!isOpen) return;
 
     try {
       document.body.classList.add("modal-open");
-    } catch (e) {}
+    } catch (e) {
+      // ignore
+    }
 
     setTimeout(() => confirmBtnRef.current?.focus?.(), 30);
 
@@ -42,6 +55,18 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
     };
   }, [isOpen, onClose]);
 
+  // Reset local state when modal is closed so it is fresh when reopened
+  useEffect(() => {
+    if (!isOpen) {
+      setPassword("");
+      setShowPassword(false);
+      setPasswordTouched(false);
+      setVerifyHint("");
+      setFormError("");
+      setLoading(false);
+    }
+  }, [isOpen]);
+
   // Safe local/session storage clearing (keeps safe keys)
   const safeClearUserData = () => {
     try {
@@ -58,8 +83,11 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
 
       try {
         sessionStorage.clear();
-      } catch (e) {}
+      } catch (e) {
+        // ignore session clear failures
+      }
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.error("Error clearing storage during account delete:", e);
     }
   };
@@ -69,6 +97,7 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
       const { data } = await supabase.auth.getSession();
       return data?.session?.access_token || null;
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.warn("getAccessToken failed:", e);
       return null;
     }
@@ -94,14 +123,9 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
     setLoading(true);
     setVerifyHint("Verifying Password...");
 
-    // Abortable network calls with timeout
-    const controller = new AbortController();
-    const timeoutMs = 10000;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
     try {
-      // 1) Re-authenticate
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      // 1) Re-authenticate client-side to confirm password is correct
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password,
       });
@@ -109,100 +133,145 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
       if (signInError) {
         setFormError("Password is incorrect! Please try again");
         setVerifyHint("");
+        setLoading(false);
         return;
       }
 
-      // 2) If backend API available, attempt server-side deletion
+      // 2) If backend API available, call it to securely delete auth.user and profiles row using server-side privileges
       if (API_BASE_URL) {
         const token = await getAccessToken();
         if (!token) {
           setFormError("Failed to obtain authentication token! Try signing in again");
           setVerifyHint("");
+          setLoading(false);
           return;
         }
 
-        const url = `${API_BASE_URL.replace(/\/$/, "")}/auth/delete-account`;
-        const payload = JSON.stringify({ password });
-
-        // If available, use sendBeacon to avoid UI blocking (best-effort async)
+        // call DELETE endpoint (server should verify password again and perform safe deletion)
+        let res;
         try {
-          if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-            const ok = navigator.sendBeacon(url, payload);
-            if (ok) {
-              // optimistic cleanup — do client cleanup and navigate immediately
-              safeClearUserData();
-              try { if (typeof onAccountDelete === "function") await onAccountDelete(); } catch {}
-              try { if (typeof logout === "function") await logout(); } catch { await supabase.auth.signOut().catch(()=>{}); }
-              setPassword("");
-              if (typeof onClose === "function") onClose();
-              navigate("/", { replace: true });
-              return;
-            }
-          }
-        } catch (e) {
-          // ignore sendBeacon failures and fall back to fetch
+          res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/auth/delete-account`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ password }),
+          });
+        } catch (fetchErr) {
+          setFormError("Failed to contact server! Please try again later");
+          setVerifyHint("");
+          setLoading(false);
+          return;
         }
 
-        // fallback: normal fetch with abort signal
-        const res = await fetch(url, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: payload,
-          signal: controller.signal,
-        });
+        let j = {};
+        try {
+          j = await res.json();
+        } catch (e) {
+          // non-json response
+          j = {};
+        }
 
-        const j = await res.json().catch(() => ({}));
         if (!res.ok) {
           const errMsg = j?.error || j?.message || `Server responded with ${res.status}`;
           setFormError(errMsg);
           setVerifyHint("");
+          setLoading(false);
           return;
         }
 
         // success path
         safeClearUserData();
-        try { if (typeof onAccountDelete === "function") await onAccountDelete(); } catch {}
-        try { setVerifyHint(""); alert(j?.message || "Your Account Has Been Deleted From Our Database!"); } catch {}
-        try { if (typeof logout === "function") await logout(); } catch { await supabase.auth.signOut().catch(()=>{}); }
 
-        setPassword("");
+        try {
+          if (typeof onAccountDelete === "function") await onAccountDelete();
+        } catch (cbErr) {
+          // eslint-disable-next-line no-console
+          console.warn("onAccountDelete callback failed:", cbErr);
+        }
+
+        try {
+          setVerifyHint("");
+          // friendly success message
+          window.alert(j?.message || "Your account has been deleted successfully");
+        } catch (e) {
+          // ignore alert failures
+        }
+
+        // attempt logout (best-effort)
+        try {
+          if (typeof logout === "function") await logout();
+        } catch (e) {
+          try {
+            await supabase.auth.signOut();
+          } catch (er) {
+            // ignore
+          }
+        }
+
+        if (isMountedRef.current) {
+          setLoading(false);
+          setPassword("");
+        }
+
         if (typeof onClose === "function") onClose();
         navigate("/", { replace: true });
         return;
       }
 
-      // 3) No backend: best-effort client-side deletion of profile and sign-out
+      // 3) No backend configured: best-effort local deletion of profile row (cannot delete auth.user from client)
       try {
-        await supabase.from("profiles").delete().eq("id", user.id).catch(() => {});
+        const { error: delErr } = await supabase.from("profiles").delete().eq("id", user.id);
+        if (delErr) {
+          // eslint-disable-next-line no-console
+          console.warn("Failed to delete profile row from client:", delErr);
+        }
       } catch (e) {
+        // eslint-disable-next-line no-console
         console.warn("profiles delete failed:", e);
       }
 
       safeClearUserData();
 
-      try { if (typeof onAccountDelete === "function") await onAccountDelete(); } catch {}
-      try { await supabase.auth.signOut(); } catch {}
-      try { if (typeof logout === "function") await logout(); } catch {}
+      try {
+        if (typeof onAccountDelete === "function") await onAccountDelete();
+      } catch (cbErr) {
+        // eslint-disable-next-line no-console
+        console.warn("onAccountDelete callback failed:", cbErr);
+      }
 
-      alert("Account Deletion Requested");
-      setPassword("");
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        if (typeof logout === "function") await logout();
+      } catch (e) {
+        // ignore
+      }
+
+      // inform user that client-side deletion was requested
+      window.alert("Account deletion requested! Server-side deletion may still be required for full removal");
+
+      if (isMountedRef.current) {
+        setLoading(false);
+        setVerifyHint("");
+        setPassword("");
+      }
+
       if (typeof onClose === "function") onClose();
       navigate("/", { replace: true });
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error("Account delete failed:", err);
-      if (err?.name === "AbortError") {
-        setFormError("Request timed out! Please try again");
-      } else {
+      if (isMountedRef.current) {
         setFormError(err?.message || "Account deletion failed! Try again later");
+        setVerifyHint("");
+        setLoading(false);
       }
-      setVerifyHint("");
-    } finally {
-      clearTimeout(timeoutId);
-      setLoading(false);
-      setVerifyHint("");
     }
   };
 
@@ -214,28 +283,32 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-modal-title"
+      onClick={() => typeof onClose === "function" && onClose()}
     >
       <div className={styles.deleteContent} onClick={(e) => e.stopPropagation()}>
         <h2 id="delete-modal-title">Account Deletion</h2>
 
         {/* Password Confirmation */}
         <div className={styles.field}>
-          <label>Confirm Password To Proceed</label>
+          <label htmlFor="delete-password">Confirm Password To Proceed</label>
           <div className={styles.pwdWrap}>
             <input
+              id="delete-password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => {
-                setPassword(e.target.value.replace(/\s/g, ""));
+                setPassword(e.target.value);
                 if (e.target.value.length > 0) setPasswordTouched(true);
               }}
               placeholder="Enter Your Password"
               aria-describedby="delete-hint"
+              autoComplete="current-password"
             />
             <button
               type="button"
               className={styles.eye}
               onClick={() => setShowPassword((s) => !s)}
+              aria-pressed={showPassword}
             >
               {showPassword ? "Hide" : "Show"}
             </button>
@@ -246,7 +319,11 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
               <small className={styles.hint}>{verifyHint}</small>
             ) : formError ? (
               <small className={`${styles.hint} ${styles.error}`}>{formError}</small>
-            ) : ""}
+            ) : (
+              <small className={styles.hint}>
+                This action will permanently remove your account, be careful before you proceed
+              </small>
+            )}
           </div>
         </div>
 
@@ -256,12 +333,16 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
             id="confirm-delete"
             className={styles.deleteBtn}
             onClick={handleConfirm}
-            disabled={loading || password.length === 0}
+            disabled={loading || password.trim().length === 0}
           >
             Delete
           </button>
 
-          <button className={styles.cancelBtn} id="cancel-delete" onClick={() => typeof onClose === "function" && onClose()}>
+          <button
+            className={styles.cancelBtn}
+            id="cancel-delete"
+            onClick={() => typeof onClose === "function" && onClose()}
+          >
             Cancel
           </button>
         </div>
@@ -269,3 +350,9 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
     </div>
   );
 }
+
+AccountDelete.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func,
+  onAccountDelete: PropTypes.func,
+};
