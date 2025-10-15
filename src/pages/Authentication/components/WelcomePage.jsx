@@ -13,11 +13,13 @@ function parseAccessTokenFromUrl() {
       const hash = window.location.hash.replace(/^#/, "");
       const params = new URLSearchParams(hash);
       const access_token = params.get("access_token") || params.get("token");
-      if (access_token) return access_token;
+      const refresh_token = params.get("refresh_token");
+      if (access_token) return { access_token, refresh_token: refresh_token || null };
     }
     const url = new URL(window.location.href);
     const access_token = url.searchParams.get("access_token") || url.searchParams.get("token");
-    if (access_token) return access_token;
+    const refresh_token = url.searchParams.get("refresh_token") || null;
+    if (access_token) return { access_token, refresh_token };
   } catch (e) {
     // ignore
   }
@@ -30,9 +32,14 @@ function clearTokenFromUrl() {
     const u = new URL(window.location.href);
     u.searchParams.delete("access_token");
     u.searchParams.delete("token");
-    window.history.replaceState({}, document.title, u.pathname + u.search);
+    u.searchParams.delete("refresh_token");
+    // remove hash fragment as well
+    const path = u.pathname + u.search;
+    window.history.replaceState({}, document.title, path);
   } catch (e) {
-    try { window.history.replaceState({}, document.title, window.location.pathname); } catch (e) {}
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch {}
   }
 }
 
@@ -43,218 +50,277 @@ export default function WelcomePage() {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [message, setMessage] = useState("");
+  const [ready, setReady] = useState(false);
+  const [preparingText, setPreparingText] = useState("Verifying Your Account, Please Wait…");
+
   const SUCCESS_IMG = "/Success.jpg";
   const FAIL_IMG = "/Fail.jpg";
 
-  // Helper: upsert profile (best-effort)
-  async function tryUpsertProfile(u, resolvedRole) {
-    if (!u || !u.id) return false;
+  // Utility: sleep
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    // Build profile object from metadata (best-effort)
-    const meta = u.user_metadata || {};
-    const profileRow = {
-      id: u.id,
-      full_name: meta.full_name || null,
-      email: u.email || null,
-      contact: meta.contact || null,
-      role: meta.role || resolvedRole || (resolvedRole === "admin" ? "admin" : "student"),
-      stream: meta.stream || null,
-      year_of_study: meta.year_of_study || null,
-      access_key: meta.access_key || null,
-    };
-
-    // If email missing, still attempt (some setups may not require email in profile)
+  // Get SDK session (safe wrapper)
+  async function getSdkSession() {
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .upsert([profileRow], { onConflict: "id", returning: "minimal" });
-      if (error) {
-        console.warn("WelcomePage: profiles upsert returned error:", error);
-        return false;
+      if (supabase?.auth?.getSession) {
+        const resp = await supabase.auth.getSession().catch(() => ({}));
+        // newer SDK shape: { data: { session } }
+        const session = resp?.data?.session ?? resp?.session ?? resp?.data ?? resp;
+        return session ?? null;
       }
-      return true;
+      // older SDK: supabase.auth.session()
+      if (typeof supabase.auth?.session === "function") {
+        return supabase.auth.session() ?? null;
+      }
     } catch (e) {
-      console.warn("WelcomePage: profiles upsert failed:", e);
-      return false;
+      // ignore
     }
+    return null;
+  }
+
+  // Try to set SDK session from token object { access_token, refresh_token }
+  async function trySetSessionFromToken(tokenObj) {
+    if (!tokenObj || !tokenObj.access_token) return false;
+
+    try {
+      // prefer setSession (newer SDK)
+      if (supabase?.auth?.setSession) {
+        await supabase.auth.setSession({
+          access_token: tokenObj.access_token,
+          refresh_token: tokenObj.refresh_token || tokenObj.access_token,
+        });
+        return true;
+      }
+      // older fallback: setAuth
+      if (supabase?.auth?.setAuth) {
+        supabase.auth.setAuth(tokenObj.access_token);
+        return true;
+      }
+    } catch (e) {
+      console.warn("WelcomePage: setSession failed:", e);
+    }
+    return false;
+  }
+
+  // Fetch user via SDK getUser or session; fallback to /auth/v1/user if token available
+  async function resolveUserUsingSdkOrToken(tokenObj) {
+    try {
+      // 1) try getUser (newer SDK)
+      if (supabase?.auth?.getUser) {
+        const { data } = await supabase.auth.getUser().catch(() => ({}));
+        if (data?.user) return data.user;
+      }
+
+      // 2) try getSession -> session.user
+      const session = await getSdkSession();
+      if (session?.user) return session.user;
+
+      // 3) fallback: if token present, call /auth/v1/user
+      if (tokenObj?.access_token && SUPABASE_URL) {
+        try {
+          const resp = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
+            headers: { Authorization: `Bearer ${tokenObj.access_token}`, "Content-Type": "application/json" },
+          });
+          if (resp.ok) {
+            const userObj = await resp.json().catch(() => null);
+            if (userObj) return userObj;
+          } else {
+            // non-ok -> ignore
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      console.warn("WelcomePage: resolveUserUsingSdkOrToken failed:", e);
+    }
+    return null;
+  }
+
+  // Poll for profile existence (best-effort). Returns profile row or null
+  async function waitForProfile(userId, maxAttempts = 12, intervalMs = 700) {
+    if (!userId) return null;
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, contact, role, stream, year_of_study, access_key")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (!error && profile && profile.id) {
+          return profile;
+        }
+      } catch (e) {
+        // ignore and retry
+      }
+      await sleep(intervalMs);
+    }
+    return null;
   }
 
   useEffect(() => {
     mountedRef.current = true;
 
-    async function resolveSessionAndUser() {
+    async function init() {
       setStatus("pending");
-
-      // 1) If welcome already consumed, redirect immediately to the appropriate dashboard
-      try {
-        const seen = localStorage.getItem("qn_welcome_shown");
-        if (seen) {
-          try {
-            const parsed = JSON.parse(seen);
-            if (parsed && parsed.userId) {
-              const route = parsed.role === "admin" ? "/Admin/Dashboard" : "/User/Dashboard";
-              // use location.replace to prevent back-navigation to welcome
-              window.location.replace(route);
-              return;
-            }
-          } catch (e) {
-            // ignore parse errors and continue
-          }
-        }
-      } catch (e) {
-        // ignore localStorage errors
-      }
+      setMessage("");
+      setReady(false);
 
       try {
-        // Attempt flow A: SDK helper that parses session from URL (preferred)
-        let resolvedUser = null;
-        let resolvedRole = null;
-        if (supabase?.auth?.getSessionFromUrl) {
-          try {
-            const got = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({}));
-            const maybeUser = got?.data?.session?.user || got?.user || got?.data?.user || null;
-            if (maybeUser) {
-              resolvedUser = maybeUser;
-              resolvedRole = maybeUser.user_metadata?.role || maybeUser.role || "student";
-              // Attempt to refresh user metadata from SDK
-              try {
-                if (supabase?.auth?.getUser) {
-                  const { data: refreshed } = await supabase.auth.getUser();
-                  if (refreshed?.user) resolvedUser = refreshed.user;
-                }
-              } catch (e) {
-                // ignore
-              }
-            }
-          } catch (errInner) {
-            // ignore and continue to other fallbacks
-            console.warn("WelcomePage: getSessionFromUrl failed:", errInner);
-          }
-        }
-
-        // Attempt flow B: check stored session
-        if (!resolvedUser) {
-          try {
-            const sessionResp = await supabase.auth.getSession().catch(() => ({}));
-            const sessionObj = sessionResp?.data?.session ?? sessionResp?.session ?? sessionResp?.data ?? sessionResp;
-            const maybeUser = sessionObj?.user ?? null;
-            if (maybeUser) {
-              resolvedUser = maybeUser;
-              resolvedRole = maybeUser.user_metadata?.role || maybeUser.role || "student";
-            }
-          } catch (errSession) {
-            console.warn("WelcomePage: getSession error:", errSession);
-          }
-        }
-
-        // Attempt flow C: parse access token in URL and call auth/v1/user (server-side method)
-        const token = parseAccessTokenFromUrl();
-        if (!resolvedUser && token && SUPABASE_URL) {
-          try {
-            const resp = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
-              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            });
-            if (resp.ok) {
-              const fetchedUser = await resp.json();
-              // fetchedUser shape is user object
-              if (fetchedUser) {
-                resolvedUser = fetchedUser;
-                resolvedRole = fetchedUser.user_metadata?.role || fetchedUser.role || "student";
-              }
-            } else {
-              console.warn("WelcomePage: /auth/v1/user returned non-ok:", resp.status);
-            }
-          } catch (e) {
-            console.warn("WelcomePage: token user fetch failed", e);
-          }
-        }
-
-        // If we still don't have a user, verification failed
-        if (!resolvedUser) {
-          setStatus("failed");
-          setMessage("Unable to verify your request! The confirmation link may be expired or invalid");
-          return;
-        }
-
-        // We have a resolvedUser. Try to refresh the user via SDK getUser() if possible to get freshest metadata
+        // 1) Attempt to let SDK parse session from URL
+        let tokenObj = parseAccessTokenFromUrl();
+        let sdkSessionSet = false;
         try {
-          if (supabase?.auth?.getUser) {
-            const { data: refreshed } = await supabase.auth.getUser().catch(() => ({}));
-            if (refreshed?.user) {
-              resolvedUser = refreshed.user;
-              resolvedRole = resolvedUser.user_metadata?.role || resolvedUser.role || resolvedRole || "student";
+          if (supabase?.auth?.getSessionFromUrl) {
+            // getSessionFromUrl will parse tokens from fragment and store session in client if possible
+            const got = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({}));
+            // check if it yielded a session
+            const maybeSession = got?.data?.session ?? got?.session ?? got?.data ?? null;
+            if (maybeSession && maybeSession.access_token) {
+              sdkSessionSet = true;
+              tokenObj = tokenObj || { access_token: maybeSession.access_token, refresh_token: maybeSession.refresh_token || null };
             }
           }
         } catch (e) {
           // ignore
         }
 
-        // Best-effort: if metadata seems minimal, attempt one more fetch using token (if available)
-        if (token && (!resolvedUser.user_metadata || Object.keys(resolvedUser.user_metadata || {}).length === 0)) {
+        // 2) If SDK didn't persist session, try setting it manually from token found in URL
+        if (!sdkSessionSet && tokenObj) {
           try {
-            const resp = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
-              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            });
-            if (resp.ok) {
-              const fetchedUser = await resp.json();
-              if (fetchedUser) {
-                resolvedUser = fetchedUser;
-                resolvedRole = fetchedUser.user_metadata?.role || fetchedUser.role || resolvedRole || "student";
-              }
+            const ok = await trySetSessionFromToken(tokenObj);
+            if (ok) {
+              sdkSessionSet = true;
             }
           } catch (e) {
             // ignore
           }
         }
 
-        // Attempt upsert — best-effort
-        try {
-          await tryUpsertProfile(resolvedUser, resolvedRole);
-        } catch (e) {
-          console.warn("WelcomePage: profile upsert attempt threw:", e);
+        // 3) Resolve user via SDK or token
+        const resolvedUser = await resolveUserUsingSdkOrToken(tokenObj);
+        if (!resolvedUser) {
+          setStatus("failed");
+          setMessage("Unable to verify your request! The confirmation link may be expired or invalid");
+          clearTokenFromUrl();
+          return;
         }
 
-        // Mark success
+        // ensure role
+        const resolvedRole = resolvedUser.user_metadata?.role || resolvedUser.role || "student";
+
+        // 4) If SDK session not present, set session again (best-effort) to ensure client has access
+        if (!sdkSessionSet && tokenObj) {
+          try {
+            await trySetSessionFromToken(tokenObj);
+            sdkSessionSet = true;
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        // 5) Wait/poll for profile row to exist (so dashboard can read immediately)
+        const profile = await waitForProfile(resolvedUser.id, 12, 700);
+        if (!profile) {
+          console.warn("WelcomePage: profile not found after waiting; dashboard may need to fetch later");
+        }
+
+        // 6) Persist one-time marker
+        try {
+          localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: resolvedUser.id, role: resolvedRole, ts: Date.now() }));
+        } catch (e) {}
+
         if (!mountedRef.current) return;
         setUser(resolvedUser);
-        setRole(resolvedRole || "student");
+        setRole(resolvedRole);
         setStatus("success");
         setMessage("You're All Set Now! Use the button below to navigate to your dashboard");
 
-        // Persist one-time marker so the welcome cannot be revisited
-        try {
-          localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: resolvedUser.id, role: resolvedRole || "student", ts: Date.now() }));
-        } catch (e) {
-          // ignore storage errors
+        // mark ready only if sdkSessionSet and profile exists (profile can be null)
+        setReady(Boolean(sdkSessionSet && profile && profile.id));
+        // if profile missing but sdkSessionSet, keep preparing text and allow retry from button
+        if (!sdkSessionSet) {
+          setPreparingText("Finalizing Your Session, Please Wait...");
+        } else if (!profile) {
+          setPreparingText("Finishing setup for your dashboard...");
         }
 
         // cleanup URL tokens
         clearTokenFromUrl();
       } catch (err) {
-        console.error("WelcomePage error:", err);
+        console.error("WelcomePage init error:", err);
+        if (!mountedRef.current) return;
         setStatus("failed");
         setMessage("Unable to verify the confirmation link! Please try again or contact support");
+        clearTokenFromUrl();
       }
     }
-    resolveSessionAndUser();
+
+    init();
 
     return () => {
       mountedRef.current = false;
     };
   }, []);
 
-  // Action when user clicks Go To Dashboard
-  const handleGoToDashboard = () => {
+  // When user clicks Go To Dashboard: ensure session + profile available before navigating
+  const handleGoToDashboard = async () => {
     try {
-      if (user && user.id) {
+      // 1) if already ready - navigate
+      if (ready && user && user.id) {
         try { localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: user.id, role: role || "student", ts: Date.now() })); } catch (e) {}
+        const route = role === "admin" ? "/Admin/Dashboard" : "/User/Dashboard";
+        window.location.replace(route);
+        return;
       }
-      const route = role === "admin" ? "/Admin/Dashboard" : "/User/Dashboard";
-      // replace so back button won't return to welcome
+
+      setStatus("pending");
+      setPreparingText("Finalizing Your Profile, Please Wait...");
+
+      // 2) try to ensure SDK session exists
+      const tokenObj = parseAccessTokenFromUrl();
+      let sdkSession = await getSdkSession();
+      if (!sdkSession && tokenObj) {
+        await trySetSessionFromToken(tokenObj);
+        // small delay to let SDK persist
+        await sleep(400);
+        sdkSession = await getSdkSession();
+      }
+
+      // 3) attempt to resolve user again
+      const resolvedUser = await resolveUserUsingSdkOrToken(tokenObj);
+      if (!resolvedUser) {
+        setStatus("failed");
+        setMessage("Unable To Establish Session! Try Signing In");
+        return;
+      }
+
+      // 4) Poll again for profile (give a slightly longer window on button click)
+      const profile = await waitForProfile(resolvedUser.id, 15, 700);
+      if (!profile) {
+        // not found; still navigate but warn that user may need to refresh or sign in
+        console.warn("WelcomePage: profile still not found after final wait");
+        setStatus("success");
+        setReady(false);
+        setMessage("Account verified but profile setup is still in progress! If the dashboard looks incomplete, try signing in");
+        // Still attempt to navigate (so user can continue)
+        try { localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: resolvedUser.id, role: role || "student", ts: Date.now() })); } catch (e) {}
+        const route = (role === "admin") ? "/Admin/Dashboard" : "/User/Dashboard";
+        window.location.replace(route);
+        return;
+      }
+
+      // 5) success: profile exists and session likely present
+      try { localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: resolvedUser.id, role: role || "student", ts: Date.now() })); } catch (e) {}
+      setStatus("success");
+      setReady(true);
+      const route = (role === "admin") ? "/Admin/Dashboard" : "/User/Dashboard";
       window.location.replace(route);
-    } catch (e) {
-      console.warn("Failed to navigate to dashboard:", e);
-      navigate(role === "admin" ? "/Admin/Dashboard" : "/User/Dashboard", { replace: true });
+    } catch (err) {
+      console.error("WelcomePage goToDashboard error:", err);
+      setStatus("failed");
+      setMessage("Failed to proceed to dashboard! You can sign in from the home page");
     }
   };
 
@@ -262,7 +328,7 @@ export default function WelcomePage() {
     try {
       window.location.reload();
     } catch (e) {
-      navigate("/SignUp", { replace: true });
+      navigate("/SignIn", { replace: true });
     }
   };
 
@@ -275,20 +341,21 @@ export default function WelcomePage() {
 
         <main className={styles.main}>
           <div className={styles.imageWrap}>
-            <img
-              src={status === "success" ? SUCCESS_IMG : FAIL_IMG}
-              alt={status === "success" ? "Success" : "Failed"}
-              className={styles.heroImage}
-            />
+            <img src={status === "success" ? SUCCESS_IMG : FAIL_IMG} alt={status === "success" ? "Success" : "Failed"} className={styles.heroImage} />
           </div>
 
           <div className={styles.messageBox}>
-            {status === "pending" && <p className={styles.hint}>Verifying Your Account, Please Wait…</p>}
+            {status === "pending" && <p className={styles.hint}>{preparingText}</p>}
 
             {status === "success" && (
               <>
                 <p className={styles.lead}>Congratulations — Account Verification Successful</p>
                 <p className={styles.sub}>{message}</p>
+                {!ready && (
+                  <p className={styles.hint} style={{ marginTop: "0.6rem", opacity: 0.9 }}>
+                    Finalizing setup for your dashboard... If this takes long time, try clicking the button below once or opt for sign in
+                  </p>
+                )}
               </>
             )}
 
@@ -302,8 +369,13 @@ export default function WelcomePage() {
 
           <div className={styles.actions}>
             {status === "success" ? (
-              <button className={`${styles.btn} ${styles.primary}`} onClick={handleGoToDashboard}>
-                Go To Dashboard
+              <button
+                className={`${styles.btn} ${styles.primary}`}
+                onClick={handleGoToDashboard}
+                disabled={!ready && status === "success" && !user}
+                aria-disabled={!ready && status === "success" && !user}
+              >
+                {ready ? "Go To Dashboard" : "Prepare Dashboard"}
               </button>
             ) : (
               <>
