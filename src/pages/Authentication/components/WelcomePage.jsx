@@ -46,6 +46,39 @@ export default function WelcomePage() {
   const SUCCESS_IMG = "/Success.jpg";
   const FAIL_IMG = "/Fail.jpg";
 
+  // Helper: upsert profile (best-effort)
+  async function tryUpsertProfile(u, resolvedRole) {
+    if (!u || !u.id) return false;
+
+    // Build profile object from metadata (best-effort)
+    const meta = u.user_metadata || {};
+    const profileRow = {
+      id: u.id,
+      full_name: meta.full_name || null,
+      email: u.email || null,
+      contact: meta.contact || null,
+      role: meta.role || resolvedRole || (resolvedRole === "admin" ? "admin" : "student"),
+      stream: meta.stream || null,
+      year_of_study: meta.year_of_study || null,
+      access_key: meta.access_key || null,
+    };
+
+    // If email missing, still attempt (some setups may not require email in profile)
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .upsert([profileRow], { onConflict: "id", returning: "minimal" });
+      if (error) {
+        console.warn("WelcomePage: profiles upsert returned error:", error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.warn("WelcomePage: profiles upsert failed:", e);
+      return false;
+    }
+  }
+
   useEffect(() => {
     mountedRef.current = true;
 
@@ -73,93 +106,130 @@ export default function WelcomePage() {
       }
 
       try {
-        // 2) Try SDK helper that parses session from URL and stores it
+        // Attempt flow A: SDK helper that parses session from URL (preferred)
+        let resolvedUser = null;
+        let resolvedRole = null;
         if (supabase?.auth?.getSessionFromUrl) {
           try {
-            const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({}));
-            if (!error && (data?.session?.user || data?.user)) {
-              const u = data.session?.user || data.user;
-              if (!mountedRef.current) return;
-              setUser(u);
-              const r = u.user_metadata?.role || u.role || "student";
-              setRole(r);
-              setStatus("success");
-              setMessage("You're All Set Now! Use the button below to navigate to your dashboard");
-              try { localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: u.id, role: r, ts: Date.now() })); } catch (e) {}
-              clearTokenFromUrl();
-              return;
+            const got = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({}));
+            const maybeUser = got?.data?.session?.user || got?.user || got?.data?.user || null;
+            if (maybeUser) {
+              resolvedUser = maybeUser;
+              resolvedRole = maybeUser.user_metadata?.role || maybeUser.role || "student";
+              // Attempt to refresh user metadata from SDK
+              try {
+                if (supabase?.auth?.getUser) {
+                  const { data: refreshed } = await supabase.auth.getUser();
+                  if (refreshed?.user) resolvedUser = refreshed.user;
+                }
+              } catch (e) {
+                // ignore
+              }
             }
           } catch (errInner) {
-            // ignore and continue
+            // ignore and continue to other fallbacks
+            console.warn("WelcomePage: getSessionFromUrl failed:", errInner);
           }
         }
 
-        // 3) Fallback: check for already stored session
-        try {
-          const { data: sessionResp } = await supabase.auth.getSession();
-          const sessionObj = sessionResp?.session ?? sessionResp;
-          if (sessionObj?.user) {
-            const u = sessionObj.user;
-            if (!mountedRef.current) return;
-            setUser(u);
-            const r = u.user_metadata?.role || u.role || "student";
-            setRole(r);
-            setStatus("success");
-            setMessage("You're All Set Now! Use the button below to navigate to your dashboard");
-            try { localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: u.id, role: r, ts: Date.now() })); } catch (e) {}
-            clearTokenFromUrl();
-            return;
+        // Attempt flow B: check stored session
+        if (!resolvedUser) {
+          try {
+            const sessionResp = await supabase.auth.getSession().catch(() => ({}));
+            const sessionObj = sessionResp?.data?.session ?? sessionResp?.session ?? sessionResp?.data ?? sessionResp;
+            const maybeUser = sessionObj?.user ?? null;
+            if (maybeUser) {
+              resolvedUser = maybeUser;
+              resolvedRole = maybeUser.user_metadata?.role || maybeUser.role || "student";
+            }
+          } catch (errSession) {
+            console.warn("WelcomePage: getSession error:", errSession);
           }
-        } catch (errSession) {
-          // ignore and continue
         }
 
-        // 4) Fallback: parse access token from URL (hash or query) and call /auth/v1/user to validate
+        // Attempt flow C: parse access token in URL and call auth/v1/user (server-side method)
         const token = parseAccessTokenFromUrl();
-        if (token && SUPABASE_URL) {
+        if (!resolvedUser && token && SUPABASE_URL) {
           try {
             const resp = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
               headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             });
             if (resp.ok) {
-              const u = await resp.json();
-              if (!mountedRef.current) return;
-              setUser(u);
-              const r = u.user_metadata?.role || u.role || "student";
-              setRole(r);
-              setStatus("success");
-              setMessage("You're All Set Now! Use the button below to navigate to your dashboard");
-              try { localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: u.id, role: r, ts: Date.now() })); } catch (e) {}
-              clearTokenFromUrl();
-
-              // best-effort: ensure server-side profile exists (upsert)
-              try {
-                const meta = u.user_metadata || {};
-                const profileRow = {
-                  id: u.id,
-                  full_name: meta.full_name || null,
-                  email: u.email || null,
-                  contact: meta.contact || null,
-                  role: meta.role || (r === "admin" ? "admin" : "student"),
-                  stream: meta.stream || null,
-                  year_of_study: meta.year_of_study || null,
-                };
-                // Upsert (service role not available here — this is best-effort from client)
-                await supabase.from("profiles").upsert([profileRow], { onConflict: "id", returning: "minimal" });
-              } catch (e) {
-                // Non-fatal
-                console.warn("WelcomePage: profile upsert failed:", e);
+              const fetchedUser = await resp.json();
+              // fetchedUser shape is user object
+              if (fetchedUser) {
+                resolvedUser = fetchedUser;
+                resolvedRole = fetchedUser.user_metadata?.role || fetchedUser.role || "student";
               }
-              return;
+            } else {
+              console.warn("WelcomePage: /auth/v1/user returned non-ok:", resp.status);
             }
           } catch (e) {
             console.warn("WelcomePage: token user fetch failed", e);
           }
         }
 
-        // If we get here, we could not verify session/token
-        setStatus("failed");
-        setMessage("Unable to verify your request! The confirmation link may be expired or invalid");
+        // If we still don't have a user, verification failed
+        if (!resolvedUser) {
+          setStatus("failed");
+          setMessage("Unable to verify your request! The confirmation link may be expired or invalid");
+          return;
+        }
+
+        // We have a resolvedUser. Try to refresh the user via SDK getUser() if possible to get freshest metadata
+        try {
+          if (supabase?.auth?.getUser) {
+            const { data: refreshed } = await supabase.auth.getUser().catch(() => ({}));
+            if (refreshed?.user) {
+              resolvedUser = refreshed.user;
+              resolvedRole = resolvedUser.user_metadata?.role || resolvedUser.role || resolvedRole || "student";
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        // Best-effort: if metadata seems minimal, attempt one more fetch using token (if available)
+        if (token && (!resolvedUser.user_metadata || Object.keys(resolvedUser.user_metadata || {}).length === 0)) {
+          try {
+            const resp = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            });
+            if (resp.ok) {
+              const fetchedUser = await resp.json();
+              if (fetchedUser) {
+                resolvedUser = fetchedUser;
+                resolvedRole = fetchedUser.user_metadata?.role || fetchedUser.role || resolvedRole || "student";
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        // Attempt upsert — best-effort
+        try {
+          await tryUpsertProfile(resolvedUser, resolvedRole);
+        } catch (e) {
+          console.warn("WelcomePage: profile upsert attempt threw:", e);
+        }
+
+        // Mark success
+        if (!mountedRef.current) return;
+        setUser(resolvedUser);
+        setRole(resolvedRole || "student");
+        setStatus("success");
+        setMessage("You're All Set Now! Use the button below to navigate to your dashboard");
+
+        // Persist one-time marker so the welcome cannot be revisited
+        try {
+          localStorage.setItem("qn_welcome_shown", JSON.stringify({ userId: resolvedUser.id, role: resolvedRole || "student", ts: Date.now() }));
+        } catch (e) {
+          // ignore storage errors
+        }
+
+        // cleanup URL tokens
+        clearTokenFromUrl();
       } catch (err) {
         console.error("WelcomePage error:", err);
         setStatus("failed");
