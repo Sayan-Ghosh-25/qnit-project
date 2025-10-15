@@ -581,7 +581,7 @@ export async function deleteAccount(req, res) {
       return res.status(500).json({ ok: false, error: "Failed to delete account" });
     }
 
-    return res.json({ ok: true, message: "Account Deleted" });
+    return res.json({ ok: true, message: "Your Account Has Been Deleted From Our Database! We Are Sorry To See You Go" });
   } catch (err) {
     console.error("deleteAccount:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
