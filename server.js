@@ -12,7 +12,7 @@ import newsRoutes from "./src/routes/newsRoute.js";
 
 dotenv.config();
 const app = express();
-const PORT = Number(process.env.PORT) || 8080;
+const PORT = process.env.PORT || 8080;
 
 // --- Basic safety checks ---
 const missingEnvs = [];
@@ -81,6 +81,7 @@ try {
 
 // Health check
 app.get("/", (req, res) => res.json({ ok: true }));
+app.get("/health", (req, res) => res.send("OK"));
 
 // Generic error handler to avoid crashing from a thrown error inside a route
 app.use((err, req, res, next) => {
