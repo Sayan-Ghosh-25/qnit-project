@@ -12,7 +12,7 @@ import newsRoutes from "./src/routes/newsRoute.js";
 
 dotenv.config();
 const app = express();
-const PORT = Number(process.env.PORT) || 8080 || 5000;
+const PORT = Number(process.env.PORT) || 8080;
 
 // --- Basic safety checks ---
 const missingEnvs = [];
@@ -89,7 +89,7 @@ app.use((err, req, res, next) => {
 });
 
 // --- Start server and expose graceful shutdown ---
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
   if (allowedOrigins.length) {
     console.log("Allowed origins:", allowedOrigins.join(", "));
