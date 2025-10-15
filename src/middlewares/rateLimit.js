@@ -1,7 +1,7 @@
 // src/middlewares/rateLimit.js
 const map = new Map();
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_PER_WINDOW = 3;
+const WINDOW_MS = 10 * 30 * 1000;
+const MAX_PER_WINDOW = 10;
 
 export function rateLimitMiddleware(req, res, next) {
   const key = (req.body.email || req.body.contact || req.ip || "").toLowerCase();
@@ -16,7 +16,7 @@ export function rateLimitMiddleware(req, res, next) {
   if (recent.length > MAX_PER_WINDOW) {
     const retryAfter = Math.ceil((WINDOW_MS - (now - recent[0])) / 1000);
     return res.status(429).json({
-      error: "Too many requests! Try again later.",
+      error: "Too many requests! Try again later",
       retryAfter,
     });
   }

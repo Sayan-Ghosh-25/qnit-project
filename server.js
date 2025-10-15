@@ -11,49 +11,116 @@ import feedbackRoutes from "./src/routes/feedbackRoutes.js";
 import newsRoutes from "./src/routes/newsRoute.js";
 
 dotenv.config();
-
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 8080 || 5000;
 
-// Check required env variables
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY!");
-  process.exit(1);
+// --- Basic safety checks ---
+const missingEnvs = [];
+if (!process.env.SUPABASE_URL) missingEnvs.push("SUPABASE_URL");
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missingEnvs.push("SUPABASE_SERVICE_ROLE_KEY");
+
+if (missingEnvs.length) {
+  console.error(
+    `Missing required environment variables: ${missingEnvs.join( ", " )}`
+  );
 }
 
-// Initialize Supabase client
-export const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// --- Initialize Supabase safely ---
+let supabaseAdmin = null;
+try {
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+} catch (err) {
+  console.error("Failed to create Supabase client:", err);
+}
 
+// --- Middlewares ---
 app.use(helmet());
 app.use(express.json());
 
-// CORS
+// CORS: safe origin check that does not throw and crash the server
 const allowedOrigins = process.env.FRONTEND_ORIGIN
-  ? process.env.FRONTEND_ORIGIN.split(",").map(o => o.trim().replace(/\/$/, ""))
+  ? process.env.FRONTEND_ORIGIN.split(",").map((o) => o.trim().replace(/\/$/, ""))
   : [];
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
+    // allow non-browser tools (no origin) like curl, Railway health checks, server-to-server calls
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin.replace(/\/$/, ""))) return callback(null, true);
-    console.error("Blocked by CORS:", origin);
-    callback(new Error("Not allowed by CORS"));
-  }
-}));
 
-// Routes
-app.use("/auth", authRoutes);
-app.use("/user", userRoutes);
-app.use("/user", feedbackRoutes);
-app.use("/api/news", newsRoutes);
+    const normalized = origin.replace(/\/$/, "");
+    if (allowedOrigins.length === 0) {
+      // If no allowed origins configured, opt into allowing all
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(normalized)) {
+      return callback(null, true);
+    }
+
+    console.warn("Blocked by CORS:", origin);
+    return callback(null, false);
+  },
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+
+// --- Routes (wrap to avoid top-level import crashes) ---
+try {
+  app.use("/auth", authRoutes);
+  app.use("/user", userRoutes);
+  app.use("/user", feedbackRoutes);
+  app.use("/api/news", newsRoutes);
+} catch (err) {
+  console.error("Error mounting routes:", err);
+}
 
 // Health check
 app.get("/", (req, res) => res.json({ ok: true }));
 
-// Start server
-app.listen(PORT, () => {
+// Generic error handler to avoid crashing from a thrown error inside a route
+app.use((err, req, res, next) => {
+  console.error("Unhandled route error:", err && (err.stack || err.message || err));
+  res.status(500).json({ error: "Internal server error" });
+});
+
+// --- Start server and expose graceful shutdown ---
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  if (allowedOrigins.length) {
+    console.log("Allowed origins:", allowedOrigins.join(", "));
+  } else {
+    console.log("Allowed origins: ALL");
+  }
+});
+
+// Graceful shutdown handlers
+const shutdown = (signal) => {
+  console.log(`Received ${signal}. Shutting down gracefully...`);
+  server.close(() => {
+    console.log("Closed HTTP server");
+    process.exit(0);
+  });
+
+  // Force exit if it takes too long
+  setTimeout(() => {
+    console.warn("Forcing shutdown after timeout");
+    process.exit(1);
+  }, 10_000).unref();
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Log unhandled exceptions/rejections so the container doesn't silently die
+process.on("uncaughtException", (err) => {
+  console.error("uncaughtException:", err && (err.stack || err.message || err));
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("unhandledRejection:", reason);
 });
