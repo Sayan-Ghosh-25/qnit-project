@@ -75,7 +75,6 @@ export default function AuthModal({
 }) {
   const navigate = useNavigate();
   const auth = useAuth();
-  // fallback login if backend doesn't return session
   const loginFromContext = auth?.login;
 
   const [history, setHistory] = useState([VIEW.WELCOME]);
@@ -87,35 +86,35 @@ export default function AuthModal({
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [status, setStatus] = useState(null); // "success" | "error" | null
+  const [status, setStatus] = useState(null);
   const [showPass, setShowPass] = useState(false);
 
-  // user-exists check states:
-  // false = not registered, "checking" = in flight, true = registered, null = unknown/error
+  // user-exists check states
   const [userExistsEmailStatus, setUserExistsEmailStatus] = useState(null);
   const checkTimerRef = useRef(null);
   const checkAbortFlagRef = useRef({ aborted: false, currentKey: null });
 
   const timeoutsRef = useRef([]);
+  const statusTimerRef = useRef(null);
   const recaptchaRef = useRef(null);
   const [captchaToken, setCaptchaToken] = useState(null);
 
   // helpers
   const go = (next) => setHistory((h) => [...h, next]);
   const back = () => {
-    setStatus(null);
+    clearStatusImmediate();
     if (history.length > 1) setHistory((h) => h.slice(0, -1));
     else onClose();
   };
 
   function handleOverlayClick(e) {
     if (e.target === e.currentTarget) {
-      setStatus(null);
+      clearStatusImmediate();
       onClose();
     }
   }
   function handleCloseClick() {
-    setStatus(null);
+    clearStatusImmediate();
     onClose();
   }
 
@@ -132,6 +131,27 @@ export default function AuthModal({
 
   function validateEmail(em) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
+  }
+
+  // ---------- Status helpers ----------
+  function clearStatusImmediate() {
+    if (statusTimerRef.current) {
+      clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = null;
+    }
+    setStatus(null);
+  }
+
+  function showStatus(type, visibilityMs = 1000) {
+    if (statusTimerRef.current) {
+      clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = null;
+    }
+    setStatus(type);
+    statusTimerRef.current = setTimeout(() => {
+      setStatus(null);
+      statusTimerRef.current = null;
+    }, visibilityMs);
   }
 
   /* Secure, fast "does this email exist?" check */
@@ -153,6 +173,7 @@ export default function AuthModal({
     setUserExistsEmailStatus("checking");
 
     if (!validateEmail(trimmed)) {
+      setUserExistsEmailStatus(null);
       return;
     }
 
@@ -194,7 +215,7 @@ export default function AuthModal({
           // ignore RPC errors -> fallback to select
         }
 
-        // Fallback: minimal select on profiles table 
+        // Fallback: minimal select on profiles table
         try {
           const { data, error } = await supabase
             .from("profiles")
@@ -243,6 +264,7 @@ export default function AuthModal({
       timeoutsRef.current = [];
       if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
       checkAbortFlagRef.current.aborted = true;
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
     };
   }, []);
 
@@ -252,20 +274,21 @@ export default function AuthModal({
     const emailTrimmed = trimEnds(identifier).toLowerCase();
 
     if (!emailTrimmed || !password || !signUserType) {
-      setStatus("error");
+      showStatus("error", 1000);
       return;
     }
 
     // enforce user-exists check
     if (userExistsEmailStatus !== true) {
-      setStatus("error");
+      showStatus("error", 1000);
       return;
     }
 
     // if using API backend, captchaToken must be present
     if (API_BASE_URL && !captchaToken) {
       if (recaptchaRef.current) recaptchaRef.current.reset();
-      setStatus("error");
+      setCaptchaToken(null);
+      showStatus("error", 1000);
       return;
     }
 
@@ -318,7 +341,7 @@ export default function AuthModal({
           }
         }
 
-        setStatus("success");
+        showStatus("success", 700);
         const navT = setTimeout(() => {
           if (typeof onNavigate === "function") onNavigate(signUserType);
           if (signUserType === "admin") navigate("/Admin/Dashboard");
@@ -335,7 +358,7 @@ export default function AuthModal({
         });
         if (error) throw error;
 
-        setStatus("success");
+        showStatus("success", 700);
         const navT = setTimeout(() => {
           if (typeof onNavigate === "function") onNavigate(signUserType);
           if (signUserType === "admin") navigate("/Admin/Dashboard");
@@ -347,10 +370,10 @@ export default function AuthModal({
       }
     } catch (err) {
       console.error("Sign-in error:", err);
-      setStatus("error");
-      // reset captcha so user must re-verify
+      // reset captcha so user must re-verify if backend is used
       if (recaptchaRef.current) recaptchaRef.current.reset();
       setCaptchaToken(null);
+      showStatus("error", 1000);
     } finally {
       setBusy(false);
     }
@@ -361,14 +384,15 @@ export default function AuthModal({
     e?.preventDefault?.();
     const emailTrimmed = trimEnds(identifier).toLowerCase();
     if (!emailTrimmed || !signUserType) {
-      setStatus("error");
+      showStatus("error", 1000);
       return;
     }
 
     // If using backend we require captcha; for direct supabase flow captcha not required
     if (API_BASE_URL && !captchaToken) {
       if (recaptchaRef.current) recaptchaRef.current.reset();
-      setStatus("error");
+      setCaptchaToken(null);
+      showStatus("error", 1000);
       return;
     }
 
@@ -388,7 +412,7 @@ export default function AuthModal({
         if (!res.ok) throw new Error(payload?.error || "Reset failed");
 
         // backend succeeded — show success UX
-        setStatus("success");
+        showStatus("success", 1000);
         if (recaptchaRef.current) recaptchaRef.current.reset();
         setCaptchaToken(null);
 
@@ -407,7 +431,7 @@ export default function AuthModal({
         // supabase returns { data, error } (older SDKs returned { error })
         if (error) throw error;
 
-        setStatus("success");
+        showStatus("success", 1200);
         const navT = setTimeout(() => {
           if (typeof onNavigate === "function") onNavigate("reset");
           if (typeof onConfirm === "function") onConfirm("reset");
@@ -417,33 +441,22 @@ export default function AuthModal({
       }
     } catch (err) {
       console.error("Forgot password error:", err);
-      setStatus("error");
       if (recaptchaRef.current) recaptchaRef.current.reset();
       setCaptchaToken(null);
+      showStatus("error", 1000);
     } finally {
       setBusy(false);
     }
   }
 
-  // whenever status changes, auto clear after 1000ms
-  useEffect(() => {
-    if (status === "success" || status === "error") {
-      const t = setTimeout(() => setStatus(null), 1000);
-      timeoutsRef.current.push(t);
-      return () => clearTimeout(t);
-    }
-  }, [status]);
-
-  // Clear transient error status as soon as user edits inputs so button re-validates
-  useEffect(() => {
-    if (status === "error") {
-      setStatus(null);
-    }
-  }, [identifier, password, signUserType, captchaToken]);
-
   // derive enabled states
   const signValid =
-    !!identifier && !!password && !!signUserType && !busy && (API_BASE_URL ? !!captchaToken : true) && userExistsEmailStatus === true;
+    !!identifier &&
+    !!password &&
+    !!signUserType &&
+    !busy &&
+    (API_BASE_URL ? !!captchaToken : true) &&
+    userExistsEmailStatus === true;
   const forgotValid = !!identifier && !!signUserType && !busy && (API_BASE_URL ? !!captchaToken : true);
 
   if (!isOpen) return null;
@@ -528,11 +541,10 @@ export default function AuthModal({
               value={signUserType}
               onChange={(e) => {
                 setSignUserType(e.target.value);
-                // reset identifier/user check when user type changes
                 setIdentifier("");
                 setUserExistsEmailStatus(null);
                 setPassword("");
-                setStatus(null);
+                clearStatusImmediate();
                 if (recaptchaRef.current) recaptchaRef.current.reset();
                 setCaptchaToken(null);
               }}
@@ -548,28 +560,27 @@ export default function AuthModal({
 
           <div className={styles.field}>
             <label>User ID</label>
-              <input
-                type="email"
-                placeholder="Enter Your Email"
-                value={identifier}
-                onChange={(e) => {
-                  setStatus(null);
-                  setIdentifier(trimEnds(e.target.value));
-                }}
-                required
-                disabled={!signUserType}
-              />
-              <div>
-                {!trimEnds(identifier) ? null : !validateEmail(trimEnds(identifier)) ? (
-                  <small className={`${styles.hint} ${styles.error}`}>Invalid email format</small>
-                ) : userExistsEmailStatus === true ? (
-                  <small className={`${styles.hint} ${styles.success}`}>User is registered</small>
-                ) : userExistsEmailStatus === false ? (
-                  <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
-                ) : (
-                  <small className={styles.hint}>Checking if user exists</small>
-                )}
-              </div>
+            <input
+              type="email"
+              placeholder="Enter Your Email"
+              value={identifier}
+              onChange={(e) => {
+                setIdentifier(trimEnds(e.target.value));
+              }}
+              required
+              disabled={!signUserType}
+            />
+            <div>
+              {!trimEnds(identifier) ? null : !validateEmail(trimEnds(identifier)) ? (
+                <small className={`${styles.hint} ${styles.error}`}>Invalid email format</small>
+              ) : userExistsEmailStatus === true ? (
+                <small className={`${styles.hint} ${styles.success}`}>User is registered</small>
+              ) : userExistsEmailStatus === false ? (
+                <small className={`${styles.hint} ${styles.error}`}>User not registered</small>
+              ) : (
+                <small className={styles.hint}>Checking if user exists</small>
+              )}
+            </div>
           </div>
 
           <div className={styles.field}>
@@ -580,7 +591,6 @@ export default function AuthModal({
                 placeholder="Enter your Password"
                 value={password}
                 onChange={(e) => {
-                  setStatus(null);
                   setPassword(e.target.value);
                 }}
                 required
@@ -600,14 +610,12 @@ export default function AuthModal({
 
           <div className={styles.rowBetween}>
             {/* ReCAPTCHA: only show if user email exists and backend requires it */}
-            <div className={styles.captchaContainer}
-            style={{ display: API_BASE_URL && userExistsEmailStatus === true ? "block" : "none" }}>
+            <div
+              className={styles.captchaContainer}
+              style={{ display: API_BASE_URL && userExistsEmailStatus === true ? "block" : "none" }}
+            >
               {RECAPTCHA_SITE_KEY ? (
-                <ReCAPTCHA
-                  sitekey={RECAPTCHA_SITE_KEY}
-                  onChange={handleCaptcha}
-                  ref={recaptchaRef} key ="dark" theme="dark"
-                />
+                <ReCAPTCHA sitekey={RECAPTCHA_SITE_KEY} onChange={handleCaptcha} ref={recaptchaRef} key="dark" theme="dark" />
               ) : (
                 API_BASE_URL ? <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small> : null
               )}
@@ -647,7 +655,7 @@ export default function AuthModal({
                 setSignUserType(e.target.value);
                 setIdentifier("");
                 setUserExistsEmailStatus(null);
-                setStatus(null);
+                clearStatusImmediate();
                 if (recaptchaRef.current) recaptchaRef.current.reset();
                 setCaptchaToken(null);
               }}
@@ -684,21 +692,19 @@ export default function AuthModal({
             </div>
           </div>
 
-        <div className={styles.rowBetween}>
-          {/* ReCAPTCHA: only show if backend requires it and user exists */}
-          <div className={styles.captchaContainer}
-          style={{ display: API_BASE_URL && userExistsEmailStatus === true ? "block" : "none" }}>
-            {RECAPTCHA_SITE_KEY ? (
-              <ReCAPTCHA
-                sitekey={RECAPTCHA_SITE_KEY}
-                onChange={handleCaptcha}
-                ref={recaptchaRef} key ="dark" theme ="dark"
-              />
-            ) : (
-              API_BASE_URL ? <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small> : null
-            )}
+          <div className={styles.rowBetween}>
+            {/* ReCAPTCHA: only show if backend requires it and user exists */}
+            <div
+              className={styles.captchaContainer}
+              style={{ display: API_BASE_URL && userExistsEmailStatus === true ? "block" : "none" }}
+            >
+              {RECAPTCHA_SITE_KEY ? (
+                <ReCAPTCHA sitekey={RECAPTCHA_SITE_KEY} onChange={handleCaptcha} ref={recaptchaRef} key="dark" theme="dark" />
+              ) : (
+                API_BASE_URL ? <small style={{ color: "#c33" }}>reCAPTCHA not configured!</small> : null
+              )}
+            </div>
           </div>
-        </div>
 
           <button className={`${styles.btn} ${styles.primary} ${styles.block}`} type="submit" disabled={!forgotValid}>
             {busy ? (
