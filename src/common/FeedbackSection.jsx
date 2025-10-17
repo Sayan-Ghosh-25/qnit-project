@@ -15,6 +15,9 @@ export default function FeedbackSection() {
   const textareaRef = useRef(null);
   const starsRef = useRef([]);
 
+  // store original values to detect "no changes"
+  const originalRef = useRef({ text: "", rating: 0 });
+
   // helper: get client JWT access token
   async function getAccessToken() {
     try {
@@ -46,6 +49,7 @@ export default function FeedbackSection() {
             setLoading(false);
             setEditing(true);
             setSaved(false);
+            originalRef.current = { text: "", rating: 0 };
           }
           return;
         }
@@ -59,6 +63,7 @@ export default function FeedbackSection() {
             setLoading(false);
             setEditing(true);
             setSaved(false);
+            originalRef.current = { text: "", rating: 0 };
           }
           return;
         }
@@ -66,14 +71,20 @@ export default function FeedbackSection() {
         const fb = payload?.feedback || null;
         if (!cancelled) {
           if (fb) {
-            setText(fb.feedback || "");
-            setRating(Number(fb.rating || 0));
-            const has = (fb.feedback || "").trim() !== "" || Number(fb.rating || 0) > 0;
+            const fbText = fb.feedback || "";
+            const fbRating = Number(fb.rating || 0);
+            setText(fbText);
+            setRating(fbRating);
+            // store canonical trimmed original for later comparisons
+            originalRef.current = { text: (fbText || "").trim(), rating: fbRating };
+
+            const has = (fbText || "").trim() !== "" || fbRating > 0;
             setEditing(!has);
             setSaved(has);
           } else {
             setText("");
             setRating(0);
+            originalRef.current = { text: "", rating: 0 };
             setEditing(true);
             setSaved(false);
           }
@@ -85,6 +96,7 @@ export default function FeedbackSection() {
           setLoading(false);
           setEditing(true);
           setSaved(false);
+          originalRef.current = { text: "", rating: 0 };
         }
       }
     }
@@ -142,6 +154,7 @@ export default function FeedbackSection() {
         setRating(0);
         setEditing(true);
         setSaved(false);
+        originalRef.current = { text: "", rating: 0 };
         return;
       }
       const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
@@ -154,19 +167,24 @@ export default function FeedbackSection() {
         setRating(0);
         setEditing(true);
         setSaved(false);
+        originalRef.current = { text: "", rating: 0 };
         return;
       }
       const payload = await res.json();
       const fb = payload?.feedback || null;
       if (fb) {
-        setText(fb.feedback || "");
-        setRating(Number(fb.rating || 0));
-        const has = (fb.feedback || "").trim() !== "" || Number(fb.rating || 0) > 0;
+        const fbText = fb.feedback || "";
+        const fbRating = Number(fb.rating || 0);
+        setText(fbText);
+        setRating(fbRating);
+        originalRef.current = { text: (fbText || "").trim(), rating: fbRating };
+        const has = (fbText || "").trim() !== "" || fbRating > 0;
         setEditing(!has);
         setSaved(has);
       } else {
         setText("");
         setRating(0);
+        originalRef.current = { text: "", rating: 0 };
         setEditing(true);
         setSaved(false);
       }
@@ -176,6 +194,7 @@ export default function FeedbackSection() {
       setRating(0);
       setEditing(true);
       setSaved(false);
+      originalRef.current = { text: "", rating: 0 };
     }
   };
 
@@ -183,6 +202,19 @@ export default function FeedbackSection() {
     e?.preventDefault?.();
     if (submitting) return;
     const trimmed = (text || "").trim();
+
+    // detect no-change when editing an already-saved feedback
+    if (saved) {
+      const origText = (originalRef.current.text || "").trim();
+      const origRating = Number(originalRef.current.rating || 0);
+      if (trimmed === origText && Number(rating) === origRating) {
+        alert("No Changes Detected!");
+        // keep focus on text area to encourage edits
+        textareaRef.current?.focus();
+        return;
+      }
+    }
+
     if (!trimmed) {
       alert("Feedback Text Cannot Be Empty!");
       return;
@@ -226,13 +258,19 @@ export default function FeedbackSection() {
       const body = await res.json().catch(() => ({}));
       const fb = body?.feedback || null;
       if (fb) {
-        setText(fb.feedback || "");
-        setRating(Number(fb.rating || 0));
+        const fbText = fb.feedback || trimmed;
+        const fbRating = Number(fb.rating ?? rating);
+        setText(fbText);
+        setRating(fbRating);
         setSaved(true);
         setEditing(false);
+        // update canonical original so future edits compare correctly
+        originalRef.current = { text: (fbText || "").trim(), rating: fbRating };
       } else {
+        // fallback: assume payload saved
         setSaved(true);
         setEditing(false);
+        originalRef.current = { text: trimmed, rating: Number(rating) };
       }
       alert("Feedback Submitted Successfully!");
     } catch (err) {
@@ -265,13 +303,13 @@ export default function FeedbackSection() {
 
       {loading ? (
         <div className={styles.skeletonWrapper}>
-        {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className={styles.skeletonRow}>
-            <div className={styles.skeletonLabel}></div>
-            <div className={styles.skeletonInput}></div>
-          </div>
-        ))}
-      </div>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className={styles.skeletonRow}>
+              <div className={styles.skeletonLabel}></div>
+              <div className={styles.skeletonInput}></div>
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           <div
