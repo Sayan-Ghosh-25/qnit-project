@@ -10,6 +10,7 @@ export default function FeedbackSection() {
   const [wordCount, setWordCount] = useState(0);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const textareaRef = useRef(null);
   const starsRef = useRef([]);
@@ -180,6 +181,7 @@ export default function FeedbackSection() {
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
+    if (submitting) return;
     const trimmed = (text || "").trim();
     if (!trimmed) {
       alert("Feedback Text Cannot Be Empty!");
@@ -189,12 +191,12 @@ export default function FeedbackSection() {
       alert("Please Provide A Rating!");
       return;
     }
-    if (trimmed.length > 1500) {
-      alert("Feedback too long (max 1500 characters).");
+    if (trimmed.length > 1000) {
+      alert("Feedback too long (max 1000 characters)");
       return;
     }
 
-    // fetch existing to compare
+    setSubmitting(true);
     try {
       const token = await getAccessToken();
       if (!token) {
@@ -202,7 +204,6 @@ export default function FeedbackSection() {
         return;
       }
       const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
-      // Build payload
       const payload = { feedback: trimmed, rating: Number(rating) };
 
       const res = await fetch(`${API_BASE}/user/me/feedback`, {
@@ -222,22 +223,23 @@ export default function FeedbackSection() {
         return;
       }
 
-      const body = await res.json();
+      const body = await res.json().catch(() => ({}));
       const fb = body?.feedback || null;
       if (fb) {
         setText(fb.feedback || "");
         setRating(Number(fb.rating || 0));
         setSaved(true);
         setEditing(false);
-        alert("Feedback Submitted Successfully!");
       } else {
         setSaved(true);
         setEditing(false);
-        alert("Feedback Submitted Successfully!");
       }
+      alert("Feedback Submitted Successfully!");
     } catch (err) {
       console.error("Failed to submit feedback:", err);
       alert("Failed to submit feedback! Please try again");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -323,7 +325,7 @@ export default function FeedbackSection() {
                 onClick={handleSubmit}
                 disabled={saved && !editing}
               >
-                Submit
+                {submitting ? "Submitting..." : "Submit"}
               </button>
 
               <button

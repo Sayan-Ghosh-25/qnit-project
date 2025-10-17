@@ -457,7 +457,7 @@ export default function ProfileSection() {
 
           <div className={styles.profileSectionButtons}>
             <button type="button" id="updateBtn" className={styles.updateButton} onClick={updateProfile} disabled={!isEditing || updating}>
-              {updating ? "Updating" : "Update"}
+              {updating ? "Updating..." : "Update"}
             </button>
 
             <button type="button" id="cancelBtn" className={styles.cancelButton} onClick={cancelChanges} disabled={!isEditing || updating}>

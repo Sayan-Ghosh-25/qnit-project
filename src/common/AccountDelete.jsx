@@ -321,7 +321,7 @@ export default function AccountDelete({ isOpen, onClose, onAccountDelete }) {
               <small className={`${styles.hint} ${styles.error}`}>{formError}</small>
             ) : (
               <small className={styles.hint}>
-                This action will permanently remove your account, be careful before you proceed
+                This action will permanently remove your account, please be careful before you proceed
               </small>
             )}
           </div>
