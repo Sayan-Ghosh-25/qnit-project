@@ -1,30 +1,14 @@
 // src/services/emailService.js
-import fetch from "node-fetch";
+import nodemailer from "nodemailer";
 
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || null;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || null;
-const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN || null;
-const DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL || null;
-const DEFAULT_FROM_NAME = process.env.FROM_NAME || "QNIT";
+const EMAIL_USER = process.env.EMAIL_USER || null;
+const EMAIL_PASS = process.env.EMAIL_PASS || null;
+const DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL;
+const DEFAULT_FROM_NAME = process.env.FROM_NAME;
 const DEFAULT_TIMEOUT_MS = Number(process.env.EMAIL_REQUEST_TIMEOUT_MS || 15000);
+const MAX_SEND_RETRIES = Number(process.env.EMAIL_REQUEST_RETRIES || 2);
 
-/* ---- Utilities ---- */
-function ensureEnv() {
-  const missing = [];
-  if (!GOOGLE_CLIENT_ID) missing.push("GOOGLE_CLIENT_ID");
-  if (!GOOGLE_CLIENT_SECRET) missing.push("GOOGLE_CLIENT_SECRET");
-  if (!GOOGLE_REFRESH_TOKEN) missing.push("GOOGLE_REFRESH_TOKEN");
-  if (!DEFAULT_FROM_EMAIL) missing.push("FROM_EMAIL");
-  if (missing.length) {
-    throw new Error(
-      `Missing required environment variables: ${missing.join(", ")}`
-    );
-  }
-}
-
+/* small helper to escape user-provided strings when interpolating into HTML */
 function escapeHtml(str = "") {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -34,10 +18,11 @@ function escapeHtml(str = "") {
     .replace(/'/g, "&#039;");
 }
 
-/* Build admin private key template */
+/* Template builder for admin private-key email (uses your provided design) */
 function buildAdminPrivateKeyEmail({ applicant, rawCode, expiresAtIso, adminEmail }) {
   const expiresAtHuman = expiresAtIso ? new Date(expiresAtIso).toLocaleString() : "";
   const year = new Date().getFullYear();
+
   const html = `<!doctype html>
   <html lang="en">
     <body style="margin:0;padding:0;background:#06203a;font-family:system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;color:#fff;">
@@ -99,138 +84,114 @@ function buildAdminPrivateKeyEmail({ applicant, rawCode, expiresAtIso, adminEmai
   return { html, text };
 }
 
-/* base64url encode RFC822 raw message */
-function base64UrlEncode(strOrBuffer) {
-  const b = Buffer.isBuffer(strOrBuffer) ? strOrBuffer : Buffer.from(String(strOrBuffer), "utf8");
-  return b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+/* Create / reuse transporter (module-scoped so serverless warm instances can reuse) */
+let transporter = null;
+function getTransporter() {
+  if (transporter) return transporter;
+
+  if (!EMAIL_USER) throw new Error("EMAIL_USER is not configured");
+  if (!EMAIL_PASS) throw new Error("EMAIL_PASS is not configured");
+
+  // prefer explicit FROM_EMAIL, else use EMAIL_USER
+  const fromEmail = DEFAULT_FROM_EMAIL;
+  if (!fromEmail) throw new Error("FROM_EMAIL is not configured");
+
+  transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 100,
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+    connectionTimeout: DEFAULT_TIMEOUT_MS,
+    greetingTimeout: DEFAULT_TIMEOUT_MS,
+    socketTimeout: DEFAULT_TIMEOUT_MS,
+  });
+
+  // optionally verify transporter at startup
+  transporter.verify().catch((err) => {
+    console.warn("emailService: transporter.verify() failed:", err && err.message ? err.message : err);
+  });
+
+  return transporter;
 }
 
-/* Build a RFC2822 / MIME multipart/alternative message */
-function buildRawMessage({ fromEmail, fromName, to, subject, html, text }) {
-  // Use CRLF for headers/body separation
-  const boundary = `----=_NextPart_${Math.random().toString(36).slice(2, 12)}`;
-  const headers = [
-    `From: ${fromName ? `${fromName} <${fromEmail}>` : fromEmail}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    "",
-    "",
-  ].join("\r\n");
-
-  const plainSection = [
-    `--${boundary}`,
-    `Content-Type: text/plain; charset="utf-8"`,
-    `Content-Transfer-Encoding: 7bit`,
-    "",
-    text || "",
-    "",
-  ].join("\r\n");
-
-  const htmlSection = [
-    `--${boundary}`,
-    `Content-Type: text/html; charset="utf-8"`,
-    `Content-Transfer-Encoding: 7bit`,
-    "",
-    html || "",
-    "",
-  ].join("\r\n");
-
-  const closing = [`--${boundary}--`, ""].join("\r\n");
-  const raw = headers + plainSection + htmlSection + closing;
-  return base64UrlEncode(raw);
+/* Helper: sleep ms */
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
-/* Exchange refresh token for access token */
-async function getAccessToken() {
-  ensureEnv();
-
-  const body = new URLSearchParams();
-  body.set("client_id", GOOGLE_CLIENT_ID);
-  body.set("client_secret", GOOGLE_CLIENT_SECRET);
-  body.set("refresh_token", GOOGLE_REFRESH_TOKEN);
-  body.set("grant_type", "refresh_token");
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-
-  try {
-    const resp = await fetch(TOKEN_URL, {
-      method: "POST",
-      body: body.toString(),
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    const j = await resp.json().catch(() => null);
-    if (!resp.ok) {
-      const err = new Error(`Failed to obtain access token: ${resp.status}`);
-      err.response = j;
-      throw err;
-    }
-    if (!j || !j.access_token) throw new Error("No access_token in token response");
-    return { accessToken: j.access_token, expiresIn: j.expires_in || null, raw: j };
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
-  }
+/* Determine whether error is transient to decide retrying */
+function isTransientError(err) {
+  if (!err) return false;
+  const code = err.code || err?.original?.code || "";
+  const name = err.name || "";
+  const msg = (err.message || "").toLowerCase();
+  const transientCodes = ["ecconnreset", "etimedout", "eai_again", "ecanceled", "enotfound", "esocket"];
+  if (transientCodes.some((c) => String(code || "").toLowerCase().includes(c))) return true;
+  if (name === "Error" && (msg.includes("timeout") || msg.includes("socket") || msg.includes("connection"))) return true;
+  return false;
 }
 
-/* Send raw message via Gmail API */
-async function sendRawEmail({ to, subject, html, text, fromEmail = DEFAULT_FROM_EMAIL, fromName = DEFAULT_FROM_NAME }) {
-  ensureEnv();
-  if (!to) throw new Error("Recipient `to` is required");
-
-  // Acquire access token
-  const { accessToken } = await getAccessToken();
-  const raw = buildRawMessage({ fromEmail, fromName, to, subject, html, text });
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-
-  try {
-    const resp = await fetch(GMAIL_SEND_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ raw }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    const j = await resp.json().catch(() => null);
-    if (!resp.ok) {
-      const err = new Error(`Gmail send error ${resp.status}`);
-      err.response = j;
-      throw err;
-    }
-
-    return j;
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
-  }
-}
-
-/* Public function used by authController */
+/* Public function used by authController  */
 export async function sendAdminPrivateKeyEmail({ adminEmail, applicant, rawCode, expiresAtIso }) {
-  if (!adminEmail) throw new Error("adminEmail required");
+  const adminRecipient = (process.env.ADMIN_NOTIFY_EMAIL || adminEmail || "").trim();
+  if (!adminRecipient) {
+    throw new Error("ADMIN_NOTIFY_EMAIL is not configured");
+  }
 
-  const { html, text } = buildAdminPrivateKeyEmail({ applicant, rawCode, expiresAtIso, adminEmail });
-  const resp = await sendRawEmail({
-    to: adminEmail,
-    subject: "QNIT: New Private Key Request For Admin Role",
+  // Build message content
+  const { html, text } = buildAdminPrivateKeyEmail({ applicant, rawCode, expiresAtIso, adminEmail: adminRecipient });
+
+  // Build "from" header
+  const fromEmail = DEFAULT_FROM_EMAIL;
+  const fromName = DEFAULT_FROM_NAME || "QNIT";
+  const fromHeader = `"${fromName}" <${fromEmail}>`;
+
+  const mailOptions = {
+    from: fromHeader,
+    to: adminRecipient,
+    subject: "QNIT: Private Key Request",
     html,
     text,
-    fromEmail: DEFAULT_FROM_EMAIL,
-    fromName: DEFAULT_FROM_NAME,
-  });
-  return resp;
+  };
+
+  const t = getTransporter();
+
+  let lastErr = null;
+  for (let attempt = 0; attempt <= MAX_SEND_RETRIES; attempt++) {
+    try {
+      const info = await t.sendMail(mailOptions);
+      // normalize return value similar to nodemailer info
+      return {
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+        raw: info,
+      };
+    } catch (err) {
+      lastErr = err;
+      const transient = isTransientError(err);
+      if (attempt === MAX_SEND_RETRIES || !transient) {
+        const out = new Error(err.message || "Failed to send admin email");
+        out.original = err;
+        throw out;
+      }
+      // backoff before retrying
+      const backoffMs = 400 * Math.pow(2, attempt);
+      await sleep(backoffMs);
+    }
+  }
+
+  // If we exit loop without returning, throw error
+  const out = new Error(lastErr?.message || "Failed to send admin email");
+  out.original = lastErr;
+  throw out;
 }
 
-export default {
-  sendAdminPrivateKeyEmail,
-};
+export default { sendAdminPrivateKeyEmail };
