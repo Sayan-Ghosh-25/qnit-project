@@ -177,6 +177,12 @@ textarea.dimmed {
   gap: 0.5rem;
 }
 
+.feedbackFormButtons button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .feedbackFormButtons button:active {
   transform: scale(0.98);
 }
@@ -318,6 +324,9 @@ textarea.dimmed {
 }
 :global(.light-theme) .feedbackForm p {
     color: #222;
+}
+:global(.light-theme) .feedbackFormButtons button[disabled] {
+  opacity: 0.8;
 }
 :global(.light-theme) .submitButton {
   background: #0038c5e6;

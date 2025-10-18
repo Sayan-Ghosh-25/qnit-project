@@ -136,6 +136,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 0.5rem;
 }
 
+.profileSectionButtons button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .profileSectionButtons button:active {
   transform: scale(0.98);
 }
@@ -274,6 +280,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 :global(.light-theme) input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0);
+}
+:global(.light-theme) .profileSectionButtons button[disabled] {
+  opacity: 0.8;
 }
 :global(.light-theme) .updateButton {
   background: #0038c5e6;
