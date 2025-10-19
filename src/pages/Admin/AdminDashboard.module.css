@@ -552,7 +552,8 @@ nav li a.active {
     z-index: 9999 !important;
     top: auto !important;
     overflow: hidden !important;
-    border-radius: 0.65rem !important;
+    border-top-left-radius: 0.65rem !important;
+    border-top-right-radius: 0.65rem !important;
     transform: translateY(0);
     transition: transform 0.3s ease-out;
     will-change: transform;
@@ -632,7 +633,7 @@ nav li a.active {
     box-shadow: none;
   }
   .image-text-section {
-    margin: 3rem 0;
+    margin: 4rem 0;
   }
   .text-muted {
     font-size: 0.9rem;
