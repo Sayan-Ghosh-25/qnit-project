@@ -68,6 +68,8 @@ const questionSectionData = [
         subject: "Artificial Intellingence",
         pdfs: [
           { url: getPublicPdfUrl("IT504-2019.pdf"), caption: "IT504-2019" },
+          { url: getPublicPdfUrl("IT504-2023.pdf"), caption: "IT504-2023" },
+          { url: getPublicPdfUrl("IT504-2024.pdf"), caption: "IT504-2024" },
         ],
       },
     ],
