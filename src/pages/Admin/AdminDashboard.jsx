@@ -9,7 +9,7 @@ import { useProfile } from "@/context/ProfileContext";
 /* -----------------------
    Lazy loaded section components
    ----------------------- */
-const ProfileSection = lazy(() => import("@/common/ProfileSection.jsx"));
+const ProfileSection = lazy(() => import("./components/AdminProfile.jsx"));
 const ManageUsers = lazy(() => import("./components/ManageUsers.jsx"));
 const UploadSection = lazy(() => import("./components/UploadSection.jsx"));
 const UserFeedbacks = lazy(() => import("./components/UserFeedbacks.jsx"));
@@ -60,10 +60,11 @@ function DashboardHomeContent({ greetingText, openLearnMore, handleNavClick }) {
           <div className={cx("text")}>
             <h2>{greetingText}</h2>
             <p>
-              Turn Stress Into Your Strength! All You Need Just A Little Bit
-              Motivation...
+            Welcome To Your Admin Dashboard
               <br />
-              Let's Power Up Your Day With The Perfect Motivational Quote:
+              Manage Documents, Track User Activities and Read Feedbacks 
+              <br />
+              and Do More within a Click through this One-Stop Destination! 
             </p>
             <div className={cx("intro-buttons")}>
               <a href="#" id="learnMoreBtn" data-modal="learnMoreModal" onClick={openLearnMore}>
@@ -521,7 +522,7 @@ export default function AdminDashboard() {
           <ul>
             <li>
               <strong>New Uploads:</strong>
-              <br />- 5th Semester's Previous Year Questions <br />- 5th Semester's Syllabus <br />- 5th Semester's Lab Cover Pages
+              <br />- 6th Semester's Previous Year Questions <br />- 6th Semester's Syllabus <br />- 6th Semester's Lab Cover Pages
             </li>
             <li>
               <br />
