@@ -1,0 +1,157 @@
+/* ===== User Feedback UI Styles ===== */
+:root {
+  --navy: #001436;
+  --dark-slate: #495670;
+  --light-slate: #a8b2d1;
+  --white: #e6f1ff;
+  --blue: #57cbff;
+  --pink: #f57dff;
+  --yellow: #ffd970;
+  --border-radius: 0.5rem;
+  --transition: all 0.25s cubic-bezier(0.645, 0.045, 0.355, 1);
+  --shadow: 0 10px 30px -15px rgba(2, 12, 27, 0.7);
+}
+
+.feedbackSection {
+  padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 3rem);
+  background: var(--navy);
+  border-radius: var(--border-radius);
+  margin: 1rem;
+  position: relative;
+  min-height: 400px;
+}
+
+.feedbackHeader h2 {
+  font-weight: 700;
+  margin: -2.5rem 0 1rem;
+  text-align: center;
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  color: var(--white);
+  position: relative;
+  padding-bottom: 0.75rem;
+}
+
+.feedbackHeader h2::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 3px;
+  background: linear-gradient(45deg, var(--pink), var(--blue));
+  border-radius: 3px;
+}
+
+.fbSubtitle {
+  text-align: center;
+  color: var(--light-slate);
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.feedbackContainer {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--blue);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  gap: 1rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.fbUserCard {
+  background: transparent;
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 10px rgba(60, 232, 255, 0.3);
+  padding: 1.25rem 2rem;
+  margin: 0.1rem;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.fbUserCard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+  background: #002561;
+}
+
+.fbCardContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fbMainInfo {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 0.8fr;
+  width: 100%;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.fbUserInfo, .fbReviewInfo, .fbRatingInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fbLabel {
+  color: var(--light-slate);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.fbValue {
+  color: var(--white);
+  font-weight: 400;
+  font-size: 1.1rem;
+}
+
+.fbStars {
+  letter-spacing: 2px;
+  font-size: 1rem;
+}
+
+/* Empty State */
+.syEmptyState {
+  text-align: center;
+  padding: 4rem;
+  color: var(--light-slate);
+}
+
+/* Responsive Adaptation */
+@media (max-width: 768px) {
+  .feedbackHeader h2 { margin: -1rem 0 1rem; }
+  
+  .feedbackContainer {
+    border: 1px solid rgba(255, 255, 255, 0);
+    padding: 0rem;
+  }
+
+  .fbMainInfo {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .fbUserCard {
+    padding: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .fbValue {
+    font-size: 0.9rem;
+  }
+}
+
+/* Light Theme */
+:global(.light-theme) .feedbackSection { background: rgba(0, 217, 255, 0.1); }
+:global(.light-theme) .feedbackContainer {  border: 1px solid rgba(255, 255, 255, 0); }
+:global(.light-theme) .fbUserCard { background: #fff; }
+:global(.light-theme) .fbValue, 
+:global(.light-theme) .feedbackHeader h2 { color: #001436; }
+:global(.light-theme) .fbLabel, 
+:global(.light-theme) .fbSubtitle { color: #555; }
