@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "^1.5.0",
+    "axios": "^1.13.5",
     "i": "^0.3.7",
     "motion": "^12.23.22",
     "pdfjs-dist": "^5.4.149",
