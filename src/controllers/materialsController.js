@@ -21,7 +21,6 @@ export async function publishMaterials(req, res) {
       is_latest: !!isLatestTag,
       data: normalized,
       is_visible: true,
-      created_by: adminUser?.id || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
