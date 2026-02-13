@@ -9,6 +9,7 @@ import authRoutes from "./src/routes/authRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import feedbackRoutes from "./src/routes/feedbackRoutes.js";
 import newsRoutes from "./src/routes/newsRoute.js";
+import materialsRoutes from "./src/routes/materialsRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -75,6 +76,7 @@ try {
   app.use("/user", userRoutes);
   app.use("/user", feedbackRoutes);
   app.use("/api/news", newsRoutes);
+  app.use("/api/materials", materialsRoutes);
 } catch (err) {
   console.error("Error mounting routes:", err);
 }

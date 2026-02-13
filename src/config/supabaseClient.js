@@ -18,5 +18,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Admin SDK — for privileged tasks (create users, OTP, private keys)
 export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
+  auth: { 
+    persistSession: false, 
+    autoRefreshToken: false },
 });
