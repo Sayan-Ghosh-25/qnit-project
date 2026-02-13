@@ -9,7 +9,7 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY,
 );
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function UploadSection() {
   // --- 1. CORE FORM STATE ---
@@ -638,7 +638,7 @@ export default function UploadSection() {
             >
               <label>Total Subjects</label>
               <input
-                type="number"
+                type="text"
                 placeholder="Number of subjects"
                 onChange={(e) => createQuestionSkeleton(e.target.value)}
               />
@@ -665,7 +665,7 @@ export default function UploadSection() {
                   <div className={styles.inputGroup}>
                     <label>Total Materials</label>
                     <input
-                      type="number"
+                      type="text"
                       placeholder="Number of files"
                       onChange={(e) => {
                         const count = parseInt(e.target.value) || 0;
