@@ -17,6 +17,8 @@ export default function UploadSection() {
   const [sectionType, setSectionType] = useState("latest");
   const [heading, setHeading] = useState("");
   const [isLatestTag, setIsLatestTag] = useState(true);
+  const [questionCount, setQuestionCount] = useState("");
+  const [flatCount, setFlatCount] = useState("");
 
   // --- 2. UPLOAD QUEUE STATE (Dynamic Structure) ---
   // For 'Question': Nested Subjects -> Files
@@ -97,11 +99,19 @@ export default function UploadSection() {
     });
   };
 
+  const getAccessToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || null;
+  };
+
   // small helper to build auth headers
-  const authHeaders = () => ({
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-  });
+  const authHeaders = async () => {
+    const token = await getAccessToken();
+    return {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    };
+  };
 
   // fetch helper that returns JSON or throws with meaningful message
   const fetchJson = async (url, opts) => {
@@ -223,7 +233,7 @@ export default function UploadSection() {
   const handleFinalPublish = async () => {
     if (!heading || !materialType)
       return showToast("Required: Heading & Material Type", "error");
-    const token = sessionStorage.getItem("token");
+  const token = await getAccessToken();
     if (!token)
       return showToast("You must be logged in as admin to publish", "error");
 
@@ -280,7 +290,7 @@ export default function UploadSection() {
 
       await fetchJson(`${API_URL}/api/materials/publish`, {
         method: "POST",
-        headers: authHeaders(),
+        headers: await authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -309,7 +319,7 @@ export default function UploadSection() {
   const fetchLiveMaterials = useCallback(async () => {
     try {
       const data = await fetchJson(`${API_URL}/api/materials/live`, {
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
       });
       if (data.ok && data.materials) {
         setLiveGroups(data.materials);
@@ -331,7 +341,7 @@ export default function UploadSection() {
     try {
       await fetchJson(`${API_URL}/api/materials/visibility/${id}`, {
         method: "PATCH",
-        headers: authHeaders(),
+        headers: await authHeaders(),
         body: JSON.stringify({ isVisible: !status }),
       });
       showToast("Visibility updated");
@@ -347,7 +357,7 @@ export default function UploadSection() {
     try {
       await fetchJson(`${API_URL}/api/materials/switch-section/${id}`, {
         method: "PATCH",
-        headers: authHeaders(),
+        headers: await authHeaders(),
         body: JSON.stringify({ sectionType: target }),
       });
       showToast(`Group moved to ${target.toUpperCase()}`);
@@ -364,7 +374,7 @@ export default function UploadSection() {
     try {
       await fetchJson(`${API_URL}/api/materials/group/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
       });
       showToast("Group Deleted Successfully!", "error");
       await fetchLiveMaterials();
@@ -403,7 +413,7 @@ export default function UploadSection() {
         `${API_URL}/api/materials/file-update/${groupId}`,
         {
           method: "PUT",
-          headers: authHeaders(),
+          headers: await authHeaders(),
           body: JSON.stringify({
             fileIndex,
             subjectIndex,
@@ -440,7 +450,7 @@ export default function UploadSection() {
         `${API_URL}/api/materials/file-delete/${groupId}`,
         {
           method: "DELETE",
-          headers: authHeaders(),
+          headers: await authHeaders(),
           body: JSON.stringify({ fileIndex: fIdx, subjectIndex: sIdx }),
         },
       );
@@ -489,13 +499,13 @@ export default function UploadSection() {
 
             <div className={styles.fileActions}>
               <button
-                className={styles.iconBtn}
+                className={styles.editBtn}
                 onClick={() => openFileEditModal(group, fIdx)}
               >
-                <i className="fas fa-edit" title="Edit file"></i>
+                <i className="fas fa-pen" title="Edit file"></i>
               </button>
               <button
-                className={styles.iconBtn}
+                className={styles.deleteBtn}
                 onClick={() => deleteSpecificFile(group.id, fIdx)}
               >
                 <i className="fas fa-trash" title="Delete file"></i>
@@ -517,7 +527,7 @@ export default function UploadSection() {
             <h4 className={styles.subjectTitle}>
               {sub.subject || sub.name || `Subject ${sIdx + 1}`}
             </h4>
-            <div>
+            <div className={styles.fileList}>
               {Array.isArray(sub.pdfs) && sub.pdfs.length > 0 ? (
                 sub.pdfs.map((pdf, fIdx) => (
                   <div key={fIdx} className={styles.fileRow}>
@@ -532,13 +542,13 @@ export default function UploadSection() {
 
                     <div className={styles.fileActions}>
                       <button
-                        className={styles.iconBtn}
+                        className={styles.editBtn}
                         onClick={() => openFileEditModal(group, fIdx, sIdx)}
                       >
-                        <i className="fas fa-edit" title="Edit file"></i>
+                        <i className="fas fa-pen" title="Edit file"></i>
                       </button>
                       <button
-                        className={styles.iconBtn}
+                        className={styles.deleteBtn}
                         onClick={() => deleteSpecificFile(group.id, fIdx, sIdx)}
                       >
                         <i className="fas fa-trash" title="Delete file"></i>
@@ -569,7 +579,7 @@ export default function UploadSection() {
         <div className={styles.panelHeader}>
           <h2>Upload New Document</h2>
           <p className={styles.panelSubtitle}>
-            Configure and deploy study materials to the student dashboard
+            Configure & New Deploy Study Materials
           </p>
         </div>
 
@@ -582,6 +592,8 @@ export default function UploadSection() {
               onChange={(e) => {
                 setMaterialType(e.target.value);
                 clearUploadForm();
+                setQuestionCount("");
+                setFlatCount("");
               }}
             >
               <option value="">-- Select Type --</option>
@@ -606,7 +618,7 @@ export default function UploadSection() {
             <label>Heading</label>
             <input
               type="text"
-              placeholder="e.g. Syllabus for 5th Sem"
+              placeholder="e.g. Syllabus For 5th Sem"
               value={heading}
               onChange={(e) => setHeading(e.target.value)}
             />
@@ -639,8 +651,12 @@ export default function UploadSection() {
               <label>Total Subjects</label>
               <input
                 type="text"
-                placeholder="Number of subjects"
-                onChange={(e) => createQuestionSkeleton(e.target.value)}
+                placeholder="Enter Number of Subjects"
+                value={questionCount}
+                onChange={(e) => {
+                  createQuestionSkeleton(e.target.value);
+                  setQuestionCount(e.target.value);
+                }}
               />
             </div>
 
@@ -666,7 +682,7 @@ export default function UploadSection() {
                     <label>Total Materials</label>
                     <input
                       type="text"
-                      placeholder="Number of files"
+                      placeholder="Enter Number of Files"
                       onChange={(e) => {
                         const count = parseInt(e.target.value) || 0;
                         const up = [...subjects];
@@ -695,7 +711,7 @@ export default function UploadSection() {
                       <div className={styles.uploadPlaceholder}>
                         <i className="fas fa-file-pdf"></i>
                         <span>
-                          Select {sub.materials.length} PDF(s) for{" "}
+                          Select {sub.materials.length} PDF(s) For{" "}
                           {sub.name || `Subject ${sIdx + 1}`}
                         </span>
                       </div>
@@ -722,7 +738,7 @@ export default function UploadSection() {
                             <label>Filename</label>
                             <input
                               className={styles.disabledInput}
-                              value={m.fileName || "Pending..."}
+                              value={m.fileName || ""}
                               disabled
                             />
                           </div>
@@ -730,7 +746,7 @@ export default function UploadSection() {
                             <label>Display Caption</label>
                             <input
                               type="text"
-                              placeholder="e.g. IT501-2025"
+                              placeholder="e.g. IT402-2025"
                               value={m.caption}
                               onChange={(e) => {
                                 const up = [...subjects];
@@ -759,9 +775,13 @@ export default function UploadSection() {
             >
               <label>Total Materials</label>
               <input
-                type="number"
-                placeholder="Number of files"
-                onChange={(e) => createFlatSkeleton(e.target.value)}
+                type="text"
+                placeholder="Enter Number of Files"
+                value={flatCount}
+                onChange={(e) => {
+                  createFlatSkeleton(e.target.value);
+                  setFlatCount(e.target.value);
+                }}
               />
             </div>
 
@@ -773,7 +793,7 @@ export default function UploadSection() {
                 >
                   <div className={styles.uploadPlaceholder}>
                     <i className="fas fa-cloud-upload-alt"></i>
-                    <span>Select {flatMaterials.length} PDF(s) to Upload</span>
+                    <span>Select {flatMaterials.length} PDF(s) To Upload</span>
                   </div>
                   <input
                     id="flat-input"
@@ -826,7 +846,7 @@ export default function UploadSection() {
                         <label>Filename</label>
                         <input
                           className={styles.disabledInput}
-                          value={m.fileName || "Pending..."}
+                          value={m.fileName || ""}
                           disabled
                         />
                       </div>
@@ -834,7 +854,7 @@ export default function UploadSection() {
                         <label>Display Caption</label>
                         <input
                           type="text"
-                          placeholder="e.g. Lab Cover Page"
+                          placeholder="e.g. IT402 Syllabus"
                           value={m.caption}
                           onChange={(e) => {
                             const up = [...flatMaterials];
@@ -860,8 +880,8 @@ export default function UploadSection() {
             onClick={handleFinalPublish}
           >
             {loading
-              ? "INITIALIZING PUBLICATION..."
-              : `PUBLISH ${materialType.toUpperCase()} TO DASHBOARD`}
+              ? "Initializing..."
+              : `Upload ${materialType}(s) To Database`}
           </button>
         )}
       </section>
@@ -873,7 +893,7 @@ export default function UploadSection() {
         <div className={styles.panelHeader}>
           <h2>View Live Documents</h2>
           <p className={styles.panelSubtitle}>
-            Monitor, reorder, and control visibility of the published assets
+            Monitor & Control Visibility of The Published Materials
           </p>
         </div>
 
@@ -884,14 +904,29 @@ export default function UploadSection() {
                 <span className={styles.sectionBadge}>
                   {group.material_type || group.materialType}
                 </span>
-                <div style={{ display: "flex", gap: "10px" }}>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <div className={styles.toggleRow}>
+                    <span style={{ fontSize: "0.8rem", marginRight: "-8px" }}>
+                      Visibility
+                    </span>
+                    <label className={styles.switch}>
+                      <input
+                        type="checkbox"
+                        checked={group.is_visible}
+                        onChange={() =>
+                          updateVisibility(group.id, group.is_visible)
+                        }
+                      />
+                      <span className={styles.slider}></span>
+                    </label>
+                  </div>
                   <button
-                    className={styles.deleteBtn}
+                    className={styles.editBtn}
                     onClick={() =>
                       setEditGroupModal({ show: true, data: group })
                     }
                   >
-                    <i className="fas fa-edit"></i>
+                    <i className="fas fa-pen"></i>
                   </button>
                   <button
                     className={styles.deleteBtn}
@@ -927,7 +962,7 @@ export default function UploadSection() {
 
                 <div className={styles.cardFooter}>
                   <div className={styles.toggleRow}>
-                    <span style={{ fontSize: "0.7rem" }}>ARCHIVE</span>
+                    <span style={{ fontSize: "0.8rem", marginRight: "-8px" }}>Archive</span>
                     <label className={styles.switch}>
                       <input
                         type="checkbox"
@@ -938,24 +973,9 @@ export default function UploadSection() {
                       />
                       <span className={styles.slider}></span>
                     </label>
-                    <span style={{ fontSize: "0.7rem" }}>LATEST</span>
+                    <span style={{ fontSize: "0.8rem", marginLeft: "-8px"  }}>Latest</span>
                   </div>
 
-                  <div className={styles.toggleRow}>
-                    <span style={{ fontSize: "0.7rem", marginRight: "8px" }}>
-                      VISIBLE
-                    </span>
-                    <label className={styles.switch}>
-                      <input
-                        type="checkbox"
-                        checked={group.is_visible}
-                        onChange={() =>
-                          updateVisibility(group.id, group.is_visible)
-                        }
-                      />
-                      <span className={styles.slider}></span>
-                    </label>
-                  </div>
                 </div>
               </div>
             </div>
@@ -977,12 +997,6 @@ export default function UploadSection() {
           <div className={styles.modalContent}>
             <div className={styles.plateHeader}>
               <span className={styles.plateNumber}>EDIT GROUP HEADING</span>
-              <button
-                className={styles.removeBtn}
-                onClick={() => setEditGroupModal({ show: false, data: null })}
-              >
-                &times;
-              </button>
             </div>
             <div className={styles.inputGroup} style={{ marginTop: "1rem" }}>
               <label>Heading</label>
@@ -992,30 +1006,37 @@ export default function UploadSection() {
                 id="edit-group-heading"
               />
             </div>
-            <button
-              className={styles.primaryUploadBtn}
-              onClick={async () => {
-                try {
-                  const newHeading =
-                    document.getElementById("edit-group-heading").value;
-                  await fetchJson(
-                    `${API_URL}/api/materials/update-heading/${editGroupModal.data.id}`,
-                    {
-                      method: "PATCH",
-                      headers: authHeaders(),
-                      body: JSON.stringify({ heading: newHeading }),
-                    },
-                  );
-                  setEditGroupModal({ show: false, data: null });
-                  await fetchLiveMaterials();
-                  showToast("Group heading updated");
-                } catch (e) {
-                  showToast(e.message || "Update failed", "error");
-                }
-              }}
-            >
-              Update Heading
-            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                className={styles.cancelBtn}
+                onClick={() => setEditGroupModal({ show: false, data: null })}>
+                Cancel
+              </button>
+              <button
+                className={styles.primaryUploadBtn}
+                onClick={async () => {
+                  try {
+                    const newHeading =
+                      document.getElementById("edit-group-heading").value;
+                    await fetchJson(
+                      `${API_URL}/api/materials/update-heading/${editGroupModal.data.id}`,
+                      {
+                        method: "PATCH",
+                        headers: await authHeaders(),
+                        body: JSON.stringify({ heading: newHeading }),
+                      },
+                    );
+                    setEditGroupModal({ show: false, data: null });
+                    await fetchLiveMaterials();
+                    showToast("Group heading updated");
+                  } catch (e) {
+                    showToast(e.message || "Update failed", "error");
+                  }
+                }}
+              >
+                Update
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1025,21 +1046,7 @@ export default function UploadSection() {
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
             <div className={styles.plateHeader}>
-              <span className={styles.plateNumber}>EDIT FILE</span>
-              <button
-                className={styles.removeBtn}
-                onClick={() =>
-                  setEditFileModal({
-                    show: false,
-                    groupId: null,
-                    fileIndex: null,
-                    subjectIndex: null,
-                    data: { caption: "", index: 0 },
-                  })
-                }
-              >
-                &times;
-              </button>
+              <span className={styles.plateNumber}>EDIT FILE INFO</span>
             </div>
 
             <div className={styles.inputGroup} style={{ marginTop: "1rem" }}>
@@ -1056,10 +1063,10 @@ export default function UploadSection() {
               />
             </div>
 
-            <div className={styles.inputGroup} style={{ marginTop: "0.5rem" }}>
+            <div className={styles.inputGroup} style={{ marginTop: "1rem" }}>
               <label>Index</label>
               <input
-                type="number"
+                type="text"
                 value={editFileModal.data.index}
                 onChange={(e) =>
                   setEditFileModal((p) => ({
@@ -1073,16 +1080,9 @@ export default function UploadSection() {
               />
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <div style={{ display: "flex", gap: "8px" }}>
               <button
-                className={styles.primaryUploadBtn}
-                onClick={saveFileEdits}
-                disabled={loading}
-              >
-                {loading ? "Updating..." : "Save Changes"}
-              </button>
-              <button
-                className={styles.removeBtn}
+                className={styles.cancelBtn}
                 onClick={() =>
                   setEditFileModal({
                     show: false,
@@ -1094,6 +1094,13 @@ export default function UploadSection() {
                 }
               >
                 Cancel
+              </button>
+              <button
+                className={styles.primaryUploadBtn}
+                onClick={saveFileEdits}
+                disabled={loading}
+              >
+                {loading ? "Updating..." : "Update"}
               </button>
             </div>
           </div>
