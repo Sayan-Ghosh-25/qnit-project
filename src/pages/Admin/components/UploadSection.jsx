@@ -13,12 +13,13 @@ const API_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function UploadSection() {
   // --- 1. CORE FORM STATE ---
-  const [materialType, setMaterialType] = useState(""); // Question, Syllabus, Others
+  const [materialType, setMaterialType] = useState("");
   const [sectionType, setSectionType] = useState("latest");
   const [heading, setHeading] = useState("");
   const [isLatestTag, setIsLatestTag] = useState(true);
   const [questionCount, setQuestionCount] = useState("");
   const [flatCount, setFlatCount] = useState("");
+  const [accessToken, setAccessToken] = useState(null);
 
   // --- 2. UPLOAD QUEUE STATE (Dynamic Structure) ---
   const [subjects, setSubjects] = useState([]);
@@ -95,30 +96,31 @@ export default function UploadSection() {
     });
   };
 
-  // Get access token robustly
-  const getAccessToken = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (!error && data?.session?.access_token) return data.session.access_token;
-      return null;
-    } catch (err) {
-      return null;
-    }
-  };
+  // Get auth session robustly
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAccessToken(data?.session?.access_token || null);
+    });
+  
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setAccessToken(session?.access_token || null);
+      }
+    );
+    return () => listener.subscription.unsubscribe();
+  }, []);
   
   // hasJsonBody = false for GET / DELETE without body
-  const authHeaders = async ({ json = true, requireAuth = false } = {}) => {
-    const token = await getAccessToken();
+  const authHeaders = ({ json = true, requireAuth = false } = {}) => {
+    if (requireAuth && !accessToken) {
+      throw new Error("Authentication Required"); }
     const headers = {};
-
     if (json) headers["Content-Type"] = "application/json";
-      if (requireAuth && !token) {
-        throw new Error("Authentication Required");
-      } if (token && token.split(".").length === 3) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      return headers;
-    }; 
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+    return headers;
+  };
   
   // Helper for fetching json structure
     const fetchJson = async (url, opts = {}) => {
@@ -310,7 +312,7 @@ export default function UploadSection() {
   const fetchLiveMaterials = useCallback(async () => {
     setFetchingLive(true);
     try {
-      const headers = await authHeaders({ json: false, requireAuth: false });
+      const headers = await authHeaders({ json: false, requireAuth: true });
       const data = await fetchJson(`${API_URL}/api/materials/live`, {
         headers,
       });
@@ -334,11 +336,13 @@ export default function UploadSection() {
 
   const updateVisibility = async (id, status) => {
     try {
-      await fetchJson(`${API_URL}/api/materials/visibility/${id}`, {
+     const res =  await fetchJson(`${API_URL}/api/materials/visibility/${id}`, {
         method: "PATCH",
         headers: await authHeaders({ json: true, requireAuth: true }),
         body: JSON.stringify({ isVisible: !status }),
       });
+
+      if (!res?.ok) throw new Error("Update Failed");
       showToast("Visibility Updated");
       await fetchLiveMaterials();
     } catch (err) {
@@ -467,6 +471,9 @@ export default function UploadSection() {
       "pdfs" in group.data[0]
     );
   };
+
+  // Normalization of visiblity toggler
+  const visible = typeof group.is_visible === "boolean" ? group.is_visible : Boolean(group.isVisible);
 
   // ==========================================
   // Render Helpers
@@ -913,9 +920,10 @@ export default function UploadSection() {
                     <label className={styles.switch}>
                       <input
                         type="checkbox"
-                        checked={group.is_visible}
+                        checked={visible}
+                        disabled={loading}
                         onChange={() =>
-                          updateVisibility(group.id, group.is_visible)
+                        updateVisibility(group.id, visible)
                         }
                       />
                       <span className={styles.slider}></span>
