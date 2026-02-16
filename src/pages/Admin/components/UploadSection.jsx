@@ -44,10 +44,7 @@ export default function UploadSection() {
     data: { caption: "", index: 0 },
   });
 
-  // --- 5. Upload Progress (simple) ---
-  const [uploadProgress, setUploadProgress] = useState({});
-
-  // --- 6. Refs for file inputs ---
+  // --- 5. Refs for file inputs ---
   const flatInputRef = useRef(null);
   const questionInputRefs = useRef({});
 
@@ -63,15 +60,6 @@ export default function UploadSection() {
     );
   }, []);
 
-  const getBucket = (type) => {
-    const mapping = {
-      Question: "PYQs",
-      Syllabus: "Syllabus",
-      Others: "Others",
-    };
-    return mapping[type] || "Others";
-  };
-
   // Redundancy Check: Prevents uploading two files with same name in one batch
   const checkDuplicateInQueue = (files, currentList) => {
     const existingNames = new Set(
@@ -83,11 +71,6 @@ export default function UploadSection() {
   };
 
   // Safe Filename: Timestamp + Sanitize
-  const generateSafePath = (fileName) => {
-    const cleanName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-    return `${Date.now()}_${cleanName}`;
-  };
-
   const updateSubjectName = (index, name) => {
     setSubjects((prev) => {
       const copy = [...prev];
@@ -231,63 +214,97 @@ export default function UploadSection() {
   // D. THE PUBLISHING ENGINE (Storage -> DB)
   // ==========================================
   const handleFinalPublish = async () => {
+    if (loading) {
+      showToast("Please Wait...");
+      setLoading(true);
+      return;
+    } if (!accessToken) {
+      showToast("Please Wait...");
+      return;
+    }
+      
     if (!heading || !materialType)
-      return showToast("Required: Heading & Material Type", "error");
-
-    setLoading(true);
-    const bucket = getBucket(materialType);
+      return showToast("Required: Heading & Material Type", "error");    
 
     try {
-      let submissionData = [];
-
-      const uploadFile = async (file) => {
-        const path = generateSafePath(file.name);
-        setUploadProgress((p) => ({ ...p, [path]: 0 }));
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .upload(path, file);
-        if (error) throw error;
-        setUploadProgress((p) => ({ ...p, [path]: 100 }));
-        return { bucket, path, caption: "", originalName: file.name };
-      };
-
-      if (materialType === "Question") {
-        for (const sub of subjects) {
-          if (!sub.name) throw new Error("All subjects must have a name");
-          const pdfList = [];
-          for (const mat of sub.materials) {
-            if (!mat || !mat.file)
-              throw new Error(`File missing for subject: ${sub.name}`);
-            const uploaded = await uploadFile(mat.file);
-            pdfList.push({ ...uploaded, caption: mat.caption || mat.fileName });
-          }
-          submissionData.push({ subject: sub.name, pdfs: pdfList });
-        }
-      } else {
-        for (const mat of flatMaterials) {
-          if (!mat || !mat.file) throw new Error("No files are selected");
-          const uploaded = await uploadFile(mat.file);
-          submissionData.push({
-            ...uploaded,
-            caption: mat.caption || mat.fileName,
-          });
-        }
-      }
-
-      const payload = {
+      const payloadBlueprint = {
         materialType,
         sectionType,
         heading,
         isLatestTag: sectionType === "latest" ? isLatestTag : false,
-        data: submissionData,
+        data: [],
       };
+  
+      const form = new FormData();
+  
+      // helper to append file into form and return its key
+      const appendFile = (file, groupIdx, subjectIdx, fileIdx) => {
+        const key = `f_${groupIdx}_${subjectIdx === null ? "x" : subjectIdx}_${fileIdx}`;
+        form.append(key, file, file.name);
+        return key;
+      };
+  
+      // build blueprint differently for Question vs flat types
+      if (materialType === "Question") {
+        for (let s = 0; s < subjects.length; s++) {
+          const sub = subjects[s];
+          if (!sub.name) throw new Error("All subjects must have a name");
+  
+          const pdfs = [];
+          if (!Array.isArray(sub.materials) || sub.materials.length === 0) {
+            throw new Error(`No files selected for subject ${sub.name}`);
+          }
+  
+          for (let f = 0; f < sub.materials.length; f++) {
+            const mat = sub.materials[f];
+            if (!mat || !mat.file) throw new Error(`File missing for subject: ${sub.name}`);
+            const key = appendFile(mat.file, s, s, f);
+            pdfs.push({
+              fileKey: key,
+              caption: mat.caption || mat.fileName || mat.file.name,
+              originalName: mat.file.name,
+            });
+          }
+  
+          payloadBlueprint.data.push({
+            subject: sub.name,
+            pdfs,
+          });
+        }
+      } else {
+        for (let g = 0; g < flatMaterials.length; g++) {
+          const mat = flatMaterials[g];
+          if (!mat || !mat.file) throw new Error("No files are selected");
+          const key = appendFile(mat.file, g, null, 0);
+          payloadBlueprint.data.push({
+            bucket: null,
+            path: null,
+            fileKey: key,
+            caption: mat.caption || mat.fileName || mat.file.name,
+            originalName: mat.file.name,
+          });
+        }
+      }
+  
+      // append payload JSON (server will parse)
+      form.append("payload", JSON.stringify(payloadBlueprint));
 
-      await fetchJson(`${API_URL}/api/materials/publish`, {
+      const headers = await authHeaders({ json: false, requireAuth: true });
+  
+      const res = await fetch(`${API_URL}/api/materials/publish`, {
         method: "POST",
-        headers: await authHeaders({ json: true, requireAuth: true }),
-        body: JSON.stringify(payload),
+        headers,
+        body: form,
       });
-
+  
+      // use same fetchJson behaviour as before for consistent error handling
+      const text = await res.text();
+      let json = null;
+      try { json = text ? JSON.parse(text) : null; } catch {}
+      if (!res.ok) {
+        throw new Error((json && (json.message || json.error)) || text || res.statusText || "Network Error");
+      }
+  
       showToast("Materials Published Successfully!");
       clearUploadForm();
       await fetchLiveMaterials();
@@ -297,13 +314,6 @@ export default function UploadSection() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const clearUploadForm = () => {
-    setHeading("");
-    setSubjects([]);
-    setFlatMaterials([]);
-    setUploadProgress({});
   };
 
   // ==========================================
@@ -905,26 +915,23 @@ export default function UploadSection() {
             </div>
           ) : (
         <div className={styles.liveMaterialsContainer}>
-          {liveGroups.map((group) => {
-            const visible = typeof group.is_visible === "boolean" ? group.is_visible : Boolean(group.isVisible);
-            return (                
+          {liveGroups.map((group) => (                
             <div key={group.id} className={styles.liveCard}>
               <div className={styles.liveCardHeader}>
                 <span className={styles.sectionBadge}>
                   {group.material_type || group.materialType}
                 </span>
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <div className={styles.toggleRow}>
+                  <div className={styles.toggleRow} style={{display: "none"}}>
                     <span style={{ fontSize: "0.8rem", marginRight: "-8px" }}>
                       Visibility
                     </span>
                     <label className={styles.switch}>
                       <input
                         type="checkbox"
-                        checked={visible}
-                        disabled={loading}
+                        checked={group.is_visible}
                         onChange={() =>
-                        updateVisibility(group.id, visible)
+                          updateVisibility(group.id, group.is_visible)
                         }
                       />
                       <span className={styles.slider}></span>
@@ -988,7 +995,7 @@ export default function UploadSection() {
                 </div>
               </div>
             </div>
-          )})}
+          ))}
         </div>
         )}
       </section>
