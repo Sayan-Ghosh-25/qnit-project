@@ -154,17 +154,20 @@ export async function updateVisibility(req, res) {
     if (!(await ensureAdminOrFail(req, res))) return;
 
     const id = req.params.id;
-    if (!id) return res.status(400).json({ ok: false, message: "Missing Id" });
+    const { isVisible } = req.body;
 
-    const { isVisible } = req.body ?? {};
-    const { data: existing, error: selErr } = await supabaseAdmin.from("materials").select("is_visible").eq("id", id).maybeSingle();
-    if (selErr) {
-      console.error("updateVisibility: select error:", selErr);
-      return res.status(500).json({ ok: false, message: "DB Error", detail: selErr });
+    if (typeof isVisible !== "boolean") {
+      return res.status(400).json({
+        ok: false,
+        message: "isVisible Must Be boolean",
+      });
     }
 
-    const newVal = typeof isVisible === "boolean" ? isVisible : !existing?.is_visible;
-    const { error } = await supabaseAdmin.from("materials").update({ is_visible: newVal, updated_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await supabaseAdmin.from("materials").update({
+        is_visible: isVisible,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id);
+
     if (error) {
       console.error("updateVisibility: update error:", error);
       return res.status(500).json({ ok: false, message: "Update Failed", detail: error });
