@@ -98,39 +98,39 @@ export default function UploadSection() {
   // Get access token robustly
   const getAccessToken = async () => {
     try {
-      const fromStorage = sessionStorage.getItem("token");
-      if (fromStorage) return fromStorage;
-
-      // fallback to supabase client session
-      const { data } = await supabase.auth.getSession();
-      return data?.session?.access_token || null;
+      const { data, error } = await supabase.auth.getSession();
+      if (!error && data?.session?.access_token) return data.session.access_token;
+      return null;
     } catch (err) {
       return null;
     }
   };
-
-  // unified header builder: pass hasJsonBody = false for GET/DELETE calls without JSON body
-  const authHeaders = async (hasJsonBody = true) => {
+  
+  // hasJsonBody = false for GET / DELETE without body
+  const authHeaders = async ({ json = true, requireAuth = false } = {}) => {
     const token = await getAccessToken();
     const headers = {};
-    if (hasJsonBody) headers["Content-Type"] = "application/json";
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    return headers;
-  };
 
-  const fetchJson = async (url, opts = {}) => {
+    if (json) headers["Content-Type"] = "application/json";
+      if (requireAuth && !token) {
+        throw new Error("Authentication Required");
+      } if (token && token.split(".").length === 3) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      return headers;
+    }; 
+  
+  // Helper for fetching json structure
+    const fetchJson = async (url, opts = {}) => {
     const res = await fetch(url, opts);
     const text = await res.text();
     let json = null;
     try {
       json = text ? JSON.parse(text) : null;
-    } catch {
-      // ignore parse error
-    }
+    } catch {}
+  
     if (!res.ok) {
-      const errMsg =
-        (json && (json.message || json.error)) || text || res.statusText;
-      throw new Error(errMsg || "Network error");
+      throw new Error((json && (json.message || json.error)) || text || res.statusText || "Network Error");
     }
     return json ?? { ok: true };
   };
@@ -232,10 +232,6 @@ export default function UploadSection() {
     if (!heading || !materialType)
       return showToast("Required: Heading & Material Type", "error");
 
-  const token = await getAccessToken();
-    if (!token)
-      return showToast("You must be logged in as admin to publish", "error");
-
     setLoading(true);
     const bucket = getBucket(materialType);
 
@@ -286,7 +282,7 @@ export default function UploadSection() {
 
       await fetchJson(`${API_URL}/api/materials/publish`, {
         method: "POST",
-        headers: await authHeaders(true),
+        headers: await authHeaders({ json: true, requireAuth: true }),
         body: JSON.stringify(payload),
       });
 
@@ -294,7 +290,7 @@ export default function UploadSection() {
       clearUploadForm();
       await fetchLiveMaterials();
     } catch (err) {
-      showToast(err.message || "Publication failed", "error");
+      showToast(err.message || "Publication Failed", "error");
       console.error(err);
     } finally {
       setLoading(false);
@@ -314,7 +310,7 @@ export default function UploadSection() {
   const fetchLiveMaterials = useCallback(async () => {
     setFetchingLive(true);
     try {
-      const headers = await authHeaders(false);
+      const headers = await authHeaders({ json: false, requireAuth: false });
       const data = await fetchJson(`${API_URL}/api/materials/live`, {
         headers,
       });
@@ -340,13 +336,13 @@ export default function UploadSection() {
     try {
       await fetchJson(`${API_URL}/api/materials/visibility/${id}`, {
         method: "PATCH",
-        headers: await authHeaders(true),
+        headers: await authHeaders({ json: true, requireAuth: true }),
         body: JSON.stringify({ isVisible: !status }),
       });
-      showToast("Visibility updated");
+      showToast("Visibility Updated");
       await fetchLiveMaterials();
     } catch (err) {
-      showToast(err.message || "Visibility update failed", "error");
+      showToast(err.message || "Visibility Update Failed", "error");
     }
   };
 
@@ -355,13 +351,13 @@ export default function UploadSection() {
     try {
       await fetchJson(`${API_URL}/api/materials/switch-section/${id}`, {
         method: "PATCH",
-        headers: await authHeaders(true),
+        headers: await authHeaders({ json: true, requireAuth: true }),
         body: JSON.stringify({ sectionType: target }),
       });
-      showToast(`Group moved to ${target.toUpperCase()}`);
+      showToast(`Group Moved to ${target.toUpperCase()}`);
       await fetchLiveMaterials();
     } catch (err) {
-      showToast(err.message || "Section switch failed", "error");
+      showToast(err.message || "Section Switch Failed", "error");
     }
   };
 
@@ -371,12 +367,12 @@ export default function UploadSection() {
     try {
       await fetchJson(`${API_URL}/api/materials/group/${id}`, {
         method: "DELETE",
-        headers: await authHeaders(false),
+        headers: await authHeaders({ json: false, requireAuth: true }),
       });
       showToast("Group Deleted Successfully!", "error");
       await fetchLiveMaterials();
     } catch (err) {
-      showToast(err.message || "Delete failed", "error");
+      showToast(err.message || "Delete Failed", "error");
     }
   };
 
@@ -402,14 +398,14 @@ export default function UploadSection() {
 
   const saveFileEdits = async () => {
     const { groupId, fileIndex, subjectIndex, data } = editFileModal;
-    if (!groupId) return showToast("No group selected", "error");
+    if (!groupId) return showToast("No Group Selected", "error");
     setLoading(true);
     try {
       const res = await fetch(
         `${API_URL}/api/materials/file-update/${groupId}`,
         {
           method: "PUT",
-          headers: await authHeaders(true),
+          headers: await authHeaders({ json: true, requireAuth: true }),
           body: JSON.stringify({
             fileIndex,
             subjectIndex,
@@ -420,7 +416,7 @@ export default function UploadSection() {
       );
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(txt || "Update failed");
+        throw new Error(txt || "Update Failed");
       }
       showToast("File Updated Successfully");
       setEditFileModal({
@@ -432,7 +428,7 @@ export default function UploadSection() {
       });
       await fetchLiveMaterials();
     } catch (e) {
-      showToast(e.message || "Update failed", "error");
+      showToast(e.message || "Update Failed", "error");
       console.error(e);
     } finally {
       setLoading(false);
@@ -446,18 +442,18 @@ export default function UploadSection() {
         `${API_URL}/api/materials/file-delete/${groupId}`,
         {
           method: "DELETE",
-          headers: await authHeaders(true),
+          headers: await authHeaders({ json: true, requireAuth: true }),
           body: JSON.stringify({ fileIndex: fIdx, subjectIndex: sIdx }),
         },
       );
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(txt || "Delete failed");
+        throw new Error(txt || "Delete Failed");
       }
-      showToast("File removed from group");
+      showToast("File Removed From Group");
       await fetchLiveMaterials();
     } catch (e) {
-      showToast(e.message || "Delete failed", "error");
+      showToast(e.message || "Delete Failed", "error");
       console.error(e);
     }
   };
@@ -1023,15 +1019,15 @@ export default function UploadSection() {
                       `${API_URL}/api/materials/update-heading/${editGroupModal.data.id}`,
                       {
                         method: "PATCH",
-                        headers: await authHeaders(),
+                        headers: await authHeaders({ json: true, requireAuth: true }),
                         body: JSON.stringify({ heading: newHeading }),
                       },
                     );
                     setEditGroupModal({ show: false, data: null });
                     await fetchLiveMaterials();
-                    showToast("Group heading updated");
+                    showToast("Group Heading Updated");
                   } catch (e) {
-                    showToast(e.message || "Update failed", "error");
+                    showToast(e.message || "Update Failed", "error");
                   }
                 }}
               >
