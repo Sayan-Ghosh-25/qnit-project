@@ -21,14 +21,13 @@ export default function UploadSection() {
   const [flatCount, setFlatCount] = useState("");
 
   // --- 2. UPLOAD QUEUE STATE (Dynamic Structure) ---
-  // For 'Question': Nested Subjects -> Files
-  // For 'Syllabus/Others': Flat Files
   const [subjects, setSubjects] = useState([]);
   const [flatMaterials, setFlatMaterials] = useState([]);
 
   // --- 3. MANAGEMENT & LIVE STATE ---
-  const [liveGroups, setLiveGroups] = useState([]); // All data fetched from DB
+  const [liveGroups, setLiveGroups] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchingLive, setFetchingLive] = useState(false);
   const [toasts, setToasts] = useState([]);
 
   // --- 4. MODAL & EDITING STATE ---
@@ -40,22 +39,20 @@ export default function UploadSection() {
     show: false,
     groupId: null,
     fileIndex: null,
-    subjectIndex: null, // For Questions
+    subjectIndex: null,
     data: { caption: "", index: 0 },
   });
 
   // --- 5. Upload Progress (simple) ---
-  // map key -> progress (0..100)
   const [uploadProgress, setUploadProgress] = useState({});
 
-  // --- 6. Refs for file inputs (avoid document.getElementById) ---
+  // --- 6. Refs for file inputs ---
   const flatInputRef = useRef(null);
-  const questionInputRefs = useRef({}); // keyed by subject index
+  const questionInputRefs = useRef({});
 
   // ==========================================
   // A. UTILITIES & DATA INTEGRITY
   // ==========================================
-
   const showToast = useCallback((message, type = "success") => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -90,7 +87,6 @@ export default function UploadSection() {
     return `${Date.now()}_${cleanName}`;
   };
 
-  // updateSubjectName (was missing previously)
   const updateSubjectName = (index, name) => {
     setSubjects((prev) => {
       const copy = [...prev];
@@ -99,22 +95,30 @@ export default function UploadSection() {
     });
   };
 
+  // Get access token robustly
   const getAccessToken = async () => {
-    const { data } = await supabase.auth.getSession();
-    return data?.session?.access_token || null;
+    try {
+      const fromStorage = sessionStorage.getItem("token");
+      if (fromStorage) return fromStorage;
+
+      // fallback to supabase client session
+      const { data } = await supabase.auth.getSession();
+      return data?.session?.access_token || null;
+    } catch (err) {
+      return null;
+    }
   };
 
-  // small helper to build auth headers
-  const authHeaders = async () => {
+  // unified header builder: pass hasJsonBody = false for GET/DELETE calls without JSON body
+  const authHeaders = async (hasJsonBody = true) => {
     const token = await getAccessToken();
-    return {
-      "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
-    };
+    const headers = {};
+    if (hasJsonBody) headers["Content-Type"] = "application/json";
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
   };
 
-  // fetch helper that returns JSON or throws with meaningful message
-  const fetchJson = async (url, opts) => {
+  const fetchJson = async (url, opts = {}) => {
     const res = await fetch(url, opts);
     const text = await res.text();
     let json = null;
@@ -134,7 +138,6 @@ export default function UploadSection() {
   // ==========================================
   // B. DYNAMIC SKELETON & REORDERING LOGIC
   // ==========================================
-
   const createQuestionSkeleton = (total) => {
     const count = Math.max(0, parseInt(total) || 0);
     setSubjects(
@@ -167,7 +170,6 @@ export default function UploadSection() {
   // ==========================================
   // C. FILE SELECTION & VALIDATION ENGINE
   // ==========================================
-
   const handleFileProcessing = (e, type, sIdx = null, fIdx = 0) => {
     const rawFiles = Array.from(e.target.files || []);
     if (!rawFiles.length) return;
@@ -185,7 +187,6 @@ export default function UploadSection() {
         if (updated[idx]) {
           updated[idx] = { ...updated[idx], file, fileName: file.name };
         } else {
-          // if slot doesn't exist, push new placeholder
           updated.push({ file, fileName: file.name, caption: "" });
         }
       });
@@ -210,7 +211,6 @@ export default function UploadSection() {
             fileName: file.name,
           };
         } else {
-          // add if missing
           updatedSubs[sIdx].materials[idx] = {
             file,
             fileName: file.name,
@@ -220,7 +220,6 @@ export default function UploadSection() {
       });
       setSubjects(updatedSubs);
     }
-    // reset input
     try {
       e.target.value = null;
     } catch {}
@@ -229,10 +228,10 @@ export default function UploadSection() {
   // ==========================================
   // D. THE PUBLISHING ENGINE (Storage -> DB)
   // ==========================================
-
   const handleFinalPublish = async () => {
     if (!heading || !materialType)
       return showToast("Required: Heading & Material Type", "error");
+
   const token = await getAccessToken();
     if (!token)
       return showToast("You must be logged in as admin to publish", "error");
@@ -243,10 +242,8 @@ export default function UploadSection() {
     try {
       let submissionData = [];
 
-      // helper upload function
       const uploadFile = async (file) => {
         const path = generateSafePath(file.name);
-        // simple progress: set 0 then set 100 after upload (Supabase JS doesn't expose progress)
         setUploadProgress((p) => ({ ...p, [path]: 0 }));
         const { data, error } = await supabase.storage
           .from(bucket)
@@ -279,7 +276,6 @@ export default function UploadSection() {
         }
       }
 
-      // send to backend
       const payload = {
         materialType,
         sectionType,
@@ -290,7 +286,7 @@ export default function UploadSection() {
 
       await fetchJson(`${API_URL}/api/materials/publish`, {
         method: "POST",
-        headers: await authHeaders(),
+        headers: await authHeaders(true),
         body: JSON.stringify(payload),
       });
 
@@ -315,11 +311,12 @@ export default function UploadSection() {
   // ==========================================
   // E. LIVE AUDIT & MANAGEMENT LOGIC
   // ==========================================
-
   const fetchLiveMaterials = useCallback(async () => {
+    setFetchingLive(true);
     try {
+      const headers = await authHeaders(false);
       const data = await fetchJson(`${API_URL}/api/materials/live`, {
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
+        headers,
       });
       if (data.ok && data.materials) {
         setLiveGroups(data.materials);
@@ -329,6 +326,9 @@ export default function UploadSection() {
     } catch (e) {
       showToast("Failed to sync live data", "error");
       console.error(e);
+      setLiveGroups([]);
+    } finally {
+      setFetchingLive(false);
     }
   }, [showToast]);
 
@@ -336,12 +336,11 @@ export default function UploadSection() {
     fetchLiveMaterials();
   }, [fetchLiveMaterials]);
 
-  // Visibility Toggler
   const updateVisibility = async (id, status) => {
     try {
       await fetchJson(`${API_URL}/api/materials/visibility/${id}`, {
         method: "PATCH",
-        headers: await authHeaders(),
+        headers: await authHeaders(true),
         body: JSON.stringify({ isVisible: !status }),
       });
       showToast("Visibility updated");
@@ -351,13 +350,12 @@ export default function UploadSection() {
     }
   };
 
-  // Section Switcher (Latest <-> Archive)
   const switchSection = async (id, current) => {
     const target = current === "latest" ? "archive" : "latest";
     try {
       await fetchJson(`${API_URL}/api/materials/switch-section/${id}`, {
         method: "PATCH",
-        headers: await authHeaders(),
+        headers: await authHeaders(true),
         body: JSON.stringify({ sectionType: target }),
       });
       showToast(`Group moved to ${target.toUpperCase()}`);
@@ -367,14 +365,13 @@ export default function UploadSection() {
     }
   };
 
-  // Delete Entire Group
   const deleteGroup = async (id) => {
     if (!window.confirm("Permanently delete this group and all its files?"))
       return;
     try {
       await fetchJson(`${API_URL}/api/materials/group/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
+        headers: await authHeaders(false),
       });
       showToast("Group Deleted Successfully!", "error");
       await fetchLiveMaterials();
@@ -386,7 +383,6 @@ export default function UploadSection() {
   // ==========================================
   // F. FILE-LEVEL MODIFICATION ENGINE
   // ==========================================
-
   const openFileEditModal = (group, fIdx, sIdx = null) => {
     let file = null;
     try {
@@ -413,7 +409,7 @@ export default function UploadSection() {
         `${API_URL}/api/materials/file-update/${groupId}`,
         {
           method: "PUT",
-          headers: await authHeaders(),
+          headers: await authHeaders(true),
           body: JSON.stringify({
             fileIndex,
             subjectIndex,
@@ -450,7 +446,7 @@ export default function UploadSection() {
         `${API_URL}/api/materials/file-delete/${groupId}`,
         {
           method: "DELETE",
-          headers: await authHeaders(),
+          headers: await authHeaders(true),
           body: JSON.stringify({ fileIndex: fIdx, subjectIndex: sIdx }),
         },
       );
@@ -466,7 +462,6 @@ export default function UploadSection() {
     }
   };
 
-  // Helper to detect if group.data is 'question-shaped' (subject -> pdfs)
   const isQuestionGroup = (group) => {
     if (!group || !Array.isArray(group.data)) return false;
     return (
@@ -481,7 +476,7 @@ export default function UploadSection() {
   // Render Helpers
   // ==========================================
 
-  // Render file list for a group (flat)
+  // Render file list for a FLAT group
   const renderFlatFileList = (group) => {
     if (!group || !Array.isArray(group.data)) return null;
     return (
@@ -896,7 +891,17 @@ export default function UploadSection() {
             Monitor & Control Visibility of The Published Materials
           </p>
         </div>
-
+        {(
+            fetchingLive && liveGroups.length === 0
+          ) ? (
+            <div className={styles.emptyState}>
+              <p>Syncing Live Documents...</p>
+            </div>
+          ) : liveGroups.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p>⚠️ No materials are currently live!</p>
+            </div>
+          ) : (
         <div className={styles.liveMaterialsContainer}>
           {liveGroups.map((group) => (
             <div key={group.id} className={styles.liveCard}>
@@ -975,16 +980,12 @@ export default function UploadSection() {
                     </label>
                     <span style={{ fontSize: "0.8rem", marginLeft: "-8px"  }}>Latest</span>
                   </div>
-
                 </div>
               </div>
             </div>
           ))}
-
-          {liveGroups.length === 0 && (
-            <p className={styles.emptyState}>No documents are currently live</p>
-          )}
         </div>
+        )}
       </section>
 
       {/* ==========================================

@@ -12,7 +12,6 @@
   --shadow-soft: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
   --shadow-med: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
   --shadow-strong: 0 1rem 2.5rem rgba(0, 0, 0, 0.18);
-  /* replacement for undefined var(--shadow-hover) */
   --shadow-hover: 0 6px 18px rgba(0, 0, 0, 0.18);
 
   --transition-med: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -308,9 +307,8 @@
   transition: var(--transition-med);
 }
 
-.primaryUploadBtn:hover:not(:disabled) {
+.primaryUploadBtn:hover {
   transform: scale(0.98);
-  transition: all 0.4s ease-in-out;
 }
 
 .primaryUploadBtn:disabled {
@@ -333,9 +331,8 @@
   transition: var(--transition-med);
 }
 
-.cancelBtn:hover:not(:disabled) {
+.cancelBtn:hover {
   transform: scale(0.98);
-  transition: all 0.4s ease-in-out;
 }
 
 /* --- Live Cards (Grid Management) --- */
