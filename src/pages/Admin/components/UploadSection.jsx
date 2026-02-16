@@ -472,9 +472,6 @@ export default function UploadSection() {
     );
   };
 
-  // Normalization of visiblity toggler
-  const visible = typeof group.is_visible === "boolean" ? group.is_visible : Boolean(group.isVisible);
-
   // ==========================================
   // Render Helpers
   // ==========================================
@@ -906,7 +903,9 @@ export default function UploadSection() {
             </div>
           ) : (
         <div className={styles.liveMaterialsContainer}>
-          {liveGroups.map((group) => (
+          {liveGroups.map((group) => {
+            const visible = typeof group.is_visible === "boolean" ? group.is_visible : Boolean(group.isVisible);
+            return (                
             <div key={group.id} className={styles.liveCard}>
               <div className={styles.liveCardHeader}>
                 <span className={styles.sectionBadge}>
@@ -987,7 +986,7 @@ export default function UploadSection() {
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
         )}
       </section>
