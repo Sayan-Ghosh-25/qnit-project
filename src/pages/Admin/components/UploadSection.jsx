@@ -310,9 +310,10 @@ export default function UploadSection() {
   // E. LIVE AUDIT & MANAGEMENT LOGIC
   // ==========================================
   const fetchLiveMaterials = useCallback(async () => {
+    if (!accessToken) return;
     setFetchingLive(true);
     try {
-      const headers = await authHeaders({ json: false, requireAuth: true });
+      const headers = authHeaders({ json: false, requireAuth: true });
       const data = await fetchJson(`${API_URL}/api/materials/live`, {
         headers,
       });
@@ -328,11 +329,12 @@ export default function UploadSection() {
     } finally {
       setFetchingLive(false);
     }
-  }, [showToast]);
+  }, [accessToken, showToast]);
 
   useEffect(() => {
+    if (!accessToken) return;
     fetchLiveMaterials();
-  }, [fetchLiveMaterials]);
+  }, [accessToken, fetchLiveMaterials]);
 
   const updateVisibility = async (id, status) => {
     try {
