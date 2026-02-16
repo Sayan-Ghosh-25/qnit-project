@@ -163,18 +163,25 @@ export async function updateVisibility(req, res) {
       });
     }
 
-    const { error } = await supabaseAdmin.from("materials").update({
+    const { data, error } = await supabaseAdmin.from("materials").update({
         is_visible: isVisible,
         updated_at: new Date().toISOString(),
-      }).eq("id", id);
+      }).eq("id", id).select("is_visible").single();
 
     if (error) {
-      console.error("updateVisibility: update error:", error);
-      return res.status(500).json({ ok: false, message: "Update Failed", detail: error });
+      console.error("updateVisibility: Update Error:", error);
+      return res.status(500).json({
+        ok: false,
+        message: "Update Failed",
+      });
     }
-    return res.json({ ok: true, is_visible: newVal });
+
+    return res.json({
+      ok: true,
+      is_visible: data.is_visible,
+    });
   } catch (err) {
-    console.error("updateVisibility:", err && (err.stack || err.message || err));
+    console.error("updateVisibility:", err);
     return res.status(500).json({ ok: false, message: "Server Error" });
   }
 }
