@@ -1,10 +1,6 @@
 // src/controllers/materialsController.js
 import { supabase, supabaseAdmin } from "../config/supabaseClient.js";
-import {
-  buildPublicUrl,
-  normalizeMaterialPayload,
-  deleteStorageObjectsFromGroup,
-} from "../services/materialsService.js";
+import { buildPublicUrl, deleteStorageObjectsFromGroup } from "../services/materialsService.js";
 
 // Helper: extract Bearer token from Authorization header
 function extractBearerToken(req) {
@@ -41,17 +37,103 @@ async function ensureAdminOrFail(req, res) {
 }
 
 // POST /api/materials/publish (creates a new materials group (JSON data), inserts via service-role client)
-export async function publishMaterials(req, res) {
+export async function publishMaterialsMultipart(req, res) {
   try {
     if (!(await ensureAdminOrFail(req, res))) return;
 
-    const { materialType, sectionType, heading, isLatestTag = false, data } = req.body || {};
+  // resolve admin user id
+  let adminId = req.user?.id || null;
+
+  if (!adminId) {
+    const token = extractBearerToken(req);
+    if (token) {
+      const { data } = await supabaseAdmin.auth.getUser(token);
+      adminId = data?.user?.id || null;
+    }
+  }
+    const uploadedObjects = [];
+
+    // expect req.body.payload (stringified JSON) and req.files (array from multer)
+    const payloadRaw = req.body?.payload;
+    if (!payloadRaw) return res.status(400).json({ ok: false, message: "Missing Payload" });
+
+    let payload;
+    try {
+      payload = JSON.parse(payloadRaw);
+    } catch (e) {
+      return res.status(400).json({ ok: false, message: "Invalid Payload JSON" });
+    }
+
+    const { materialType, sectionType, heading, isLatestTag = false, data } = payload || {};
     if (!materialType || !sectionType || !heading || !Array.isArray(data)) {
       return res.status(400).json({ ok: false, message: "Invalid Payload" });
     }
 
-    // Normalize incoming structure
-    const normalized = normalizeMaterialPayload(data);
+    // req.files is an array of { fieldname, originalname, buffer, mimetype, ... }
+    const filesByKey = {};
+    (req.files || []).forEach((f) => {
+      filesByKey[f.fieldname] = f;
+    });
+
+    // helper to upload a file buffer to supabase storage using service role
+    const uploadBufferToStorage = async (bucket, fileKey, fileObj) => {
+      const filename = fileObj.originalname || `upload_${Date.now()}`;
+      const path = `${Date.now()}_${filename.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+      try {
+        const { error } = await supabaseAdmin.storage
+          .from(bucket)
+          .upload(path, fileObj.buffer, { contentType: fileObj.mimetype, upsert: false });
+        if (error) throw error;
+        uploadedObjects.push({ bucket, path });
+        return { bucket, path, originalName: fileObj.originalname || filename };
+      } catch (e) {
+        throw e;
+      }
+    };
+
+    const normalized = [];
+    const getBucketName = (t) => {
+      const map = { Question: "PYQs", Syllabus: "Syllabus", Others: "Others" };
+      return map[t] || "Others";
+    };
+
+    const bucketName = getBucketName(materialType);
+    if (materialType === "Question") {
+      for (const groupItem of data) {
+        if (!groupItem || !groupItem.subject || !Array.isArray(groupItem.pdfs)) {
+          return res.status(400).json({ ok: false, message: "Invalid Question Group Structure" });
+        }
+        const uploadedPdfs = [];
+        for (const pdfDesc of groupItem.pdfs) {
+          const fk = pdfDesc.fileKey;
+          const fileObj = filesByKey[fk];
+          if (!fileObj) return res.status(400).json({ ok: false, message: `Missing File For Key ${fk}` });
+
+          const uploaded = await uploadBufferToStorage(bucketName, fk, fileObj);
+          uploadedPdfs.push({
+            bucket: uploaded.bucket,
+            path: uploaded.path,
+            caption: pdfDesc.caption || pdfDesc.originalName || fileObj.originalname,
+            originalName: uploaded.originalName,
+          });
+        }
+        normalized.push({ subject: groupItem.subject, pdfs: uploadedPdfs });
+      }
+    } else {
+      for (const item of data) {
+        const fk = item.fileKey;
+        const fileObj = filesByKey[fk];
+        if (!fileObj) return res.status(400).json({ ok: false, message: `Missing File For Key ${fk}` });
+
+        const uploaded = await uploadBufferToStorage(bucketName, fk, fileObj);
+        normalized.push({
+          bucket: uploaded.bucket,
+          path: uploaded.path,
+          caption: item.caption || item.originalName || fileObj.originalname,
+          originalName: uploaded.originalName,
+        });
+      }
+    }
 
     const insertPayload = {
       material_type: materialType,
@@ -60,7 +142,7 @@ export async function publishMaterials(req, res) {
       is_latest: !!isLatestTag,
       data: normalized,
       is_visible: true,
-      created_by: req.user.id,
+      created_by: adminId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -71,12 +153,25 @@ export async function publishMaterials(req, res) {
       .select("*")
       .maybeSingle();
 
-    if (error || !inserted) {
-      console.error("publishMaterials: DB insert error:", error);
-      return res.status(500).json({ ok: false, message: "Failed to Persist Materials", detail: error });
-    }
+      if (error || !inserted) {
+        console.error("publishMaterialsMultipart: DB Insert Error:", error);
+      
+        for (const obj of uploadedObjects) {
+          try {
+            await supabaseAdmin.storage
+              .from(obj.bucket)
+              .remove([obj.path]);
+          } catch (e) {
+            console.warn("Cleanup Failed For:", obj, e);
+          }
+        }
+      
+        return res.status(500).json({
+          ok: false,
+          message: "Failed To Persist Materials",
+        });
+      }
 
-    // Add derived public URLs for convenience (non-persistent)
     const withUrls = {
       ...inserted,
       data: (inserted.data || []).map((item) =>
@@ -88,7 +183,7 @@ export async function publishMaterials(req, res) {
 
     return res.json({ ok: true, material: withUrls });
   } catch (err) {
-    console.error("publishMaterials:", err && (err.stack || err.message || err));
+    console.error("publishMaterialsMultipart:", err && (err.stack || err.message || err));
     return res.status(500).json({ ok: false, message: "Server Error" });
   }
 }
@@ -390,7 +485,7 @@ export async function fileDelete(req, res) {
 }
 
 export default {
-  publishMaterials,
+  publishMaterialsMultipart,
   getLiveMaterials,
   updateVisibility,
   switchSection,
