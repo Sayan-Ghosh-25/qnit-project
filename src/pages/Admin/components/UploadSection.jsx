@@ -115,8 +115,6 @@ export default function UploadSection() {
   // Helper for clearing form fields after upload
   const clearUploadForm = () => {
     setHeading("");
-    setMaterialType("");
-    setSectionType("latest");
     setIsLatestTag(true);
     setQuestionCount("");
     setFlatCount("");
@@ -865,7 +863,7 @@ export default function UploadSection() {
                           className={styles.removeBtn}
                           onClick={() =>
                             setFlatMaterials((prev) => {
-                              const file = prev[fIdx]?.file;
+                              const file = subjects[sIdx]?.materials[fIdx]?.file;
                               if (file) {
                                 fileFingerprintsRef.current.delete(getFileFingerprint(file));
                               }
