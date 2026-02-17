@@ -391,8 +391,28 @@ export async function fileUpdate(req, res) {
       const file = data[subjectIndex].pdfs[fileIndex];
       if (!file) return res.status(404).json({ ok: false, message: "File Not Found" });
 
+      // Index reordering for question group
+      const pdfs = data[subjectIndex].pdfs;
+      if (typeof newIndex === "number") {
+        if (newIndex < 0 || newIndex >= pdfs.length) {
+          return res.status(400).json({
+            ok: false,
+            message: "Invalid newIndex",
+          });
+        }}
+
+      // Index reordering for flat list
+      const arr = data;
+      if (typeof newIndex === "number") {
+        if (newIndex < 0 || newIndex >= arr.length) {
+          return res.status(400).json({
+            ok: false,
+            message: "Invalid newIndex",
+          });
+        }}
+
       if (newCaption !== null) file.caption = newCaption;
-      if (typeof newIndex === "number" && newIndex >= 0) {
+      if (typeof newIndex === "number" && newIndex !== fileIndex) {
         const pdfs = data[subjectIndex].pdfs;
         const moved = pdfs.splice(fileIndex, 1)[0];
         pdfs.splice(newIndex, 0, moved);
