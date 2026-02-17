@@ -24,6 +24,7 @@ export default function UploadSection() {
   // --- 2. UPLOAD QUEUE STATE (Dynamic Structure) ---
   const [subjects, setSubjects] = useState([]);
   const [flatMaterials, setFlatMaterials] = useState([]);
+  const fileFingerprintsRef = useRef(new Set());
 
   // --- 3. MANAGEMENT & LIVE STATE ---
   const [liveGroups, setLiveGroups] = useState([]);
@@ -60,16 +61,6 @@ export default function UploadSection() {
     );
   }, []);
 
-  // Redundancy Check: Prevents uploading two files with same name in one batch
-  const checkDuplicateInQueue = (files, currentList) => {
-    const existingNames = new Set(
-      (currentList || [])
-        .map((item) => (item?.fileName || "").toLowerCase())
-        .filter(Boolean),
-    );
-    return files.filter((f) => !existingNames.has(f.name.toLowerCase()));
-  };
-
   // Safe Filename: Timestamp + Sanitize
   const updateSubjectName = (index, name) => {
     setSubjects((prev) => {
@@ -84,7 +75,7 @@ export default function UploadSection() {
     supabase.auth.getSession().then(({ data }) => {
       setAccessToken(data?.session?.access_token || null);
     });
-  
+
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setAccessToken(session?.access_token || null);
@@ -92,11 +83,12 @@ export default function UploadSection() {
     );
     return () => listener.subscription.unsubscribe();
   }, []);
-  
+
   // hasJsonBody = false for GET / DELETE without body
   const authHeaders = ({ json = true, requireAuth = false } = {}) => {
     if (requireAuth && !accessToken) {
-      throw new Error("Authentication Required"); }
+      throw new Error("Authentication Required");
+    }
     const headers = {};
     if (json) headers["Content-Type"] = "application/json";
     if (accessToken) {
@@ -104,21 +96,38 @@ export default function UploadSection() {
     }
     return headers;
   };
-  
+
   // Helper for fetching json structure
-    const fetchJson = async (url, opts = {}) => {
+  const fetchJson = async (url, opts = {}) => {
     const res = await fetch(url, opts);
     const text = await res.text();
     let json = null;
     try {
       json = text ? JSON.parse(text) : null;
     } catch {}
-  
+
     if (!res.ok) {
       throw new Error((json && (json.message || json.error)) || text || res.statusText || "Network Error");
     }
     return json ?? { ok: true };
   };
+
+  // Helper for clearing form fields after upload
+  const clearUploadForm = () => {
+    setHeading("");
+    setMaterialType("");
+    setSectionType("latest");
+    setIsLatestTag(true);
+    setQuestionCount("");
+    setFlatCount("");
+    setSubjects([]);
+    setFlatMaterials([]);
+    fileFingerprintsRef.current.clear();
+  };
+
+  // Helper for blocking duplicate uploads
+  const getFileFingerprint = (file) =>
+    `${file.name}_${file.size}_${file.lastModified}`;
 
   // ==========================================
   // B. DYNAMIC SKELETON & REORDERING LOGIC
@@ -157,17 +166,31 @@ export default function UploadSection() {
   // ==========================================
   const handleFileProcessing = (e, type, sIdx = null, fIdx = 0) => {
     const rawFiles = Array.from(e.target.files || []);
-    if (!rawFiles.length) return;
-    const pdfs = rawFiles.filter((f) => f.type === "application/pdf");
+    const validFiles = [];
 
-    if (pdfs.length !== rawFiles.length) {
-      showToast("Only PDF documents are supported", "error");
+    for (const file of rawFiles) {
+      if (file.type !== "application/pdf") {
+        showToast("Only PDF Documents Are Supported", "error");
+        continue;
+      }
+
+      const fp = getFileFingerprint(file);
+      if (fileFingerprintsRef.current.has(fp)) {
+        showToast(`Duplicate File Blocked: ${file.name}`, "error");
+        continue;
+      }
+
+      fileFingerprintsRef.current.add(fp);
+      validFiles.push(file);
+    }
+    if (!validFiles.length) {
+      try { e.target.value = null; } catch {}
+      return;
     }
 
     if (type === "flat") {
-      const filtered = checkDuplicateInQueue(pdfs, flatMaterials);
       const updated = [...flatMaterials];
-      filtered.forEach((file, i) => {
+      validFiles.forEach((file, i) => {
         const idx = fIdx + i;
         if (updated[idx]) {
           updated[idx] = { ...updated[idx], file, fileName: file.name };
@@ -179,15 +202,16 @@ export default function UploadSection() {
     } else {
       const updatedSubs = [...subjects];
       if (!updatedSubs[sIdx]) {
-        showToast("Subject index mismatch", "error");
-        e.target.value = null;
+        showToast("Subject Index Mismatch", "error");
+        try { e.target.value = null; } catch {}
+        validFiles.forEach((f) => fileFingerprintsRef.current.delete(getFileFingerprint(f)));
         return;
       }
       if (!Array.isArray(updatedSubs[sIdx].materials)) {
         updatedSubs[sIdx].materials = [];
       }
-      const filtered = checkDuplicateInQueue(pdfs, updatedSubs[sIdx].materials);
-      filtered.forEach((file, i) => {
+
+      validFiles.forEach((file, i) => {
         const idx = fIdx + i;
         if (updatedSubs[sIdx].materials[idx]) {
           updatedSubs[sIdx].materials[idx] = {
@@ -214,17 +238,18 @@ export default function UploadSection() {
   // D. THE PUBLISHING ENGINE (Storage -> DB)
   // ==========================================
   const handleFinalPublish = async () => {
-    if (loading) {
-      showToast("Please Wait...");
-      setLoading(true);
+    if (!accessToken) {
+      showToast("Authentication Required", "error");
       return;
-    } if (!accessToken) {
+    } if (loading) {
       showToast("Please Wait...");
       return;
     }
-      
-    if (!heading || !materialType)
-      return showToast("Required: Heading & Material Type", "error");    
+
+    if (!heading || !materialType) {
+      return showToast("Required: Heading & Material Type", "error");
+    }
+    setLoading(true);
 
     try {
       const payloadBlueprint = {
@@ -234,27 +259,27 @@ export default function UploadSection() {
         isLatestTag: sectionType === "latest" ? isLatestTag : false,
         data: [],
       };
-  
+
       const form = new FormData();
-  
+
       // helper to append file into form and return its key
       const appendFile = (file, groupIdx, subjectIdx, fileIdx) => {
         const key = `f_${groupIdx}_${subjectIdx === null ? "x" : subjectIdx}_${fileIdx}`;
         form.append(key, file, file.name);
         return key;
       };
-  
+
       // build blueprint differently for Question vs flat types
       if (materialType === "Question") {
         for (let s = 0; s < subjects.length; s++) {
           const sub = subjects[s];
           if (!sub.name) throw new Error("All subjects must have a name");
-  
+
           const pdfs = [];
           if (!Array.isArray(sub.materials) || sub.materials.length === 0) {
             throw new Error(`No files selected for subject ${sub.name}`);
           }
-  
+
           for (let f = 0; f < sub.materials.length; f++) {
             const mat = sub.materials[f];
             if (!mat || !mat.file) throw new Error(`File missing for subject: ${sub.name}`);
@@ -265,7 +290,7 @@ export default function UploadSection() {
               originalName: mat.file.name,
             });
           }
-  
+
           payloadBlueprint.data.push({
             subject: sub.name,
             pdfs,
@@ -285,18 +310,18 @@ export default function UploadSection() {
           });
         }
       }
-  
+
       // append payload JSON (server will parse)
       form.append("payload", JSON.stringify(payloadBlueprint));
 
       const headers = await authHeaders({ json: false, requireAuth: true });
-  
+
       const res = await fetch(`${API_URL}/api/materials/publish`, {
         method: "POST",
         headers,
         body: form,
       });
-  
+
       // use same fetchJson behaviour as before for consistent error handling
       const text = await res.text();
       let json = null;
@@ -304,7 +329,7 @@ export default function UploadSection() {
       if (!res.ok) {
         throw new Error((json && (json.message || json.error)) || text || res.statusText || "Network Error");
       }
-  
+
       showToast("Materials Published Successfully!");
       clearUploadForm();
       await fetchLiveMaterials();
@@ -348,7 +373,7 @@ export default function UploadSection() {
 
   const updateVisibility = async (id, status) => {
     try {
-     const res =  await fetchJson(`${API_URL}/api/materials/visibility/${id}`, {
+      const res = await fetchJson(`${API_URL}/api/materials/visibility/${id}`, {
         method: "PATCH",
         headers: await authHeaders({ json: true, requireAuth: true }),
         body: JSON.stringify({ isVisible: !status }),
@@ -488,7 +513,7 @@ export default function UploadSection() {
   // Render Helpers
   // ==========================================
 
-  // Render file list for a FLAT group
+  // Render file list for a FLAT group (live view)
   const renderFlatFileList = (group) => {
     if (!group || !Array.isArray(group.data)) return null;
     return (
@@ -524,7 +549,7 @@ export default function UploadSection() {
     );
   };
 
-  // Render nested question group (subjects -> pdfs)
+  // Render nested question group (subjects -> pdfs) (live view)
   const renderQuestionFileList = (group) => {
     if (!group || !Array.isArray(group.data)) return null;
     return (
@@ -839,9 +864,13 @@ export default function UploadSection() {
                         <button
                           className={styles.removeBtn}
                           onClick={() =>
-                            setFlatMaterials((prev) =>
-                              prev.filter((_, i) => i !== fIdx),
-                            )
+                            setFlatMaterials((prev) => {
+                              const file = prev[fIdx]?.file;
+                              if (file) {
+                                fileFingerprintsRef.current.delete(getFileFingerprint(file));
+                              }
+                              return prev.filter((_, i) => i !== fIdx);
+                            })
                           }
                         >
                           &times;
@@ -915,7 +944,7 @@ export default function UploadSection() {
             </div>
           ) : (
         <div className={styles.liveMaterialsContainer}>
-          {liveGroups.map((group) => (                
+          {liveGroups.map((group) => (
             <div key={group.id} className={styles.liveCard}>
               <div className={styles.liveCardHeader}>
                 <span className={styles.sectionBadge}>
