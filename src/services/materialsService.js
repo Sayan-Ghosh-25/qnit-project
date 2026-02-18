@@ -1,12 +1,12 @@
 // src/services/materialsService.js
 import { supabaseAdmin } from "../config/supabaseClient.js";
 
-//Helper: Construct a public URL for a storage object
+//Helper: Construct a public proxy URL for a storage object
 export function buildPublicUrl(bucket, path) {
   try {
-    const base = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
+    const base = (import.meta.env.FRONTEND_ORIGIN || "").replace(/\/$/, "");
     if (!base || !bucket || !path) return null;
-    return `${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeURIComponent(path)}`;
+    return `${base}/${encodeURIComponent(bucket)}/${encodeURIComponent(path)}`;
   } catch {
     return null;
   }
