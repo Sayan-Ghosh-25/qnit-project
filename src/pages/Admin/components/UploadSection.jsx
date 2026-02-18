@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 // Initialize Supabase (Using standard environment variables)
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
 const API_URL = import.meta.env.VITE_API_BASE_URL;
@@ -33,6 +33,8 @@ export default function UploadSection() {
   const [toasts, setToasts] = useState([]);
 
   // --- 4. MODAL & EDITING STATE ---
+  // Added editingHeadingText to avoid DOM access
+  const [editingHeadingText, setEditingHeadingText] = useState(""); 
   const [editGroupModal, setEditGroupModal] = useState({
     show: false,
     data: null,
@@ -52,19 +54,28 @@ export default function UploadSection() {
   // ==========================================
   // A. UTILITIES & DATA INTEGRITY
   // ==========================================
+  
+  // Unique ID Generator for Keys
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  };
+
   const showToast = useCallback((message, type = "success") => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(
       () => setToasts((prev) => prev.filter((t) => t.id !== id)),
-      4000,
+      4000
     );
   }, []);
 
-  // Safe Filename: Timestamp + Sanitize
   const updateSubjectName = (index, name) => {
     setSubjects((prev) => {
       const copy = [...prev];
+      // ID is preserved via spread
       copy[index] = { ...copy[index], name };
       return copy;
     });
@@ -107,7 +118,12 @@ export default function UploadSection() {
     } catch {}
 
     if (!res.ok) {
-      throw new Error((json && (json.message || json.error)) || text || res.statusText || "Network Error");
+      throw new Error(
+        (json && (json.message || json.error)) ||
+          text ||
+          res.statusText ||
+          "Network Error"
+      );
     }
     return json ?? { ok: true };
   };
@@ -132,23 +148,31 @@ export default function UploadSection() {
   // ==========================================
   const createQuestionSkeleton = (total) => {
     const count = Math.max(0, parseInt(total) || 0);
+    // Clear fingerprints as we are resetting
+    fileFingerprintsRef.current.clear();
+    
     setSubjects(
       Array.from({ length: count }, () => ({
+        id: generateId(),
         name: "",
         materials: [],
-      })),
+      }))
     );
+    setQuestionCount(String(count));
   };
 
   const createFlatSkeleton = (total) => {
     const count = Math.max(0, parseInt(total) || 0);
+    fileFingerprintsRef.current.clear();
     setFlatMaterials(
       Array.from({ length: count }, () => ({
+        id: generateId(),
         file: null,
         fileName: "",
         caption: "",
-      })),
+      }))
     );
+    setFlatCount(String(count));
   };
 
   const moveItem = (list, setList, index, direction) => {
@@ -157,6 +181,21 @@ export default function UploadSection() {
     if (target < 0 || target >= newList.length) return;
     [newList[index], newList[target]] = [newList[target], newList[index]];
     setList(newList);
+  };
+
+  const moveNestedItem = (sIdx, mIdx, direction) => {
+    setSubjects((prev) => {
+      const up = [...prev];
+      // Create a shallow copy of the materials array to avoid mutating state directly
+      const list = [...up[sIdx].materials];
+      const target = mIdx + direction;
+      if (target < 0 || target >= list.length) return prev;
+      
+      [list[mIdx], list[target]] = [list[target], list[mIdx]];
+      
+      up[sIdx] = { ...up[sIdx], materials: list };
+      return up;
+    });
   };
 
   // ==========================================
@@ -177,10 +216,9 @@ export default function UploadSection() {
         showToast(`Duplicate File Blocked: ${file.name}`, "error");
         continue;
       }
-
-      fileFingerprintsRef.current.add(fp);
       validFiles.push(file);
     }
+
     if (!validFiles.length) {
       try { e.target.value = null; } catch {}
       return;
@@ -188,12 +226,31 @@ export default function UploadSection() {
 
     if (type === "flat") {
       const updated = [...flatMaterials];
+      let start = fIdx;
+      // Find first empty slot starting from click position
+      while (start < updated.length && updated[start]?.file) {
+        start += 1;
+      }
+      
       validFiles.forEach((file, i) => {
-        const idx = fIdx + i;
+        const idx = start + i;
+        if (idx >= updated.length) {
+          showToast("No Empty Slot Available For Additional File", "error");
+          return;
+        }
+        // Cleanup old file fingerprint if we are overwriting
+        if (updated[idx] && updated[idx].file) {
+          fileFingerprintsRef.current.delete(getFileFingerprint(updated[idx].file));
+        }
+        
+        fileFingerprintsRef.current.add(getFileFingerprint(file));
+        
+        // Preserve ID
         if (updated[idx]) {
           updated[idx] = { ...updated[idx], file, fileName: file.name };
         } else {
-          updated.push({ file, fileName: file.name, caption: "" });
+          // Fallback if array expanded unexpectedly
+          updated[idx] = { id: generateId(), file, fileName: file.name, caption: "" };
         }
       });
       setFlatMaterials(updated);
@@ -205,31 +262,43 @@ export default function UploadSection() {
         validFiles.forEach((f) => fileFingerprintsRef.current.delete(getFileFingerprint(f)));
         return;
       }
+      
       if (!Array.isArray(updatedSubs[sIdx].materials)) {
-        updatedSubs[sIdx].materials = [];
+        updatedSubs[sIdx] = { ...updatedSubs[sIdx], materials: [] };
+      }
+
+      const matList = [...updatedSubs[sIdx].materials];
+      let start = fIdx;
+      while (start < matList.length && matList[start]?.file) {
+        start += 1;
       }
 
       validFiles.forEach((file, i) => {
-        const idx = fIdx + i;
-        if (updatedSubs[sIdx].materials[idx]) {
-          updatedSubs[sIdx].materials[idx] = {
-            ...updatedSubs[sIdx].materials[idx],
-            file,
-            fileName: file.name,
-          };
+        const idx = start + i;
+        if (idx >= matList.length) {
+          showToast("No Empty Slot Available For Additional File", "error");
+          return;
+        }
+        
+        if (matList[idx] && matList[idx].file) {
+          fileFingerprintsRef.current.delete(getFileFingerprint(matList[idx].file));
+        }
+        
+        fileFingerprintsRef.current.add(getFileFingerprint(file));
+        
+        // Preserve ID
+        if (matList[idx]) {
+          matList[idx] = { ...matList[idx], file, fileName: file.name };
         } else {
-          updatedSubs[sIdx].materials[idx] = {
-            file,
-            fileName: file.name,
-            caption: "",
-          };
+          matList[idx] = { id: generateId(), file, fileName: file.name, caption: "" };
         }
       });
+      
+      updatedSubs[sIdx] = { ...updatedSubs[sIdx], materials: matList };
       setSubjects(updatedSubs);
     }
-    try {
-      e.target.value = null;
-    } catch {}
+    
+    try { e.target.value = null; } catch {}
   };
 
   // ==========================================
@@ -237,9 +306,11 @@ export default function UploadSection() {
   // ==========================================
   const handleFinalPublish = async () => {
     if (!accessToken) {
-      showToast("Authentication Required", "error");
+      showToast("Authentication Required - Please wait or refresh", "error");
       return;
-    } if (loading) {
+    }
+
+    if (loading) {
       showToast("Please Wait...");
       return;
     }
@@ -260,33 +331,41 @@ export default function UploadSection() {
 
       const form = new FormData();
 
-      // helper to append file into form and return its key
+      // Helper to append file into form and return its key
       const appendFile = (file, groupIdx, subjectIdx, fileIdx) => {
         const key = `f_${groupIdx}_${subjectIdx === null ? "x" : subjectIdx}_${fileIdx}`;
         form.append(key, file, file.name);
         return key;
       };
 
-      // build blueprint differently for Question vs flat types
       if (materialType === "Question") {
         for (let s = 0; s < subjects.length; s++) {
           const sub = subjects[s];
-          if (!sub.name) throw new Error("All subjects must have a name");
+          if (!sub.name) throw new Error(`Subject #${s + 1} is missing a name`);
 
           const pdfs = [];
           if (!Array.isArray(sub.materials) || sub.materials.length === 0) {
-            throw new Error(`No files selected for subject ${sub.name}`);
+            // Technically allow subject with no files? No, better to force removal.
+            throw new Error(`Subject "${sub.name}" has no allocated material slots`);
           }
 
+          // Filter out empty slots
+          let validFileCount = 0;
           for (let f = 0; f < sub.materials.length; f++) {
             const mat = sub.materials[f];
-            if (!mat || !mat.file) throw new Error(`File missing for subject: ${sub.name}`);
-            const key = appendFile(mat.file, s, s, f);
+            if (!mat || !mat.file) continue; // Skip empty slots
+
+            const key = appendFile(mat.file, s, s, validFileCount);
             pdfs.push({
               fileKey: key,
               caption: mat.caption || mat.fileName || mat.file.name,
               originalName: mat.file.name,
             });
+            validFileCount++;
+          }
+
+          if (validFileCount === 0) {
+            throw new Error(`Subject "${sub.name}" has no files uploaded`);
           }
 
           payloadBlueprint.data.push({
@@ -295,9 +374,12 @@ export default function UploadSection() {
           });
         }
       } else {
+        // Flat Types (Syllabus/Others)
+        let validFileCount = 0;
         for (let g = 0; g < flatMaterials.length; g++) {
           const mat = flatMaterials[g];
-          if (!mat || !mat.file) throw new Error("No files are selected");
+          if (!mat || !mat.file) continue; // Skip empty slots
+
           const key = appendFile(mat.file, g, null, 0);
           payloadBlueprint.data.push({
             bucket: null,
@@ -306,6 +388,11 @@ export default function UploadSection() {
             caption: mat.caption || mat.fileName || mat.file.name,
             originalName: mat.file.name,
           });
+          validFileCount++;
+        }
+        
+        if (validFileCount === 0) {
+            throw new Error("No files selected for upload");
         }
       }
 
@@ -320,12 +407,19 @@ export default function UploadSection() {
         body: form,
       });
 
-      // use same fetchJson behaviour as before for consistent error handling
       const text = await res.text();
       let json = null;
-      try { json = text ? JSON.parse(text) : null; } catch {}
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {}
+      
       if (!res.ok) {
-        throw new Error((json && (json.message || json.error)) || text || res.statusText || "Network Error");
+        throw new Error(
+          (json && (json.message || json.error)) ||
+            text ||
+            res.statusText ||
+            "Network Error"
+        );
       }
 
       showToast("Materials Published Successfully!");
@@ -691,11 +785,39 @@ export default function UploadSection() {
             </div>
 
             {subjects.map((sub, sIdx) => (
-              <div key={sIdx} className={styles.uploadFormPlate}>
+              <div key={sub.id} className={styles.uploadFormPlate}>
                 <div className={styles.plateHeader}>
                   <span className={styles.plateNumber}>
                     SUBJECT #{sIdx + 1}
                   </span>
+                  <div className={styles.reorderBtns}>
+                    <button
+                      onClick={() => moveItem(subjects, setSubjects, sIdx, -1)}
+                      disabled={sIdx === 0}>▲
+                    </button>
+                    <button
+                      onClick={() => moveItem(subjects, setSubjects, sIdx, 1)}
+                      disabled={sIdx === subjects.length - 1}>▼
+                    </button>
+                    <button
+                      className={styles.removeBtn}
+                      onClick={() =>
+                        setSubjects((prev) => {
+                          const updated = [...prev];
+                          const removed = updated.splice(sIdx, 1)[0];
+                          // Clean fingerprints
+                          if (removed && Array.isArray(removed.materials)) {
+                            removed.materials.forEach((m) => {
+                              if (m && m.file) {
+                                fileFingerprintsRef.current.delete(getFileFingerprint(m.file));
+                              }});
+                          }
+                          setQuestionCount(String(updated.length));
+                          return updated;
+                        })}>
+                      &times;
+                    </button>
+                  </div>
                 </div>
 
                 <div className={styles.formGrid}>
@@ -713,14 +835,41 @@ export default function UploadSection() {
                     <input
                       type="text"
                       placeholder="Enter Number of Files"
+                      value={sub.materials?.length || 0}
                       onChange={(e) => {
-                        const count = parseInt(e.target.value) || 0;
-                        const up = [...subjects];
-                        up[sIdx].materials = Array.from(
-                          { length: count },
-                          () => ({ file: null, fileName: "", caption: "" }),
-                        );
-                        setSubjects(up);
+                        const count = Math.max(0, parseInt(e.target.value, 10) || 0);
+                        setSubjects((prev) => {
+                          const up = [...prev];
+                          const current = up[sIdx] || { materials: [] };
+                          const oldMaterials = current.materials || [];
+                          
+                          // If reducing, clean fingerprints
+                          if (oldMaterials.length > count) {
+                            oldMaterials.slice(count).forEach((m) => {
+                              if (m && m.file) {
+                                fileFingerprintsRef.current.delete(
+                                  getFileFingerprint(m.file));
+                              }});
+                          } 
+                          
+                          // Resize logic: preserve existing, add new with IDs
+                          const newMaterials = [...oldMaterials];
+                          if (count < newMaterials.length) {
+                             newMaterials.length = count;
+                          } else {
+                             while (newMaterials.length < count) {
+                               newMaterials.push({
+                                 id: generateId(),
+                                 file: null,
+                                 fileName: "",
+                                 caption: ""
+                               });
+                             }
+                          }
+                          
+                          up[sIdx] = { ...up[sIdx], materials: newMaterials };
+                          return up;
+                        });
                       }}
                     />
                   </div>
@@ -762,7 +911,37 @@ export default function UploadSection() {
                     </div>
 
                     {sub.materials.map((m, mIdx) => (
-                      <div key={mIdx} className={styles.uploadFormPlate}>
+                      <div key={m.id} className={styles.uploadFormPlate}>
+                        <div className={styles.plateHeader}>
+                          <span className={styles.plateNumber}>
+                            FILE #{mIdx + 1}
+                          </span>
+                          <div className={styles.reorderBtns}>
+                            <button onClick={() => moveNestedItem(sIdx, mIdx, -1)}
+                              disabled={mIdx === 0}>▲
+                            </button>
+                            <button
+                              onClick={() => moveNestedItem(sIdx, mIdx, 1)}
+                              disabled={mIdx === sub.materials.length - 1}>▼
+                            </button>
+                            <button
+                              className={styles.removeBtn}
+                              onClick={() =>
+                                setSubjects((prev) => {
+                                  const updated = [...prev];
+                                  const file = updated[sIdx]?.materials[mIdx]?.file;
+                                  if (file) {
+                                    fileFingerprintsRef.current.delete(getFileFingerprint(file)); 
+                                  }
+                                  
+                                  const newMats = updated[sIdx].materials.filter((_, i) => i !== mIdx);
+                                  updated[sIdx] = { ...updated[sIdx], materials: newMats };
+                                  return updated;
+                                })}>
+                              &times;
+                            </button>
+                          </div>
+                        </div>
                         <div className={styles.formGrid}>
                           <div className={styles.inputGroup}>
                             <label>Filename</label>
@@ -779,10 +958,13 @@ export default function UploadSection() {
                               placeholder="e.g. IT402-2025"
                               value={m.caption}
                               onChange={(e) => {
-                                const up = [...subjects];
-                                up[sIdx].materials[mIdx].caption =
-                                  e.target.value;
-                                setSubjects(up);
+                                setSubjects(prev => {
+                                  const up = [...prev];
+                                  const mats = [...up[sIdx].materials];
+                                  mats[mIdx] = { ...mats[mIdx], caption: e.target.value };
+                                  up[sIdx] = { ...up[sIdx], materials: mats };
+                                  return up;
+                                });
                               }}
                             />
                           </div>
@@ -837,7 +1019,7 @@ export default function UploadSection() {
                 </div>
 
                 {flatMaterials.map((m, fIdx) => (
-                  <div key={fIdx} className={styles.uploadFormPlate}>
+                  <div key={m.id} className={styles.uploadFormPlate}>
                     <div className={styles.plateHeader}>
                       <span className={styles.plateNumber}>
                         FILE #{fIdx + 1}
@@ -845,32 +1027,26 @@ export default function UploadSection() {
                       <div className={styles.reorderBtns}>
                         <button
                           onClick={() =>
-                            moveItem(flatMaterials, setFlatMaterials, fIdx, -1)
-                          }
-                          disabled={fIdx === 0}
-                        >
-                          ▲
+                            moveItem(flatMaterials, setFlatMaterials, fIdx, -1)}
+                          disabled={fIdx === 0}>▲
                         </button>
                         <button
                           onClick={() =>
-                            moveItem(flatMaterials, setFlatMaterials, fIdx, 1)
-                          }
-                          disabled={fIdx === flatMaterials.length - 1}
-                        >
-                          ▼
+                            moveItem(flatMaterials, setFlatMaterials, fIdx, 1)}
+                          disabled={fIdx === flatMaterials.length - 1}>▼
                         </button>
                         <button
                           className={styles.removeBtn}
                           onClick={() =>
                             setFlatMaterials((prev) => {
-                              const file = subjects[sIdx]?.materials[fIdx]?.file;
+                              const file = prev[fIdx]?.file;
+                              const updated = prev.filter((_, i) => i !== fIdx);
                               if (file) {
                                 fileFingerprintsRef.current.delete(getFileFingerprint(file));
                               }
-                              return prev.filter((_, i) => i !== fIdx);
-                            })
-                          }
-                        >
+                              setFlatCount(String(updated.length));
+                              return updated;
+                            })}>
                           &times;
                         </button>
                       </div>
@@ -891,9 +1067,11 @@ export default function UploadSection() {
                           placeholder="e.g. IT402 Syllabus"
                           value={m.caption}
                           onChange={(e) => {
-                            const up = [...flatMaterials];
-                            up[fIdx].caption = e.target.value;
-                            setFlatMaterials(up);
+                            setFlatMaterials(prev => {
+                                const up = [...prev];
+                                up[fIdx] = { ...up[fIdx], caption: e.target.value };
+                                return up;
+                            });
                           }}
                         />
                       </div>
@@ -914,7 +1092,7 @@ export default function UploadSection() {
             onClick={handleFinalPublish}
           >
             {loading
-              ? "Initializing..."
+              ? "Uploading..."
               : `Upload ${materialType}(s) To Database`}
           </button>
         )}
@@ -930,100 +1108,106 @@ export default function UploadSection() {
             Monitor & Control Visibility of The Published Materials
           </p>
         </div>
-        {(
-            fetchingLive && liveGroups.length === 0
-          ) ? (
-            <div className={styles.emptyState}>
-              <p>Syncing Live Documents...</p>
-            </div>
-          ) : liveGroups.length === 0 ? (
-            <div className={styles.emptyState}>
-              <p>⚠️ No materials are currently live!</p>
-            </div>
-          ) : (
-        <div className={styles.liveMaterialsContainer}>
-          {liveGroups.map((group) => (
-            <div key={group.id} className={styles.liveCard}>
-              <div className={styles.liveCardHeader}>
-                <span className={styles.sectionBadge}>
-                  {group.material_type || group.materialType}
-                </span>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <div className={styles.toggleRow} style={{display: "none"}}>
-                    <span style={{ fontSize: "0.8rem", marginRight: "-8px" }}>
-                      Visibility
+        {fetchingLive && liveGroups.length === 0 ? (
+          <div className={styles.emptyState}>
+            <p>Syncing Live Documents...</p>
+          </div>
+        ) : liveGroups.length === 0 ? (
+          <div className={styles.emptyState}>
+            <p>⚠️ No Materials Are Currently Live!</p>
+          </div>
+        ) : (
+          <div className={styles.liveMaterialsContainer}>
+            {liveGroups.map((group) => (
+              <div key={group.id} className={styles.liveCard}>
+                <div className={styles.liveCardHeader}>
+                  <span className={styles.sectionBadge}>
+                    {group.material_type || group.materialType}
+                  </span>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <div
+                      className={styles.toggleRow}
+                      style={{ display: "none" }}
+                    >
+                      <span style={{ fontSize: "0.8rem", marginRight: "-8px" }}>
+                        Visibility
+                      </span>
+                      <label className={styles.switch}>
+                        <input
+                          type="checkbox"
+                          checked={group.is_visible}
+                          onChange={() =>
+                            updateVisibility(group.id, group.is_visible)
+                          }
+                        />
+                        <span className={styles.slider}></span>
+                      </label>
+                    </div>
+                    <button
+                      className={styles.editBtn}
+                      onClick={() => {
+                        setEditingHeadingText(group.heading || "");
+                        setEditGroupModal({ show: true, data: group });
+                      }}
+                    >
+                      <i className="fas fa-pen"></i>
+                    </button>
+                    <button
+                      className={styles.deleteBtn}
+                      onClick={() => deleteGroup(group.id)}
+                    >
+                      <i className="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.liveCardBody}>
+                  <h3>{group.heading}</h3>
+                  <div className={styles.metadataList}>
+                    <span>
+                      <strong>Section:</strong>{" "}
+                      {group.section_type === "latest"
+                        ? "Top Section"
+                        : "Archive"}
                     </span>
-                    <label className={styles.switch}>
-                      <input
-                        type="checkbox"
-                        checked={group.is_visible}
-                        onChange={() =>
-                          updateVisibility(group.id, group.is_visible)
-                        }
-                      />
-                      <span className={styles.slider}></span>
-                    </label>
+                    <span>
+                      <strong>Items:</strong>{" "}
+                      {Array.isArray(group.data) ? group.data.length : 0}{" "}
+                      Subjects/Files
+                    </span>
                   </div>
-                  <button
-                    className={styles.editBtn}
-                    onClick={() =>
-                      setEditGroupModal({ show: true, data: group })
-                    }
-                  >
-                    <i className="fas fa-pen"></i>
-                  </button>
-                  <button
-                    className={styles.deleteBtn}
-                    onClick={() => deleteGroup(group.id)}
-                  >
-                    <i className="fas fa-trash"></i>
-                  </button>
-                </div>
-              </div>
 
-              <div className={styles.liveCardBody}>
-                <h3>{group.heading}</h3>
-                <div className={styles.metadataList}>
-                  <span>
-                    <strong>Section:</strong>{" "}
-                    {group.section_type === "latest"
-                      ? "Top Section"
-                      : "Archive"}
-                  </span>
-                  <span>
-                    <strong>Items:</strong>{" "}
-                    {Array.isArray(group.data) ? group.data.length : 0}{" "}
-                    Subjects/Files
-                  </span>
-                </div>
+                  {/* Render the file-level */}
+                  <div className={styles.liveFilesArea}>
+                    {isQuestionGroup(group)
+                      ? renderQuestionFileList(group)
+                      : renderFlatFileList(group)}
+                  </div>
 
-                {/* Render the file-level UI (flat or question style) */}
-                <div className={styles.liveFilesArea}>
-                  {isQuestionGroup(group)
-                    ? renderQuestionFileList(group)
-                    : renderFlatFileList(group)}
-                </div>
-
-                <div className={styles.cardFooter}>
-                  <div className={styles.toggleRow}>
-                    <span style={{ fontSize: "0.8rem", marginRight: "-8px" }}>Archive</span>
-                    <label className={styles.switch}>
-                      <input
-                        type="checkbox"
-                        checked={group.section_type === "latest"}
-                        onChange={() =>
-                          switchSection(group.id, group.section_type)
-                        }
-                      />
-                      <span className={styles.slider}></span>
-                    </label>
-                    <span style={{ fontSize: "0.8rem", marginLeft: "-8px"  }}>Latest</span>
+                  <div className={styles.cardFooter}>
+                    <div className={styles.toggleRow}>
+                      <span style={{ fontSize: "0.8rem", marginRight: "-8px" }}>
+                        Archive
+                      </span>
+                      <label className={styles.switch}>
+                        <input
+                          type="checkbox"
+                          checked={group.section_type === "latest"}
+                          onChange={() =>
+                            switchSection(group.id, group.section_type)
+                          }
+                        />
+                        <span className={styles.slider}></span>
+                      </label>
+                      <span style={{ fontSize: "0.8rem", marginLeft: "-8px" }}>
+                        Latest
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
         )}
       </section>
 
@@ -1042,28 +1226,30 @@ export default function UploadSection() {
               <label>Heading</label>
               <input
                 type="text"
-                defaultValue={editGroupModal.data.heading}
-                id="edit-group-heading"
+                value={editingHeadingText}
+                onChange={(e) => setEditingHeadingText(e.target.value)}
               />
             </div>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 className={styles.cancelBtn}
-                onClick={() => setEditGroupModal({ show: false, data: null })}>
+                onClick={() => setEditGroupModal({ show: false, data: null })}
+              >
                 Cancel
               </button>
               <button
                 className={styles.primaryUploadBtn}
                 onClick={async () => {
                   try {
-                    const newHeading =
-                      document.getElementById("edit-group-heading").value;
                     await fetchJson(
                       `${API_URL}/api/materials/update-heading/${editGroupModal.data.id}`,
                       {
                         method: "PATCH",
-                        headers: await authHeaders({ json: true, requireAuth: true }),
-                        body: JSON.stringify({ heading: newHeading }),
+                        headers: await authHeaders({
+                          json: true,
+                          requireAuth: true,
+                        }),
+                        body: JSON.stringify({ heading: editingHeadingText }),
                       },
                     );
                     setEditGroupModal({ show: false, data: null });
@@ -1113,7 +1299,7 @@ export default function UploadSection() {
                     ...p,
                     data: {
                       ...p.data,
-                      index: parseInt(e.target.value || "0", 10),
+                      index: Math.max(0, parseInt(e.target.value, 10) || 0),
                     },
                   }))
                 }
