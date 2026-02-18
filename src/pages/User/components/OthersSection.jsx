@@ -6,12 +6,13 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.min?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
+// Environment API Base
+const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+
 // Early Sanitization
 function encodeIfNeeded(url) {
   if (typeof url !== "string") return "";
-  // Return as-is if already encoded
   if (/%[0-9A-Fa-f]{2}/.test(url)) return url;
-  // Otherwise safely encode
   try {
     return encodeURI(url);
   } catch {
@@ -19,57 +20,6 @@ function encodeIfNeeded(url) {
   }
 }
 
-// Point to your path on Vercel
-function getPublicPdfUrl(filename) {
-  return `https://qnit.vercel.app/Others/${filename}`;
-}
-
-// ----------------------
-// Admin-controlled Dataset
-// ----------------------
-const othersSectionData = [
-  {
-    sectionType: "latest",
-    heading: "Lab Index Pages for 5th Semester",
-    isLatest: true,
-    pdfs: [
-      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT591.pdf"),
-        caption: "IT591 Lab Index" },
-      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT592.pdf"),
-        caption: "IT592 Lab Index" },
-      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT593.pdf"),
-        caption: "IT593 Lab Index" },
-      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT594.pdf"),
-        caption: "IT594 Lab Index" },
-      { url: getPublicPdfUrl("Lab%20Index%20Page%20IT595A.pdf"),
-        caption: "IT595A Lab Index" },
-    ],
-  },
-  {
-    sectionType: "archive",
-    heading: "Lab Index Pages for 4th Semester",
-    pdfsByYear: [
-      {
-        pdfs: [
-          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT491.pdf"),
-            caption: "IT491 Lab Index" },
-          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT492.pdf"),
-            caption: "IT492 Lab Index" },
-          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT493.pdf"),
-            caption: "IT493 Lab Index" },
-          { url: getPublicPdfUrl("Lab%20Index%20Page%20IT494.pdf"),
-            caption: "IT494 Lab Index" },
-          { url: getPublicPdfUrl("Lab%20Index%20Page%20HU(IT)495.pdf"),
-            caption: "HU(IT)495 Lab Index" },
-        ],
-      },
-    ],
-  },
-];
-
-// ----------------------
-// Utilities
-// ----------------------
 function scheduleIdle(callback) {
   if (typeof window === "undefined") {
     setTimeout(callback, 50);
@@ -82,9 +32,7 @@ function scheduleIdle(callback) {
   }
 }
 
-// ----------------------
-// Pdf render queue (global)
-// ----------------------
+// Pdf render queue
 const pdfRenderQueue = [];
 let pdfRenderInProgress = 0;
 const MAX_CONCURRENT_RENDER = 3;
@@ -109,29 +57,23 @@ async function runQueue() {
   if (pdfRenderQueue.length) runQueue();
 }
 
-// ----------------------
-// Error Boundary for thumbnails (prevents whole app crash)
-// ----------------------
+// Thumbnail Error Boundary
 class ThumbnailErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false };
   }
-
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-
   componentDidCatch(error, info) {
-    // log for diagnostics (don't expose error details to users)
     console.error("ThumbnailErrorBoundary caught:", error, info);
   }
-
   render() {
     if (this.state.hasError) {
       return (
-        <div className={styles.otThumbnailError} role="img" aria-label="Preview unavailable">
-          ⚠️ Preview unavailable
+        <div className={styles.otThumbnailError} role="img" aria-label="Preview Unavailable">
+          ⚠️ Preview Unavailable
         </div>
       );
     }
@@ -139,10 +81,8 @@ class ThumbnailErrorBoundary extends React.Component {
   }
 }
 
-// ----------------------
 // PdfThumbnail — robust & fault-tolerant
-// ----------------------
-  const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview Unavailable" }) => {
+const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview Unavailable" }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
   const loadingTaskRef = useRef(null);
@@ -180,9 +120,7 @@ class ThumbnailErrorBoundary extends React.Component {
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#666";
         ctx.fillText(text || placeholderText, Math.max(100, width) / 2, Math.max(80, height) / 2);
-      } catch (e) {
-        // ignore canvas drawing errors
-      }
+      } catch (e) {}
     };
 
     const renderThumbnail = async () => {
@@ -206,9 +144,7 @@ class ThumbnailErrorBoundary extends React.Component {
         if (loadingTaskRef.current && typeof loadingTaskRef.current.destroy === "function") {
           try {
             loadingTaskRef.current.destroy();
-          } catch (e) {
-            // ignore
-          }
+          } catch (e) {}
           loadingTaskRef.current = null;
         }
         if (pdfRef.current) {
@@ -225,9 +161,7 @@ class ThumbnailErrorBoundary extends React.Component {
         loadingTaskRef.current = pdfjsLib.getDocument(encodeIfNeeded(docUrl));
         const pdf = await loadingTaskRef.current.promise;
         if (canceled || !mountedRef.current) {
-          try {
-            pdf.destroy();
-          } catch (e) {}
+          try { pdf.destroy(); } catch (e) {}
           return;
         }
         pdfRef.current = pdf;
@@ -235,9 +169,7 @@ class ThumbnailErrorBoundary extends React.Component {
         // get first page
         const page = await pdf.getPage(1);
         if (canceled || !mountedRef.current) {
-          try {
-            pdf.destroy();
-          } catch (e) {}
+          try { pdf.destroy(); } catch (e) {}
           return;
         }
 
@@ -268,35 +200,21 @@ class ThumbnailErrorBoundary extends React.Component {
         if (renderPromise) {
           await renderPromise;
         } else {
-          // fallback small delay if render API is not promise-based
           await new Promise((r) => setTimeout(r, 60));
         }
 
-        try {
-          // try to cleanup page and pdf to free memory
-          page.cleanup?.();
-        } catch (e) {}
-        try {
-          pdf.destroy();
-        } catch (e) {}
+        try { page.cleanup?.(); } catch (e) {}
+        try { pdf.destroy(); } catch (e) {}
         pdfRef.current = null;
       } catch (err) {
-        // render error (could be 404 or corrupted PDF)
-        // console.error("PDF thumbnail render error for", url, err);
         drawPlaceholder("Preview Unavailable");
-        try {
-          loadingTaskRef.current?.destroy?.();
-        } catch (e) {}
+        try { loadingTaskRef.current?.destroy?.(); } catch (e) {}
         loadingTaskRef.current = null;
-        try {
-          pdfRef.current?.destroy?.();
-        } catch (e) {}
+        try { pdfRef.current?.destroy?.(); } catch (e) {}
         pdfRef.current = null;
       } finally {
         if (canceled) {
-          try {
-            renderTaskRef.current?.cancel?.();
-          } catch (e) {}
+          try { renderTaskRef.current?.cancel?.(); } catch (e) {}
         }
       }
     };
@@ -307,19 +225,13 @@ class ThumbnailErrorBoundary extends React.Component {
         scheduleIdle(() => {
           renderThumbnail()
             .then(() => resolve())
-            .catch((err) => {
-              // console.error("RenderThumbnail internal error", err);
-              resolve();
-            });
+            .catch(() => resolve());
         });
       })
     );
 
-    // cleanup for effect
     return () => {
       canceled = true;
-
-      // cancel renderTask safely
       const rt = renderTaskRef.current;
       if (rt && typeof rt.cancel === "function") {
         try {
@@ -328,17 +240,9 @@ class ThumbnailErrorBoundary extends React.Component {
         } catch (e) {}
       }
       renderTaskRef.current = null;
-
-      // destroy loading task safely
-      try {
-        loadingTaskRef.current?.destroy?.();
-      } catch (e) {}
+      try { loadingTaskRef.current?.destroy?.(); } catch (e) {}
       loadingTaskRef.current = null;
-
-      // destroy pdf if still present
-      try {
-        pdfRef.current?.destroy?.();
-      } catch (e) {}
+      try { pdfRef.current?.destroy?.(); } catch (e) {}
       pdfRef.current = null;
     };
   }, [url, id, placeholderText]);
@@ -348,9 +252,7 @@ class ThumbnailErrorBoundary extends React.Component {
 
 PdfThumbnail.displayName = "PdfThumbnail";
 
-// ----------------------
-// Modal (PDF Viewer) — with safer fallbacks
-// ----------------------
+// Pdf Viewer Modal
 function PdfModal({ open, url, onClose }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -366,13 +268,13 @@ function PdfModal({ open, url, onClose }) {
 
   if (!mounted || !open) return null;
 
-  // sanitize simple cases — avoid javascript: or data URIs that you don't intend to allow
+  // sanitize simple cases
   const safeUrl =
-  typeof url === "string" && /^https?:\/\//.test(url)
-    ? encodeIfNeeded(url)
-    : url
-    ? encodeIfNeeded(String(url))
-    : "";
+    typeof url === "string" && /^https?:\/\//.test(url)
+      ? encodeIfNeeded(url)
+      : url
+      ? encodeIfNeeded(String(url))
+      : "";
 
   return createPortal(
     <div
@@ -384,20 +286,16 @@ function PdfModal({ open, url, onClose }) {
         if (e.target === e.currentTarget) onClose?.();
       }}>
       <div className={styles.otPdfModalInner} onClick={(e) => e.stopPropagation()}>
-        {/* Use object which gives the browser-inline PDF viewer; also provide an "Open in new tab" link */}
         {safeUrl ? (
-          <>
           <iframe
             src={safeUrl}
             width="100%"
             height="100%"
             style={{ border: "none" }}
             title="PDF Viewer"
-          >
-          </iframe>
-          </>
+          />
         ) : (
-          <div className={styles.otPdfModalError}>No preview available</div>
+          <div className={styles.otPdfModalError}>No Preview Available</div>
         )}
       </div>
       <button className={styles.otClose} aria-label="Close PDF" onClick={onClose}>&times;</button>
@@ -406,9 +304,7 @@ function PdfModal({ open, url, onClose }) {
   );
 }
 
-// ----------------------
-// Toasts
-// ----------------------
+// Simple toasts hook
 function useToasts() {
   const [toasts, setToasts] = useState([]);
   const pushToast = useCallback((text, ms = 1500) => {
@@ -419,29 +315,59 @@ function useToasts() {
   return [toasts, pushToast];
 }
 
-// ----------------------
+// Helper: normalize server file entry
+function fileToPdfEntry(item) {
+  if (!item) return null;
+  const url = item.public_url || item.publicUrl || (item.bucket && item.path ? `${item.bucket}/${item.path}` : null);
+  const caption = item.caption || item.originalName || item.path || "Untitled";
+  return { url, caption };
+}
+
 // Main Component
-// ----------------------
 export default function OthersSection() {
-  // State + Refs
   const [modalOpen, setModalOpen] = useState(false);
   const [modalUrl, setModalUrl] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openArchiveKey, setOpenArchiveKey] = useState(null);
   const [toasts, pushToast] = useToasts();
   const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState([]);
   const archiveAnswerRefs = useRef({});
   const rootRef = useRef(null);
 
-  // Simulate loading
+  // fetch live materials -> filter Others
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    let canceled = false;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/materials/live`);
+        const text = await res.text();
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) {
+          const msg = (json && (json.message || json.error)) || text || res.statusText || "Failed to fetch";
+          throw new Error(msg);
+        }
+        const allMaterials = (json && Array.isArray(json.materials) ? json.materials : []);
+        const filtered = allMaterials.filter((m) => ((m.material_type || m.materialType) || "").toString() === "Others");
+        if (!canceled) {
+          setGroups(filtered);
+        }
+      } catch (e) {
+        console.error("Failed to load materials:", e);
+        pushToast("Failed to load study materials");
+        if (!canceled) setGroups([]);
+      } finally {
+        if (!canceled) setLoading(false);
+      }
+    };
 
-  // Menu outside click
+    fetchData();
+    return () => { canceled = true; };
+  }, [pushToast]);
+
+  // menu outside click
   useEffect(() => {
     function onPointerDown(e) {
       try {
@@ -451,16 +377,14 @@ export default function OthersSection() {
         ) {
           return;
         }
-      } catch (err) {
-        // ignore
-      }
+      } catch (err) {}
       setOpenMenuId(null);
     }
     document.addEventListener("pointerdown", onPointerDown, { capture: true });
     return () => document.removeEventListener("pointerdown", onPointerDown, { capture: true });
   }, []);
 
-  // Archive Height Animation
+  // archive height animation
   useEffect(() => {
     Object.keys(archiveAnswerRefs.current).forEach((key) => {
       const el = archiveAnswerRefs.current[key];
@@ -471,7 +395,7 @@ export default function OthersSection() {
         el.style.height = "0";
       }
     });
-  }, [openArchiveKey]);
+  }, [openArchiveKey, groups]);
 
   // Handlers
   const handleOpenPdf = useCallback((url) => {
@@ -497,11 +421,10 @@ export default function OthersSection() {
       }
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(
-          () => pushToast("Link copied to Clipboard"),
-          () => pushToast("Clipboard unavailable")
+          () => pushToast("Link Copied to Clipboard"),
+          () => pushToast("Clipboard Unavailable")
         );
       } else {
-        // fallback older method
         try {
           const textarea = document.createElement("textarea");
           textarea.value = url;
@@ -511,9 +434,9 @@ export default function OthersSection() {
           document.body.appendChild(textarea);
           textarea.select();
           document.body.removeChild(textarea);
-          pushToast("Link copied to Clipboard");
+          pushToast("Link Copied to Clipboard");
         } catch (e) {
-          pushToast("Clipboard unavailable");
+          pushToast("Clipboard Unavailable");
         }
       }
       setOpenMenuId(null);
@@ -578,74 +501,110 @@ export default function OthersSection() {
     </div>
   );
 
-  // Final JSX
+  // Convert a group's data -> pdf list entries
+  const groupToPdfEntries = (group) => {
+    if (!group || !Array.isArray(group.data)) return [];
+    return group.data.map((item, idx) => {
+      if (item && Array.isArray(item.pdfs)) {
+        return (item.pdfs[0] && {
+          url: item.pdfs[0].public_url || item.pdfs[0].publicUrl || null,
+          caption: item.pdfs[0].caption || item.pdfs[0].originalName || item.pdfs[0].path || "Untitled",
+        }) || null;
+      }
+      const mapped = fileToPdfEntry(item);
+      return mapped;
+    }).filter(Boolean);
+  };
+
+  // JSX
   return (
     <section id="others-section" aria-label="others" ref={rootRef}>
-      {/* Render Others Section */}
-      {othersSectionData
-        .filter((sec) => sec.sectionType === "latest")
-        .map((sec, sIdx) => (
-          <section className={styles.othersSection} key={`latest-${sIdx}`}>
-            <h2>
-              {sec.heading}
-              {sec.isLatest ? <span className={styles.otLatestTag}>LATEST</span> : null}
-            </h2>
-            <div className={styles.otherContainer}>
-              {sec.pdfs.map((pdf, pIdx) => {
-                const id = `latest-${sIdx}-p${pIdx}`;
-                return renderPdfBox(pdf, id);
-              })}
-            </div>
-          </section>
-        ))}
-
-      {/* Render Archive Section */}
-      {othersSectionData.some((sec) => sec.sectionType === "archive") && (
-        <section className={styles.otArchiveSection}>
-          <h2>Archives</h2>
-          <div className={styles.otArchiveContainer}>
-            {othersSectionData
-              .filter((sec) => sec.sectionType === "archive")
-              .map((sec, sIdx) => (
-                <React.Fragment key={`archive-frag-${sIdx}`}>
-                  <h3
-                    className={`${styles.otArchiveQuestion} ${openArchiveKey === `archive-${sIdx}` ? styles.active : ""}`}
-                    tabIndex={0}
-                    onClick={() => handleToggleArchive(`archive-${sIdx}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleToggleArchive(`archive-${sIdx}`);
-                      }
-                    }}>
-                    {sec.heading}
-                  </h3>
-
-                  <div
-                    className={styles.otArchiveAnswer}
-                    ref={(el) => {
-                      if (el) archiveAnswerRefs.current[`archive-${sIdx}`] = el;
-                      else delete archiveAnswerRefs.current[`archive-${sIdx}`];
-                    }}>
-
-                    <div className={styles.otArchiveAnswerContainer}>
-                    {sec.pdfsByYear &&
-                        sec.pdfsByYear.map((yearGroup, yIdx) => (
-                          <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.otYearGroup}>
-                            <div className={styles.otherContainer}>
-                              {yearGroup.pdfs.map((pdf, pIdx) => {
-                                const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
-                                return renderPdfBox(pdf, id);
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
+      {loading ? (
+        <div className={styles.otSkeletonWrapper}>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className={styles.otSkeletonRow}>
+              <div className={styles.otSkeletonLabel}></div>
+              <div className={styles.otSkeletonInput}></div>
+            </div> ))}
+        </div> ) : (
+        <>
+          {groups.filter(g => (g.section_type || g.sectionType) === "latest").length === 0 ? (
+            <div className={styles.otEmptyState}><p>We Are Sorry! 🙁<br /> No Materials To Show Right Now</p></div>
+          ) : (
+            groups.filter(g => (g.section_type || g.sectionType) === "latest").map((g, sIdx) => {
+              const pdfs = groupToPdfEntries(g);
+              const heading = g.heading || g.title || "Untitled";
+              return (
+                <section className={styles.othersSection} key={`latest-${g.id || sIdx}`}>
+                  <h2>
+                    {heading}
+                    {(g.is_latest || g.isLatest) ? <span className={styles.otLatestTag}>LATEST</span> : null}
+                  </h2>
+                  <div className={styles.otherContainer}>
+                    {pdfs.length === 0 ? <div className={styles.otEmptyState}>No Files Available</div> :
+                      pdfs.map((p, pIdx) => {
+                        const id = `latest-${g.id || sIdx}-p${pIdx}`;
+                        // ensure url is encoded and absolute (defensive)
+                        const url = typeof p.url === "string" ? encodeIfNeeded(p.url) : p.url;
+                        return renderPdfBox({ url, caption: p.caption }, id);
+                      })
+                    }
                   </div>
-                </React.Fragment>
-              ))}
-          </div>
-        </section>
+                </section>
+              );
+            })
+          )}
+
+          {/* Archive Area — each archive group becomes a collapsible entry */}
+          {groups.some(g => (g.section_type || g.sectionType) === "archive") && (
+            <section className={styles.otArchiveSection}>
+              <h2>Archives</h2>
+              <div className={styles.otArchiveContainer}>
+                {groups.filter(g => (g.section_type || g.sectionType) === "archive").map((g, sIdx) => {
+                  const key = `archive-${g.id || sIdx}`;
+                  const pdfs = groupToPdfEntries(g);
+                  const heading = g.heading || "Archive Group";
+                  return (
+                    <React.Fragment key={key}>
+                      <h3
+                        className={`${styles.otArchiveQuestion} ${openArchiveKey === key ? styles.active : ""}`}
+                        tabIndex={0}
+                        onClick={() => handleToggleArchive(key)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleToggleArchive(key);
+                          }
+                        }}>
+                        {heading}
+                      </h3>
+
+                      <div
+                        className={styles.otArchiveAnswer}
+                        ref={(el) => {
+                          if (el) archiveAnswerRefs.current[key] = el;
+                          else delete archiveAnswerRefs.current[key];
+                        }}>
+
+                        <div className={styles.otArchiveAnswerContainer}>
+                          <div className={styles.otherContainer}>
+                            {pdfs.length === 0 ? <div className={styles.otEmptyState}>No Files Available</div> :
+                              pdfs.map((p, pIdx) => {
+                                const id = `archive-${g.id || sIdx}-p${pIdx}`;
+                                const url = typeof p.url === "string" ? encodeIfNeeded(p.url) : p.url;
+                                return renderPdfBox({ url, caption: p.caption }, id);
+                              })
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       {/* Modal Viewer Portal */}
