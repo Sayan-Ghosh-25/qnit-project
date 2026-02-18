@@ -4,7 +4,7 @@ import { supabaseAdmin } from "../config/supabaseClient.js";
 //Helper: Construct a public proxy URL for a storage object
 export function buildPublicUrl(bucket, path) {
   try {
-    const base = (import.meta.env.FRONTEND_ORIGIN || "").replace(/\/$/, "");
+    const base = (process.env.FRONTEND_ORIGIN || "").replace(/\/$/, "");
     if (!base || !bucket || !path) return null;
     return `${base}/${encodeURIComponent(bucket)}/${encodeURIComponent(path)}`;
   } catch {
