@@ -33,7 +33,6 @@ export default function UploadSection() {
   const [toasts, setToasts] = useState([]);
 
   // --- 4. MODAL & EDITING STATE ---
-  // Added editingHeadingText to avoid DOM access
   const [editingHeadingText, setEditingHeadingText] = useState(""); 
   const [editGroupModal, setEditGroupModal] = useState({
     show: false,
@@ -47,9 +46,24 @@ export default function UploadSection() {
     data: { caption: "", index: 0 },
   });
 
+  // --- NEW: ADD CONTENT MODAL STATE ---
+  const [addContentModal, setAddContentModal] = useState({
+    show: false,
+    group: null,
+    mode: null,
+    subjectIndex: null,
+  });
+  const [modalNewSubjects, setModalNewSubjects] = useState([]); 
+  const [modalNewFiles, setModalNewFiles] = useState([]);       
+  const modalFingerprintsRef = useRef(new Set());
+
   // --- 5. Refs for file inputs ---
   const flatInputRef = useRef(null);
   const questionInputRefs = useRef({});
+  
+  // Refs for the new modal inputs
+  const modalFlatInputRef = useRef(null);
+  const modalQuestionInputRefs = useRef({});
 
   // ==========================================
   // A. UTILITIES & DATA INTEGRITY
@@ -602,6 +616,133 @@ export default function UploadSection() {
   };
 
   // ==========================================
+  // APPEND CONTENT LOGIC
+  // ==========================================
+
+  // Open Modal & Initialize State
+  const openAddModal = (group, mode, sIdx = null) => {
+    setAddContentModal({ show: true, group, mode, subjectIndex: sIdx });
+    setModalNewSubjects([]);
+    setModalNewFiles([]);
+    modalFingerprintsRef.current.clear();
+
+    // Pre-fill skeleton based on mode
+    if (mode === "new-subject") {
+      setModalNewSubjects([{ id: generateId(), name: "", materials: [] }]);
+    } else if (mode.startsWith("append-files")) {
+      setModalNewFiles([{ id: generateId(), file: null, fileName: "", caption: "" }]);
+    }
+  };
+
+  // Handle File Processing inside Modal
+  const handleModalFileProcessing = (e, contextType, sIdx = null, fIdx = 0) => {
+    const rawFiles = Array.from(e.target.files || []);
+    const validFiles = [];
+
+    for (const file of rawFiles) {
+      if (file.type !== "application/pdf") { showToast("Only PDF Supported", "error"); continue; }
+      const fp = getFileFingerprint(file);
+      if (modalFingerprintsRef.current.has(fp)) { showToast(`Duplicate: ${file.name}`, "error"); continue; }
+      validFiles.push(file);
+    }
+    if (!validFiles.length) { try { e.target.value = null; } catch {} return; }
+
+    if (contextType === "subject-files") {
+       setModalNewSubjects(prev => {
+         const up = [...prev];
+         const matList = [...up[sIdx].materials];
+         let start = fIdx;
+         while(start < matList.length && matList[start]?.file) start++;
+         validFiles.forEach((file, i) => {
+            const idx = start + i;
+            if(idx >= matList.length) return;
+            if(matList[idx]?.file) modalFingerprintsRef.current.delete(getFileFingerprint(matList[idx].file));
+            modalFingerprintsRef.current.add(getFileFingerprint(file));
+            matList[idx] = { ...matList[idx], file, fileName: file.name };
+         });
+         up[sIdx] = { ...up[sIdx], materials: matList };
+         return up;
+       });
+    } else {
+       setModalNewFiles(prev => {
+         const updated = [...prev];
+         let start = fIdx;
+         while(start < updated.length && updated[start]?.file) start++;
+         validFiles.forEach((file, i) => {
+            const idx = start + i;
+            if(idx >= updated.length) {
+              updated.push({ id: generateId(), file, fileName: file.name, caption: "" });
+              modalFingerprintsRef.current.add(getFileFingerprint(file));
+            } else {
+              if(updated[idx]?.file) modalFingerprintsRef.current.delete(getFileFingerprint(updated[idx].file));
+              modalFingerprintsRef.current.add(getFileFingerprint(file));
+              updated[idx] = { ...updated[idx], file, fileName: file.name };
+            }
+         });
+         return updated;
+       });
+    }
+    try { e.target.value = null; } catch {}
+  };
+
+  // Submit Append Request
+  const handleAppendSubmit = async () => {
+    const { group, mode, subjectIndex } = addContentModal;
+    if (!group) return;
+    setLoading(true);
+
+    try {
+      const form = new FormData();
+      const payload = { mode: mode === "new-subject" ? "new-subject" : "append-files", subjectIndex, data: [] };
+
+      const appendFile = (file, keyPrefix) => {
+        form.append(keyPrefix, file, file.name);
+        return keyPrefix;
+      };
+
+      if (mode === "new-subject") {
+        modalNewSubjects.forEach((sub, sIdx) => {
+          if (!sub.name) throw new Error("Subject name required");
+          const pdfs = [];
+          sub.materials.forEach((m, mIdx) => {
+            if (m && m.file) {
+              const key = appendFile(m.file, `new_s${sIdx}_f${mIdx}`);
+              pdfs.push({ fileKey: key, caption: m.caption || m.fileName, originalName: m.file.name });
+            }
+          });
+          if (pdfs.length === 0) throw new Error(`Subject ${sub.name} empty`);
+          payload.data.push({ subject: sub.name, pdfs });
+        });
+      } else {
+        modalNewFiles.forEach((m, i) => {
+          if (m && m.file) {
+            const key = appendFile(m.file, `new_f${i}`);
+            payload.data.push({ fileKey: key, caption: m.caption || m.fileName, originalName: m.file.name });
+          }
+        });
+        if (payload.data.length === 0) throw new Error("No files selected");
+      }
+
+      form.append("payload", JSON.stringify(payload));
+      
+      const headers = await authHeaders({ json: false, requireAuth: true });
+      const res = await fetch(`${API_URL}/api/materials/append/${group.id}`, { method: "POST", headers, body: form });
+      if (!res.ok) {
+         const txt = await res.text();
+         throw new Error(txt || "Append Failed");
+      }
+
+      showToast("Added Successfully!");
+      setAddContentModal({ show: false, group: null, mode: null, subjectIndex: null });
+      await fetchLiveMaterials();
+    } catch (e) {
+      showToast(e.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
   // Render Helpers
   // ==========================================
 
@@ -665,6 +806,12 @@ export default function UploadSection() {
                     </div>
 
                     <div className={styles.fileActions}>
+                    <button 
+                        className={styles.editBtn}
+                        onClick={() => openAddModal(group, "append-files-subject", sIdx)}
+                      >
+                        <i className="fas fa-plus" title="Add new files"></i>
+                      </button>
                       <button
                         className={styles.editBtn}
                         onClick={() => openFileEditModal(group, fIdx, sIdx)}
@@ -1143,6 +1290,15 @@ export default function UploadSection() {
                         <span className={styles.slider}></span>
                       </label>
                     </div>
+                    <button 
+                       className={styles.editBtn}
+                       onClick={() => {
+                          if (isQuestionGroup(group)) openAddModal(group, "new-subject");
+                          else openAddModal(group, "append-files-flat");
+                       }}
+                    >
+                       <i className="fas fa-plus" title="Add new subjects"></i>
+                    </button>
                     <button
                       className={styles.editBtn}
                       onClick={() => {
@@ -1327,6 +1483,307 @@ export default function UploadSection() {
                 disabled={loading}
               >
                 {loading ? "Updating..." : "Update"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: ADD CONTENT MODAL */}
+      {addContentModal.show && (
+        <div className={styles.modalOverlay}>
+          <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }
+            .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
+
+          <div className={styles.modalContent} style={{ maxWidth: "600px" }}>
+            <div className={styles.plateHeader}>
+              <span className={styles.plateNumber}>
+                {addContentModal.mode === "new-subject" ? "ADD NEW SUBJECT GROUP" : "ADD NEW FILES"}
+              </span>
+            </div>
+
+            <div className={`${styles.dynamicFormArea} hide-scrollbar`}
+              style={{ maxHeight: "60vh", overflowY: "auto", padding: "4px" }}>
+              {/* =================================================
+                  MODE: NEW SUBJECT (Single Subject Enforced)
+                  ================================================= */}
+              {addContentModal.mode === "new-subject" &&
+                modalNewSubjects.length > 0 && (
+                  <div className={styles.uploadFormPlate}
+                    style={{ marginTop: "0", boxShadow: "none" }}>
+                    {/* Subject Header */}
+                    <div className={styles.plateHeader}>
+                      <span className={styles.plateNumber}>
+                        NEW SUBJECT DETAILS
+                      </span>
+                    </div>
+
+                    {/* Subject Metadata Inputs */}
+                    <div className={styles.formGrid}>
+                      <div className={styles.inputGroup}>
+                        <label>Subject Name</label>
+                        <input type="text"
+                          placeholder="e.g. Operating System"
+                          value={modalNewSubjects[0].name}
+                          onChange={(e) =>
+                            setModalNewSubjects((prev) => [{ ...prev[0], name: e.target.value }] )} />
+                      </div>
+                      <div className={styles.inputGroup}>
+                        <label>Total Materials</label>
+                        <input type="text"
+                          placeholder="Count"
+                          value={modalNewSubjects[0].materials.length || 0}
+                          onChange={(e) => {
+                            const count = Math.max(0, parseInt(e.target.value, 10) || 0);
+                            setModalNewSubjects((prev) => {
+                              const sub = { ...prev[0] };
+                              const currentMats = [...sub.materials];
+                              if (currentMats.length < count) {
+                                while (currentMats.length < count) {
+                                  currentMats.push({
+                                    id: generateId(),
+                                    file: null,
+                                    fileName: "",
+                                    caption: "",
+                                  });
+                                }} else if (currentMats.length > count) {
+                                currentMats.slice(count).forEach((m) => {
+                                  if (m.file)
+                                    modalFingerprintsRef.current.delete(getFileFingerprint(m.file));
+                                });
+                                currentMats.length = count; }
+                              return [{ ...sub, materials: currentMats }];
+                            });
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Dropzone & File List */}
+                    {modalNewSubjects[0].materials.length > 0 && (
+                      <>
+                        <div className={styles.dropzoneContainer}
+                          onClick={() => modalQuestionInputRefs.current[0]?.click()}>
+                          <div className={styles.uploadPlaceholder}>
+                            <i className="fas fa-file-pdf"></i>
+                            <span>
+                              Select {modalNewSubjects[0].materials.length} PDF(s)
+                              For {modalNewSubjects[0].name || "New Subject"}
+                            </span>
+                          </div>
+                          <input ref={(el) => (modalQuestionInputRefs.current[0] = el)}
+                            type="file"
+                            multiple
+                            accept=".pdf"
+                            hidden
+                            onChange={(e) => handleModalFileProcessing(e, "subject-files", 0)}
+                          />
+                        </div>
+
+                        {/* Individual File Plates */}
+                        {modalNewSubjects[0].materials.map((m, mIdx) => (
+                          <div key={m.id} className={styles.uploadFormPlate}>
+                            <div className={styles.plateHeader}>
+                              <span className={styles.plateNumber}>
+                                FILE #{mIdx + 1}
+                              </span>
+                              <div className={styles.reorderBtns}>
+                                <button
+                                  onClick={() =>
+                                    setModalNewSubjects((prev) => {
+                                      const sub = { ...prev[0] };
+                                      const list = [...sub.materials];
+                                      if (mIdx === 0) return prev;
+                                      [list[mIdx], list[mIdx - 1]] = [list[mIdx - 1], list[mIdx]];
+                                      return [{ ...sub, materials: list }];
+                                    })} disabled={mIdx === 0}>▲
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setModalNewSubjects((prev) => {
+                                      const sub = { ...prev[0] };
+                                      const list = [...sub.materials];
+                                      if (mIdx === list.length - 1) return prev;
+                                      [list[mIdx], list[mIdx + 1]] = [list[mIdx + 1], list[mIdx]];
+                                      return [{ ...sub, materials: list }];
+                                    })} disabled={mIdx ===modalNewSubjects[0].materials.length - 1}>▼
+                                </button>
+                                <button
+                                  className={styles.removeBtn}
+                                  onClick={() =>
+                                    setModalNewSubjects((prev) => {
+                                      const sub = { ...prev[0] };
+                                      const mats = [...sub.materials];
+                                      const removed = mats.splice(mIdx, 1)[0];
+                                      if (removed?.file) {
+                                        modalFingerprintsRef.current.delete(getFileFingerprint(removed.file));
+                                      } return [{ ...sub, materials: mats }];
+                                    })}>
+                                  &times;
+                                </button>
+                              </div>
+                            </div>
+                            <div className={styles.formGrid}>
+                              <div className={styles.inputGroup}>
+                                <label>Filename</label>
+                                <input className={styles.disabledInput}
+                                  value={m.fileName || ""}
+                                  disabled />
+                              </div>
+                              <div className={styles.inputGroup}>
+                                <label>Display Caption</label>
+                                <input type="text"
+                                  placeholder="IT402-2025"
+                                  value={m.caption}
+                                  onChange={(e) =>
+                                    setModalNewSubjects((prev) => {
+                                      const sub = { ...prev[0] };
+                                      const mats = [...sub.materials];
+                                      mats[mIdx] = {...mats[mIdx], caption: e.target.value };
+                                      return [{ ...sub, materials: mats }];
+                                    })}/>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
+              {/* =================================================
+                  MODE: APPEND FILES (Flat or Existing Subject)
+                  ================================================= */}
+              {addContentModal.mode &&
+                addContentModal.mode.startsWith("append-files") && (
+                  <div className={styles.uploadFormPlate}
+                    style={{ marginTop: "0", boxShadow: "none" }}>
+                    {/* Control Header */}
+                    <div className={styles.formGrid}
+                      style={{ marginBottom: "1rem" }}>
+                      <div className={styles.inputGroup}>
+                        <label>Total New Files</label>
+                        <input type="text"
+                          placeholder="Count"
+                          value={modalNewFiles.length}
+                          onChange={(e) => {
+                            const count =
+                              Math.max(0, parseInt(e.target.value, 10) || 0);
+                            setModalNewFiles((prev) => {
+                              const updated = [...prev];
+                              if (updated.length < count) {
+                                while (updated.length < count) {
+                                  updated.push({
+                                    id: generateId(),
+                                    file: null,
+                                    fileName: "",
+                                    caption: "",
+                                  });
+                                }} else {
+                                updated.slice(count).forEach((m) => {
+                                  if (m.file)
+                                    modalFingerprintsRef.current.delete(getFileFingerprint(m.file));
+                                }); updated.length = count;
+                              } return updated;
+                            });
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Dropzone */}
+                    {modalNewFiles.length > 0 && (
+                      <div className={styles.dropzoneContainer}
+                        onClick={() => modalFlatInputRef.current?.click()} >
+                        <div className={styles.uploadPlaceholder}>
+                          <i className="fas fa-cloud-upload-alt"></i>
+                          <span>Select {modalNewFiles.length} PDF(s) To Upload</span>
+                        </div>
+                        <input ref={modalFlatInputRef}
+                          type="file"
+                          multiple
+                          accept=".pdf"
+                          hidden
+                          onChange={(e) => handleModalFileProcessing(e, "flat-append")}/>
+                      </div>
+                    )}
+
+                    {/* Individual File Plates */}
+                    {modalNewFiles.map((m, i) => (
+                      <div key={m.id} className={styles.uploadFormPlate}>
+                        <div className={styles.plateHeader}>
+                          <span className={styles.plateNumber}>
+                            FILE #{i + 1}
+                          </span>
+                          <div className={styles.reorderBtns}>
+                            <button
+                              onClick={() =>
+                                setModalNewFiles((prev) => {
+                                  const list = [...prev];
+                                  if (i === 0) return prev;
+                                  [list[i], list[i - 1]] = [list[i - 1], list[i]];
+                                  return list;
+                                })} disabled={i === 0}>▲
+                            </button>
+                            <button
+                              onClick={() =>
+                                setModalNewFiles((prev) => {
+                                  const list = [...prev];
+                                  if (i === list.length - 1) return prev;
+                                  [list[i], list[i + 1]] = [list[i + 1], list[i]];
+                                  return list;
+                                })} disabled={i === modalNewFiles.length - 1}>▼
+                            </button>
+                            <button
+                              className={styles.removeBtn}
+                              onClick={() =>
+                                setModalNewFiles((prev) => {
+                                  const file = prev[i]?.file;
+                                  if (file) {
+                                    modalFingerprintsRef.current.delete(getFileFingerprint(file));
+                                  } return prev.filter((_, idx) => idx !== i);
+                                })} >
+                              &times;
+                            </button>
+                          </div>
+                        </div>
+                        <div className={styles.formGrid}>
+                          <div className={styles.inputGroup}>
+                            <label>Filename</label>
+                            <input className={styles.disabledInput}
+                              value={m.fileName || ""}
+                              disabled />
+                          </div>
+                          <div className={styles.inputGroup}>
+                            <label>Display Caption</label>
+                            <input type="text"
+                              placeholder="e.g. IT402-2025"
+                              value={m.caption}
+                              onChange={(e) =>
+                                setModalNewFiles((prev) => {
+                                  const c = [...prev];
+                                  c[i] = { ...c[i], caption: e.target.value };
+                                  return c; })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </div>
+
+            {/* Footer Actions */}
+            <div style={{ display: "flex", gap: "8px", marginTop: "1rem" }}>
+              <button className={styles.cancelBtn}
+                onClick={() => setAddContentModal({ show: false, group: null, mode: null })}>
+                Cancel
+              </button>
+              <button
+                className={styles.primaryUploadBtn}
+                onClick={handleAppendSubmit}
+                disabled={loading}>
+                {loading ? "Uploading..." : "Add Content"}
               </button>
             </div>
           </div>
