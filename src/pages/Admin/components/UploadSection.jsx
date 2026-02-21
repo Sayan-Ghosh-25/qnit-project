@@ -46,7 +46,15 @@ export default function UploadSection() {
     data: { caption: "", index: 0 },
   });
 
-  // --- NEW: ADD CONTENT MODAL STATE ---
+  // subject-edit modal state
+  const [editSubjectModal, setEditSubjectModal] = useState({
+    show: false,
+    groupId: null,
+    subjectIndex: null,
+    name: "",
+  });
+
+  // --- ADD CONTENT MODAL STATE ---
   const [addContentModal, setAddContentModal] = useState({
     show: false,
     group: null,
@@ -605,6 +613,59 @@ export default function UploadSection() {
     }
   };
 
+  // --- SUBJECT GROUP EDITING/DELETING ---
+  const handleEditSubjectName = (groupId, subjectIndex, currentName) => {
+    setEditSubjectModal({
+      show: true,
+      groupId,
+      subjectIndex,
+      name: currentName || "",
+    });
+  };
+
+  const handleDeleteSubject = async (groupId, subjectIndex) => {
+    if (!window.confirm("Are you sure you want to delete this Subject Group and all its files? This cannot be undone")) 
+      return;
+    
+    setLoading(true);
+    try {
+      await fetchJson(`${API_URL}/api/materials/subject-delete/${groupId}`, {
+        method: "DELETE",
+        headers: await authHeaders({ json: true, requireAuth: true }),
+        body: JSON.stringify({ subjectIndex }),
+      });
+      showToast("Subject Group Deleted Successfully!");
+      await fetchLiveMaterials();
+    } catch (err) {
+      showToast(err.message || "Failed to Delete Subject Group", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // called when the user submits the edit-subject modal
+  const saveSubjectEdits = async () => {
+    const { groupId, subjectIndex, name } = editSubjectModal;
+    if (!groupId) return showToast("No group selected", "error");
+    if (!name || !name.trim()) return showToast("Subject name cannot be empty", "error");
+
+    setLoading(true);
+    try {
+      await fetchJson(`${API_URL}/api/materials/subject-update/${groupId}`, {
+        method: "PUT",
+        headers: await authHeaders({ json: true, requireAuth: true }),
+        body: JSON.stringify({ subjectIndex, newSubjectName: name }),
+      });
+      showToast("Subject Name Updated Successfully!");
+      setEditSubjectModal({ show: false, groupId: null, subjectIndex: null, name: "" });
+      await fetchLiveMaterials();
+    } catch (err) {
+      showToast(err.message || "Failed to Update Subject Name", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const isQuestionGroup = (group) => {
     if (!group || !Array.isArray(group.data)) return false;
     return (
@@ -707,7 +768,7 @@ export default function UploadSection() {
           sub.materials.forEach((m, mIdx) => {
             if (m && m.file) {
               const key = appendFile(m.file, `new_s${sIdx}_f${mIdx}`);
-              pdfs.push({ fileKey: key, caption: m.caption || m.fileName, originalName: m.file.name });
+              pdfs.push({ fileKey: key, caption: m.caption || m.fileName || m.file.name });
             }
           });
           if (pdfs.length === 0) throw new Error(`Subject ${sub.name} empty`);
@@ -789,9 +850,29 @@ export default function UploadSection() {
       <div className={styles.questionGroupList}>
         {group.data.map((sub, sIdx) => (
           <div key={sIdx} className={styles.subjectBlock}>
-            <h4 className={styles.subjectTitle}>
-              {sub.subject || sub.name || `Subject ${sIdx + 1}`}
-            </h4>
+            <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "8px" }}>
+              <h4 className={styles.subjectTitle}>
+                {sub.subject || sub.name || `Subject ${sIdx + 1}`}
+              </h4>
+              <div className={styles.fileActions}>
+                <button 
+                  className={styles.editBtn}
+                  onClick={() => openAddModal(group, "append-files-subject", sIdx)}>
+                  <i className="fas fa-plus" title="Add new files"></i>
+                </button>
+                <button
+                  className={styles.editBtn}
+                  onClick={() => handleEditSubjectName(group.id, sIdx, sub.subject || sub.name)}>
+                  <i className="fas fa-pen" title="Edit Subject Name"></i>
+                </button>
+                <button
+                  className={styles.deleteBtn}
+                  onClick={() => handleDeleteSubject(group.id, sIdx)}>
+                  <i className="fas fa-trash" title="Delete Entire Subject"></i>
+                </button>
+              </div>
+            </div>
+
             <div className={styles.fileList}>
               {Array.isArray(sub.pdfs) && sub.pdfs.length > 0 ? (
                 sub.pdfs.map((pdf, fIdx) => (
@@ -804,14 +885,7 @@ export default function UploadSection() {
                         {pdf.bucket ? `/${pdf.bucket}/${pdf.path}` : ""}
                       </div>
                     </div>
-
                     <div className={styles.fileActions}>
-                    <button 
-                        className={styles.editBtn}
-                        onClick={() => openAddModal(group, "append-files-subject", sIdx)}
-                      >
-                        <i className="fas fa-plus" title="Add new files"></i>
-                      </button>
                       <button
                         className={styles.editBtn}
                         onClick={() => openFileEditModal(group, fIdx, sIdx)}
@@ -1423,6 +1497,40 @@ export default function UploadSection() {
         </div>
       )}
 
+      {/* Subject Edit Modal */}
+      {editSubjectModal.show && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <div className={styles.plateHeader}>
+              <span className={styles.plateNumber}>EDIT SUBJECT NAME</span>
+            </div>
+            <div className={styles.inputGroup} style={{ marginTop: "1rem" }}>
+              <label>Subject Name</label>
+              <input type="text"
+                value={editSubjectModal.name}
+                onChange={e =>
+                  setEditSubjectModal(p => ({ ...p, name: e.target.value }))}/>
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button className={styles.cancelBtn}
+                onClick={() => setEditSubjectModal({
+                    show: false,
+                    groupId: null,
+                    subjectIndex: null,
+                    name: "",
+                  })}>
+                  Cancel
+              </button>
+              <button className={styles.primaryUploadBtn}
+                onClick={saveSubjectEdits}
+                disabled={loading}>
+                {loading ? "Updating..." : "Update"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* File Edit Modal */}
       {editFileModal.show && (
         <div className={styles.modalOverlay}>
@@ -1633,7 +1741,7 @@ export default function UploadSection() {
                               <div className={styles.inputGroup}>
                                 <label>Display Caption</label>
                                 <input type="text"
-                                  placeholder="IT402-2025"
+                                  placeholder="e.g. IT402-2025"
                                   value={m.caption}
                                   onChange={(e) =>
                                     setModalNewSubjects((prev) => {
