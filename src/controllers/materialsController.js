@@ -640,6 +640,88 @@ export async function fileDelete(req, res) {
   }
 }
 
+// PUT /api/materials/subject-update/:id
+export async function updateSubject(req, res) {
+  try {
+    if (!(await ensureAdminOrFail(req, res))) return;
+    const id = req.params.id;
+    const { subjectIndex, newSubjectName } = req.body || {};
+    if (!id || typeof subjectIndex !== "number" || !newSubjectName) {
+      return res.status(400).json({ ok: false, message: "Missing Id, subjectIndex, or newSubjectName" });
+    }
+
+    // Fetch the specific group
+    const { data: group, error: selErr } = await supabaseAdmin.from("materials").select("*").eq("id", id).maybeSingle();
+    if (selErr || !group) return res.status(404).json({ ok: false, message: "Group Not Found" });
+    const data = JSON.parse(JSON.stringify(group.data || []));
+
+    // Ensure subject exists
+    if (!data[subjectIndex] || typeof data[subjectIndex].subject === 'undefined') {
+      return res.status(400).json({ ok: false, message: "Invalid subjectIndex" });
+    }
+
+    // Update the subject name
+    data[subjectIndex].subject = newSubjectName;
+
+    // Persist updated data
+    const { error: updErr } = await supabaseAdmin.from("materials").update(
+      { data, updated_at: new Date().toISOString() }).eq("id", id);
+    if (updErr) {
+      console.error("updateSubject: Update Error:", updErr);
+      return res.status(500).json({ ok: false, message: "Failed to Update Subject", detail: updErr });
+    }
+    return res.json({ ok: true, newSubjectName });
+  } catch (err) {
+    console.error("updateSubject:", err);
+    return res.status(500).json({ ok: false, message: "Server Error" });
+  }
+}
+
+// DELETE /api/materials/subject-delete/:id
+export async function deleteSubject(req, res) {
+  try {
+    if (!(await ensureAdminOrFail(req, res))) return;
+    const id = req.params.id;
+    const { subjectIndex } = req.body || {};
+    if (!id || typeof subjectIndex !== "number") {
+      return res.status(400).json({ ok: false, message: "Missing Id or subjectIndex" });
+    }
+
+    // Fetch the specific group
+    const { data: group, error: selErr } = await supabaseAdmin.from("materials").select("*").eq("id", id).maybeSingle();
+    if (selErr || !group) return res.status(404).json({ ok: false, message: "Group Not Found" });
+    const data = JSON.parse(JSON.stringify(group.data || []));
+    if (!data[subjectIndex]) {
+      return res.status(400).json({ ok: false, message: "Invalid subjectIndex" });
+    }
+
+    // Remove the subject from the data array
+    const targetSubject = data.splice(subjectIndex, 1)[0];
+
+    // Delete all related PDFs from Supabase Storage
+    if (targetSubject.pdfs && Array.isArray(targetSubject.pdfs)) {
+      for (const pdf of targetSubject.pdfs) {
+        if (pdf.bucket && pdf.path) {
+          try {
+            await supabaseAdmin.storage.from(pdf.bucket).remove([pdf.path]);
+          } catch (e) {
+            console.warn(`deleteSubject: Storage Remove Failed for ${pdf.path}:`, e);
+          }}}}
+
+    // Persist updated data
+    const { error: updErr } = await supabaseAdmin.from("materials").update(
+      { data, updated_at: new Date().toISOString() }).eq("id", id);
+    if (updErr) {
+      console.error("deleteSubject: Update Error:", updErr);
+      return res.status(500).json({ ok: false, message: "Failed to Delete Subject", detail: updErr });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("deleteSubject:", err);
+    return res.status(500).json({ ok: false, message: "Server Error" });
+  }
+}
+
 export default {
   publishMaterialsMultipart,
   getLiveMaterials,
@@ -650,4 +732,6 @@ export default {
   deleteGroup,
   fileUpdate,
   fileDelete,
+  updateSubject,
+  deleteSubject,
 };
