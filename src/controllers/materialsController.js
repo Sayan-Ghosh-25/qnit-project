@@ -328,6 +328,142 @@ export async function updateHeading(req, res) {
   }
 }
 
+// POST /api/materials/append/:id
+export async function appendMaterials(req, res) {
+  try {
+    if (!(await ensureAdminOrFail(req, res))) return;
+
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ ok: false, message: "Missing ID" });
+
+    // Fetch Existing Group
+    const { data: group, error: selErr } = await supabaseAdmin
+      .from("materials")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (selErr || !group) {
+      return res.status(404).json({ ok: false, message: "Group Not Found" });
+    }
+
+    const payloadRaw = req.body?.payload;
+    if (!payloadRaw) return res.status(400).json({ ok: false, message: "Missing Payload" });
+
+    let payload;
+    try {
+      payload = JSON.parse(payloadRaw);
+    } catch (e) {
+      return res.status(400).json({ ok: false, message: "Invalid JSON" });
+    }
+
+    // payload: { mode: 'new-subject' | 'append-files', subjectIndex: number | null, data: [...] }
+    const { mode, subjectIndex, data: newItems } = payload;
+    const filesByKey = {};
+    (req.files || []).forEach((f) => {
+      filesByKey[f.fieldname] = f;
+    });
+
+    const uploadedObjects = [];
+
+    // Reuse upload logic (Duplicate of publish logic for safety/isolation)
+    const uploadBufferToStorage = async (bucket, fileKey, fileObj) => {
+      const filename = fileObj.originalname || `upload_${Date.now()}`;
+      const path = `${Date.now()}_${filename.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+      const { error } = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(path, fileObj.buffer, { contentType: fileObj.mimetype, upsert: false });
+      if (error) throw error;
+      uploadedObjects.push({ bucket, path });
+      return { bucket, path, originalName: fileObj.originalname || filename };
+    };
+
+    const getBucketName = (t) => {
+      const map = { Question: "PYQs", Syllabus: "Syllabus", Others: "Others" };
+      return map[t] || "Others";
+    };
+    const bucketName = getBucketName(group.material_type);
+
+    // Process Uploads & Merge Data
+    const currentData = [...(group.data || [])];
+
+    if (group.material_type === "Question") {
+      if (mode === "new-subject") {
+        for (const subItem of newItems) {
+          const uploadedPdfs = [];
+          for (const pdfDesc of subItem.pdfs) {
+             const fk = pdfDesc.fileKey;
+             const fileObj = filesByKey[fk];
+             if (!fileObj) throw new Error(`Missing File For Key ${fk}`);
+             const uploaded = await uploadBufferToStorage(bucketName, fk, fileObj);
+             uploadedPdfs.push({
+               bucket: uploaded.bucket,
+               path: uploaded.path,
+               caption: pdfDesc.caption || pdfDesc.originalName,
+               originalName: uploaded.originalName
+             });
+          }
+          currentData.push({ subject: subItem.subject, pdfs: uploadedPdfs });
+        }
+      } else if (mode === "append-files") {
+        if (typeof subjectIndex !== 'number' || !currentData[subjectIndex]) {
+          return res.status(400).json({ ok: false, message: "Invalid Subject Index" });
+        }
+        const targetSubject = currentData[subjectIndex];
+        if (!Array.isArray(targetSubject.pdfs)) targetSubject.pdfs = [];
+
+        for (const item of newItems) {
+           const fk = item.fileKey;
+           const fileObj = filesByKey[fk];
+           if (!fileObj) throw new Error(`Missing File For Key ${fk}`);
+           const uploaded = await uploadBufferToStorage(bucketName, fk, fileObj);
+           targetSubject.pdfs.push({
+             bucket: uploaded.bucket,
+             path: uploaded.path,
+             caption: item.caption || item.originalName,
+             originalName: uploaded.originalName
+           });
+        }
+        currentData[subjectIndex] = targetSubject;
+      }
+    } else {
+      for (const item of newItems) {
+         const fk = item.fileKey;
+         const fileObj = filesByKey[fk];
+         if (!fileObj) throw new Error(`Missing File For Key ${fk}`);
+         const uploaded = await uploadBufferToStorage(bucketName, fk, fileObj);
+         currentData.push({
+           bucket: uploaded.bucket,
+           path: uploaded.path,
+           caption: item.caption || item.originalName,
+           originalName: uploaded.originalName
+         });
+      }
+    }
+
+    // Update DB
+    const { error: updErr } = await supabaseAdmin
+      .from("materials")
+      .update({ 
+        data: currentData, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", id);
+
+    if (updErr) {
+       for (const obj of uploadedObjects) {
+         await supabaseAdmin.storage.from(obj.bucket).remove([obj.path]).catch(() => {});
+       }
+       throw updErr;
+    }
+    return res.json({ ok: true });
+
+  } catch (err) {
+    console.error("appendMaterials:", err);
+    return res.status(500).json({ ok: false, message: "Server Error: " + err.message });
+  }
+}
+
 // DELETE /api/materials/group/:id
 export async function deleteGroup(req, res) {
   try {
@@ -510,6 +646,7 @@ export default {
   updateVisibility,
   switchSection,
   updateHeading,
+  appendMaterials,
   deleteGroup,
   fileUpdate,
   fileDelete,

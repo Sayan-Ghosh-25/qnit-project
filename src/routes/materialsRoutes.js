@@ -15,7 +15,7 @@ router.post("/publish", requireAuth, requireAdmin, upload.any(), materialsContro
 router.patch("/visibility/:id", requireAuth, requireAdmin, materialsController.updateVisibility);
 router.patch("/switch-section/:id", requireAuth, requireAdmin, materialsController.switchSection);
 router.patch("/update-heading/:id", requireAuth, requireAdmin, materialsController.updateHeading);
-
+router.post("/append/:id", requireAuth, requireAdmin, upload.any(), materialsController.appendMaterials);
 router.delete("/group/:id", requireAuth, requireAdmin, materialsController.deleteGroup);
 
 router.put("/file-update/:id", requireAuth, requireAdmin, materialsController.fileUpdate);
