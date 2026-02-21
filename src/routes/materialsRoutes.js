@@ -20,7 +20,7 @@ router.delete("/group/:id", requireAuth, requireAdmin, materialsController.delet
 
 router.put("/file-update/:id", requireAuth, requireAdmin, materialsController.fileUpdate);
 router.delete("/file-delete/:id", requireAuth, requireAdmin, materialsController.fileDelete);
-router.put('/subject-update/:id', materialsController.updateSubject);
-router.delete('/subject-delete/:id', materialsController.deleteSubject);
+router.put('/subject-update/:id', requireAuth, materialsController.updateSubject);
+router.delete('/subject-delete/:id', requireAuth, materialsController.deleteSubject);
 
 export default router;
