@@ -6,12 +6,13 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.min?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-// Early Sanitization
+// Environment API Base
+const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+// Early sanitization
 function encodeIfNeeded(url) {
   if (typeof url !== "string") return "";
-  // Return as-is if already encoded
   if (/%[0-9A-Fa-f]{2}/.test(url)) return url;
-  // Otherwise safely encode
   try {
     return encodeURI(url);
   } catch {
@@ -19,114 +20,6 @@ function encodeIfNeeded(url) {
   }
 }
 
-// Point to your path on Vercel
-function getPublicPdfUrl(filename) {
-  return `https://qnit.vercel.app/PYQs/${filename}`;
-}
-
-// ----------------------
-// Admin-controlled Dataset
-// ----------------------
-const questionSectionData = [
-  {
-    sectionType: "latest",
-    heading: "Previous Year Questions for 5th Semester",
-    isLatest: true,
-    pdfsBySubject: [
-      {
-        subject: "Database Management System",
-        pdfs: [
-          { url: getPublicPdfUrl("IT501-2019.pdf"), caption: "IT501-2019" },
-          { url: getPublicPdfUrl("IT501-2021.pdf"), caption: "IT501-2021" },
-          { url: getPublicPdfUrl("IT501-2022.pdf"), caption: "IT501-2022" },
-          { url: getPublicPdfUrl("IT501-2023.pdf"), caption: "IT501-2023" },
-          { url: getPublicPdfUrl("IT501-2024.pdf"), caption: "IT501-2024" },
-        ],
-      },
-      {
-        subject: "Computer Networking",
-        pdfs: [
-          { url: getPublicPdfUrl("IT502-2019.pdf"), caption: "IT502-2019" },
-          { url: getPublicPdfUrl("IT502-2021.pdf"), caption: "IT502-2021" },
-          { url: getPublicPdfUrl("IT502-2022.pdf"), caption: "IT502-2022" },
-          { url: getPublicPdfUrl("IT502-2023.pdf"), caption: "IT502-2023" },
-          { url: getPublicPdfUrl("IT502-2024.pdf"), caption: "IT502-2024" },
-        ],
-      },
-      {
-        subject: "Design & Analysis of Algorithm",
-        pdfs: [
-          { url: getPublicPdfUrl("IT503-2019.pdf"), caption: "IT503-2019" },
-          { url: getPublicPdfUrl("IT503-2020.pdf"), caption: "IT503-2020" },
-          { url: getPublicPdfUrl("IT503-2021.pdf"), caption: "IT503-2021" },
-          { url: getPublicPdfUrl("IT503-2022.pdf"), caption: "IT503-2022" },
-          { url: getPublicPdfUrl("IT503-2023.pdf"), caption: "IT503-2023" },
-          { url: getPublicPdfUrl("IT503-2024.pdf"), caption: "IT503-2024" },
-        ],
-      },
-      {
-        subject: "Artificial Intellingence",
-        pdfs: [
-          { url: getPublicPdfUrl("IT504-2019.pdf"), caption: "IT504-2019" },
-          { url: getPublicPdfUrl("IT504-2023.pdf"), caption: "IT504-2023" },
-          { url: getPublicPdfUrl("IT504-2024.pdf"), caption: "IT504-2024" },
-        ],
-      },
-    ],
-  },
-  {
-    sectionType: "archive",
-    heading: "Previous Year Questions for 4th Semester",
-    pdfsBySubject: [
-      {
-        subject: "Software Engineering",
-        pdfs: [
-          { url: getPublicPdfUrl("IT402-2019.pdf"), caption: "IT402-2019" },
-          { url: getPublicPdfUrl("IT402-2020.pdf"), caption: "IT402-2020" },
-          { url: getPublicPdfUrl("IT402-2021.pdf"), caption: "IT402-2021" },
-          { url: getPublicPdfUrl("IT402-2023.pdf"), caption: "IT402-2023" },
-          { url: getPublicPdfUrl("IT402-2024.pdf"), caption: "IT402-2024" },
-        ],
-      },
-      {
-        subject: "Operating System",
-        pdfs: [
-          { url: getPublicPdfUrl("IT403-2019.pdf"), caption: "IT403-2019" },
-          { url: getPublicPdfUrl("IT403-2020.pdf"), caption: "IT403-2020" },
-          { url: getPublicPdfUrl("IT403-2021.pdf"), caption: "IT403-2021" },
-          { url: getPublicPdfUrl("IT403-2022.pdf"), caption: "IT403-2022" },
-          { url: getPublicPdfUrl("IT403-2023.pdf"), caption: "IT403-2023" },
-          { url: getPublicPdfUrl("IT403-2024.pdf"), caption: "IT403-2024" },
-        ],
-      },
-      {
-        subject: "Discrete Mathematics",
-        pdfs: [
-          { url: getPublicPdfUrl("M(IT)401-2019.pdf"), caption: "M(IT)401-2019" },
-          { url: getPublicPdfUrl("M(IT)401-2020.pdf"), caption: "M(IT)401-2020" },
-          { url: getPublicPdfUrl("M(IT)401-2021.pdf"), caption: "M(IT)401-2021" },
-          { url: getPublicPdfUrl("M(IT)401-2023.pdf"), caption: "M(IT)401-2023" },
-          { url: getPublicPdfUrl("M(IT)401-2024.pdf"), caption: "M(IT)401-2024" },
-        ],
-      },
-      {
-        subject: "Engineering Economics",
-        pdfs: [
-          { url: getPublicPdfUrl("HU401-2019.pdf"), caption: "HU401-2019" },
-          { url: getPublicPdfUrl("HU401-2020.pdf"), caption: "HU401-2020" },
-          { url: getPublicPdfUrl("HU401-2021.pdf"), caption: "HU401-2021" },
-          { url: getPublicPdfUrl("HU401-2022.pdf"), caption: "HU401-2022" },
-          { url: getPublicPdfUrl("HU401-2023.pdf"), caption: "HU401-2023" },
-          { url: getPublicPdfUrl("HU401-2024.pdf"), caption: "HU401-2024" },
-        ],
-      },
-    ],
-  },
-];
-
-// ----------------------
-// Utilities
-// ----------------------
 function scheduleIdle(callback) {
   if (typeof window === "undefined") {
     setTimeout(callback, 50);
@@ -139,9 +32,7 @@ function scheduleIdle(callback) {
   }
 }
 
-// ----------------------
 // Pdf render queue (global)
-// ----------------------
 const pdfRenderQueue = [];
 let pdfRenderInProgress = 0;
 const MAX_CONCURRENT_RENDER = 3;
@@ -166,29 +57,23 @@ async function runQueue() {
   if (pdfRenderQueue.length) runQueue();
 }
 
-// ----------------------
-// Error Boundary for thumbnails (prevents whole app crash)
-// ----------------------
+// Thumbnail Error Boundary
 class ThumbnailErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false };
   }
-
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-
   componentDidCatch(error, info) {
-    // log for diagnostics (don't expose error details to users)
     console.error("ThumbnailErrorBoundary caught:", error, info);
   }
-
   render() {
     if (this.state.hasError) {
       return (
-        <div className={styles.quThumbnailError} role="img" aria-label="Preview unavailable">
-          ⚠️ Preview unavailable
+        <div className={styles.quThumbnailError} role="img" aria-label="Preview Unavailable">
+          ⚠️ Preview Unavailable
         </div>
       );
     }
@@ -196,10 +81,8 @@ class ThumbnailErrorBoundary extends React.Component {
   }
 }
 
-// ----------------------
 // PdfThumbnail — robust & fault-tolerant
-// ----------------------
-  const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview Unavailable" }) => {
+const PdfThumbnail = React.memo(({ url, id, placeholderText = "Preview Unavailable" }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
   const loadingTaskRef = useRef(null);
@@ -237,9 +120,7 @@ class ThumbnailErrorBoundary extends React.Component {
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#666";
         ctx.fillText(text || placeholderText, Math.max(100, width) / 2, Math.max(80, height) / 2);
-      } catch (e) {
-        // ignore canvas drawing errors
-      }
+      } catch (e) {}
     };
 
     const renderThumbnail = async () => {
@@ -252,7 +133,6 @@ class ThumbnailErrorBoundary extends React.Component {
       }
 
       try {
-        // Safe cleanup of existing tasks before starting a new one
         if (renderTaskRef.current && typeof renderTaskRef.current.cancel === "function") {
           try {
             const maybe = renderTaskRef.current.cancel();
@@ -261,40 +141,28 @@ class ThumbnailErrorBoundary extends React.Component {
           renderTaskRef.current = null;
         }
         if (loadingTaskRef.current && typeof loadingTaskRef.current.destroy === "function") {
-          try {
-            loadingTaskRef.current.destroy();
-          } catch (e) {
-            // ignore
-          }
+          try { loadingTaskRef.current.destroy(); } catch (e) {}
           loadingTaskRef.current = null;
         }
         if (pdfRef.current) {
-          try {
-            pdfRef.current.destroy();
-          } catch (e) {}
+          try { pdfRef.current.destroy(); } catch (e) {}
           pdfRef.current = null;
         }
 
-        // Start loading PDF document
         let docUrl = url;
         if (typeof docUrl !== "string") docUrl = String(docUrl);
 
         loadingTaskRef.current = pdfjsLib.getDocument(encodeIfNeeded(docUrl));
         const pdf = await loadingTaskRef.current.promise;
         if (canceled || !mountedRef.current) {
-          try {
-            pdf.destroy();
-          } catch (e) {}
+          try { pdf.destroy(); } catch (e) {}
           return;
         }
         pdfRef.current = pdf;
 
-        // get first page
         const page = await pdf.getPage(1);
         if (canceled || !mountedRef.current) {
-          try {
-            pdf.destroy();
-          } catch (e) {}
+          try { pdf.destroy(); } catch (e) {}
           return;
         }
 
@@ -317,7 +185,6 @@ class ThumbnailErrorBoundary extends React.Component {
         const renderViewport = page.getViewport({ scale: targetW / (viewportAt1.width || targetW) });
         renderTaskRef.current = page.render({ canvasContext: ctx, viewport: renderViewport });
 
-        // await render — support different renderTask shapes
         const renderPromise =
           (renderTaskRef.current && (renderTaskRef.current.promise ?? (typeof renderTaskRef.current.then === "function" ? renderTaskRef.current : null))) ||
           null;
@@ -325,58 +192,37 @@ class ThumbnailErrorBoundary extends React.Component {
         if (renderPromise) {
           await renderPromise;
         } else {
-          // fallback small delay if render API is not promise-based
           await new Promise((r) => setTimeout(r, 60));
         }
 
-        try {
-          // try to cleanup page and pdf to free memory
-          page.cleanup?.();
-        } catch (e) {}
-        try {
-          pdf.destroy();
-        } catch (e) {}
+        try { page.cleanup?.(); } catch (e) {}
+        try { pdf.destroy(); } catch (e) {}
         pdfRef.current = null;
       } catch (err) {
-        // render error (could be 404 or corrupted PDF)
-        // console.error("PDF thumbnail render error for", url, err);
         drawPlaceholder("Preview Unavailable");
-        try {
-          loadingTaskRef.current?.destroy?.();
-        } catch (e) {}
+        try { loadingTaskRef.current?.destroy?.(); } catch (e) {}
         loadingTaskRef.current = null;
-        try {
-          pdfRef.current?.destroy?.();
-        } catch (e) {}
+        try { pdfRef.current?.destroy?.(); } catch (e) {}
         pdfRef.current = null;
       } finally {
         if (canceled) {
-          try {
-            renderTaskRef.current?.cancel?.();
-          } catch (e) {}
+          try { renderTaskRef.current?.cancel?.(); } catch (e) {}
         }
       }
     };
 
-    // enqueue the render task and catch internal errors
     enqueuePdfRender(() =>
       new Promise((resolve) => {
         scheduleIdle(() => {
           renderThumbnail()
             .then(() => resolve())
-            .catch((err) => {
-              // console.error("RenderThumbnail internal error", err);
-              resolve();
-            });
+            .catch(() => resolve());
         });
       })
     );
 
-    // cleanup for effect
     return () => {
       canceled = true;
-
-      // cancel renderTask safely
       const rt = renderTaskRef.current;
       if (rt && typeof rt.cancel === "function") {
         try {
@@ -385,17 +231,9 @@ class ThumbnailErrorBoundary extends React.Component {
         } catch (e) {}
       }
       renderTaskRef.current = null;
-
-      // destroy loading task safely
-      try {
-        loadingTaskRef.current?.destroy?.();
-      } catch (e) {}
+      try { loadingTaskRef.current?.destroy?.(); } catch (e) {}
       loadingTaskRef.current = null;
-
-      // destroy pdf if still present
-      try {
-        pdfRef.current?.destroy?.();
-      } catch (e) {}
+      try { pdfRef.current?.destroy?.(); } catch (e) {}
       pdfRef.current = null;
     };
   }, [url, id, placeholderText]);
@@ -405,9 +243,7 @@ class ThumbnailErrorBoundary extends React.Component {
 
 PdfThumbnail.displayName = "PdfThumbnail";
 
-// ----------------------
-// Modal (PDF Viewer) — with safer fallbacks
-// ----------------------
+// Pdf Modal
 function PdfModal({ open, url, onClose }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -423,13 +259,13 @@ function PdfModal({ open, url, onClose }) {
 
   if (!mounted || !open) return null;
 
-  // sanitize simple cases — avoid javascript: or data URIs that you don't intend to allow
+  // sanitize simple cases
   const safeUrl =
-  typeof url === "string" && /^https?:\/\//.test(url)
-    ? encodeIfNeeded(url)
-    : url
-    ? encodeIfNeeded(String(url))
-    : "";
+    typeof url === "string" && /^https?:\/\//.test(url)
+      ? encodeIfNeeded(url)
+      : url
+      ? encodeIfNeeded(String(url))
+      : "";
 
   return createPortal(
     <div
@@ -441,18 +277,8 @@ function PdfModal({ open, url, onClose }) {
         if (e.target === e.currentTarget) onClose?.();
       }}>
       <div className={styles.quPdfModalInner} onClick={(e) => e.stopPropagation()}>
-        {/* Use object which gives the browser-inline PDF viewer; also provide an "Open in new tab" link */}
         {safeUrl ? (
-          <>
-          <iframe
-            src={safeUrl}
-            width="100%"
-            height="100%"
-            style={{ border: "none" }}
-            title="PDF Viewer"
-          >
-          </iframe>
-          </>
+          <iframe src={safeUrl} width="100%" height="100%" style={{ border: "none" }} title="PDF Viewer" />
         ) : (
           <div className={styles.quPdfModalError}>No preview available</div>
         )}
@@ -463,9 +289,7 @@ function PdfModal({ open, url, onClose }) {
   );
 }
 
-// ----------------------
 // Toasts
-// ----------------------
 function useToasts() {
   const [toasts, setToasts] = useState([]);
   const pushToast = useCallback((text, ms = 1500) => {
@@ -476,29 +300,49 @@ function useToasts() {
   return [toasts, pushToast];
 }
 
-// ----------------------
 // Main Component
-// ----------------------
 export default function QuestionSection() {
-  // State + Refs
   const [modalOpen, setModalOpen] = useState(false);
   const [modalUrl, setModalUrl] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openArchiveKey, setOpenArchiveKey] = useState(null);
   const [toasts, pushToast] = useToasts();
   const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState([]);
   const archiveAnswerRefs = useRef({});
   const rootRef = useRef(null);
 
-  // Simulate loading
+  // fetch live materials -> filter Question groups
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    let canceled = false;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/materials/live`);
+        const text = await res.text();
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) {
+          const msg = (json && (json.message || json.error)) || text || res.statusText || "Failed to fetch";
+          throw new Error(msg);
+        }
+        const allMaterials = (json && Array.isArray(json.materials) ? json.materials : []);
+        const filtered = allMaterials.filter((m) => ((m.material_type || m.materialType) || "").toString() === "Question");
+        if (!canceled) setGroups(filtered);
+      } catch (e) {
+        console.error("Failed to load question materials:", e);
+        pushToast("Failed to load question materials");
+        if (!canceled) setGroups([]);
+      } finally {
+        if (!canceled) setLoading(false);
+      }
+    };
 
-  // Menu outside click
+    fetchData();
+    return () => { canceled = true; };
+  }, [pushToast]);
+
+  // menu outside click
   useEffect(() => {
     function onPointerDown(e) {
       try {
@@ -508,16 +352,14 @@ export default function QuestionSection() {
         ) {
           return;
         }
-      } catch (err) {
-        // ignore
-      }
+      } catch (err) {}
       setOpenMenuId(null);
     }
     document.addEventListener("pointerdown", onPointerDown, { capture: true });
     return () => document.removeEventListener("pointerdown", onPointerDown, { capture: true });
   }, []);
 
-  // Archive Height Animation
+  // archive height animation
   useEffect(() => {
     Object.keys(archiveAnswerRefs.current).forEach((key) => {
       const el = archiveAnswerRefs.current[key];
@@ -528,7 +370,7 @@ export default function QuestionSection() {
         el.style.height = "0";
       }
     });
-  }, [openArchiveKey]);
+  }, [openArchiveKey, groups]);
 
   // Handlers
   const handleOpenPdf = useCallback((url) => {
@@ -554,11 +396,10 @@ export default function QuestionSection() {
       }
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(
-          () => pushToast("Link copied to Clipboard"),
-          () => pushToast("Clipboard unavailable")
+          () => pushToast("Link Copied to Clipboard"),
+          () => pushToast("Clipboard Unavailable")
         );
       } else {
-        // fallback older method
         try {
           const textarea = document.createElement("textarea");
           textarea.value = url;
@@ -568,9 +409,9 @@ export default function QuestionSection() {
           document.body.appendChild(textarea);
           textarea.select();
           document.body.removeChild(textarea);
-          pushToast("Link copied to Clipboard");
+          pushToast("Link Copied to Clipboard");
         } catch (e) {
-          pushToast("Clipboard unavailable");
+          pushToast("Clipboard Unavailable");
         }
       }
       setOpenMenuId(null);
@@ -635,82 +476,130 @@ export default function QuestionSection() {
     </div>
   );
 
-  // Final JSX
+  // Helper: convert group.data -> array of { subject, pdfs: [{url,caption}] }
+  const normalizeGroupSubjects = (group) => {
+    if (!group || !Array.isArray(group.data)) return [];
+    return group.data.map((sub) => {
+      // expected shape: { subject: "Name", pdfs: [ { public_url, caption, originalName, bucket, path } ] }
+      const subjectName = sub.subject || sub.name || "Untitled Subject";
+      const pdfsRaw = Array.isArray(sub.pdfs) ? sub.pdfs : (Array.isArray(sub.pdfsByYear) ? sub.pdfsByYear.flatMap(y => y.pdfs || []) : []);
+      const pdfs = (pdfsRaw || []).map((p) => {
+        const url = p.public_url || p.publicUrl || (p.bucket && p.path ? `${p.bucket}/${p.path}` : null) || p.url || null;
+        const caption = p.caption || p.originalName || p.path || p.url?.split("/").pop() || "Untitled";
+        return { url, caption };
+      }).filter(Boolean);
+      return { subject: subjectName, pdfs };
+    });
+  };
+
+  // JSX
   return (
     <section id="question-section" aria-label="pyqs" ref={rootRef}>
-      {/* Render PYQ Section */}
-      {questionSectionData
-        .filter((sec) => sec.sectionType === "latest")
-        .map((sec, sIdx) => (
-          <section className={styles.questionsSection} key={`latest-${sIdx}`}>
-            <h2>
-              {sec.heading}
-              {sec.isLatest ? <span className={styles.quLatestTag}>LATEST</span> : null}
-            </h2>
-              <div className={styles.pyqQuestionContainer}>
-            {sec.pdfsBySubject &&
-              sec.pdfsBySubject.map((latestGroup, yIdx) => (
-                <div key={`latest-${sIdx}-y-${yIdx}`} className={styles.quLatestGroup}>
-                  <h2>&#9733; {latestGroup.subject} &#9733;</h2>
-                  <div className={styles.questionContainer}>
-                    {latestGroup.pdfs.map((pdf, pIdx) => {
-                      const id = `latest-${sIdx}-y${yIdx}-p${pIdx}`;
-                      return renderPdfBox(pdf, id);
-                    })}
-                  </div>
-                </div>
-              ))}
-          </div>
-          </section>
-        ))}
-
-      {/* Render Archive Section */}
-      {questionSectionData.some((sec) => sec.sectionType === "archive") && (
-        <section className={styles.quArchiveSection}>
-          <h2>Archives</h2>
-          <div className={styles.quArchiveContainer}>
-            {questionSectionData
-              .filter((sec) => sec.sectionType === "archive")
-              .map((sec, sIdx) => (
-                <React.Fragment key={`archive-frag-${sIdx}`}>
-                  <h3
-                    className={`${styles.quArchiveQuestion} ${openArchiveKey === `archive-${sIdx}` ? styles.active : ""}`}
-                    tabIndex={0}
-                    onClick={() => handleToggleArchive(`archive-${sIdx}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleToggleArchive(`archive-${sIdx}`);
-                      }
-                    }}>
-                    {sec.heading}
-                  </h3>
-
-                  <div
-                    className={styles.quArchiveAnswer}
-                    ref={(el) => {
-                      if (el) archiveAnswerRefs.current[`archive-${sIdx}`] = el;
-                      else delete archiveAnswerRefs.current[`archive-${sIdx}`];
-                    }}>
-                    <div className={styles.quArchiveAnswerContainer}>
-                    {sec.pdfsBySubject &&
-                      sec.pdfsBySubject.map((archiveGroup, yIdx) => (
-                        <div key={`archive-${sIdx}-y-${yIdx}`} className={styles.quArchiveGroup}>
-                          <h2>&#9733; {archiveGroup.subject} &#9733;</h2>
+      {loading ? (
+        <div className={styles.quSkeletonWrapper}>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className={styles.quSkeletonRow}>
+              <div className={styles.quSkeletonLabel}></div>
+              <div className={styles.quSkeletonInput}></div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          {/* Latest groups */}
+          {groups.filter(g => (g.section_type || g.sectionType) === "latest").length === 0 ? (
+            <div className={styles.quEmptyState}>
+              <p>We Are Sorry! 🙁<br /> No Materials To Show Right Now</p>
+            </div>
+          ) : (
+            groups.filter(g => (g.section_type || g.sectionType) === "latest").map((g, sIdx) => {
+              const subjects = normalizeGroupSubjects(g);
+              const heading = g.heading || g.title || "Previous Year Questions";
+              return (
+                <section className={styles.questionsSection} key={`latest-${g.id || sIdx}`}>
+                  <h2>
+                    {heading}
+                    {(g.is_latest || g.isLatest) ? <span className={styles.quLatestTag}>LATEST</span> : null}
+                  </h2>
+                  <div className={styles.pyqQuestionContainer}>
+                    {subjects.length === 0 ? <div className={styles.quEmptyState}>No Files Available</div> :
+                      subjects.map((sub, subIdx) => (
+                        <div key={`latest-${g.id || sIdx}-sub-${subIdx}`} className={styles.quLatestGroup}>
+                          <h2>&#9733; {sub.subject} &#9733;</h2>
                           <div className={styles.questionContainer}>
-                            {archiveGroup.pdfs.map((pdf, pIdx) => {
-                              const id = `archive-${sIdx}-y${yIdx}-p${pIdx}`;
-                              return renderPdfBox(pdf, id);
-                            })}
+                            {sub.pdfs.length === 0 ? <div className={styles.quEmptyState}>No Files</div> :
+                              sub.pdfs.map((pdf, pIdx) => {
+                                const id = `latest-${g.id || sIdx}-sub${subIdx}-p${pIdx}`;
+                                const url = typeof pdf.url === "string" ? encodeIfNeeded(pdf.url) : pdf.url;
+                                return renderPdfBox({ url, caption: pdf.caption }, id);
+                              })
+                            }
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      ))
+                    }
                   </div>
-                </React.Fragment>
-              ))}
-          </div>
-        </section>
+                </section>
+              );
+            })
+          )}
+
+          {/* Archive groups */}
+          {groups.some(g => (g.section_type || g.sectionType) === "archive") && (
+            <section className={styles.quArchiveSection}>
+              <h2>Archives</h2>
+              <div className={styles.quArchiveContainer}>
+                {groups.filter(g => (g.section_type || g.sectionType) === "archive").map((g, sIdx) => {
+                  const key = `archive-${g.id || sIdx}`;
+                  const subjects = normalizeGroupSubjects(g);
+                  const heading = g.heading || "Archive Group";
+                  return (
+                    <React.Fragment key={key}>
+                      <h3
+                        className={`${styles.quArchiveQuestion} ${openArchiveKey === key ? styles.active : ""}`}
+                        tabIndex={0}
+                        onClick={() => handleToggleArchive(key)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleToggleArchive(key);
+                          }
+                        }}>
+                        {heading}
+                      </h3>
+
+                      <div
+                        className={styles.quArchiveAnswer}
+                        ref={(el) => {
+                          if (el) archiveAnswerRefs.current[key] = el;
+                          else delete archiveAnswerRefs.current[key];
+                        }}>
+                        <div className={styles.quArchiveAnswerContainer}>
+                          {subjects.length === 0 ? <div className={styles.quEmptyState}>No Files Available</div> :
+                            subjects.map((sub, subIdx) => (
+                              <div key={`archive-${g.id || sIdx}-sub-${subIdx}`} className={styles.quArchiveGroup}>
+                                <h2>&#9733; {sub.subject} &#9733;</h2>
+                                <div className={styles.questionContainer}>
+                                  {sub.pdfs.length === 0 ? <div className={styles.quEmptyState}>No Files</div> :
+                                    sub.pdfs.map((pdf, pIdx) => {
+                                      const id = `archive-${g.id || sIdx}-sub${subIdx}-p${pIdx}`;
+                                      const url = typeof pdf.url === "string" ? encodeIfNeeded(pdf.url) : pdf.url;
+                                      return renderPdfBox({ url, caption: pdf.caption }, id);
+                                    })
+                                  }
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       {/* Modal Viewer Portal */}

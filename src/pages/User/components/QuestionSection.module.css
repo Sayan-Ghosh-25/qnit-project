@@ -386,6 +386,9 @@
 
 /* ===== Empty State Styling ===== */
 .quEmptyState {
+  border: 1px solid red;
+  border-radius: 1.5rem;
+  box-shadow: 0px 0px 20px rgba(255, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -393,19 +396,60 @@
   text-align: center;
   padding: 1.5rem;
   margin: 12rem auto;
-  max-width: 500px;
-}
-
-.quEmptyState img {
-  width: 5rem;
-  height: 5rem;
-  margin-bottom: 1rem;
+  max-width: 400px;
 }
 
 .quEmptyState p {
+  font-style: italic;
   font-size: 1.2rem;
   color: var(--white);
 }
+
+/* =========================
+  Loading Animation
+  ========================= */
+  .quSkeletonWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 10rem !important;
+    margin: 5rem;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .quSkeletonRow {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .quSkeletonLabel {
+    width: 100px;
+    height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #223253 25%, #2b3f6e 50%, #28395f 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  
+  .quSkeletonInput {
+    flex: 1;
+    height: 22px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #223253 25%, #2b3f6e 50%, #28395f 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
 /* =========================
   Light Theme
@@ -465,7 +509,11 @@
   background:#fff;
   color: #000
 }
-      
+:global(.light-theme) .quSkeletonLabel,
+:global(.light-theme) .quSkeletonInput {
+  background: linear-gradient(90deg, #e2e2e2 25%, #f4f4f4 50%, #e2e2e2 75%);
+}
+
 /* ===== Enhanced Responsiveness ===== */
 @media (max-width: 768px) {
   .questionContainer {
@@ -622,15 +670,15 @@
   }
 
   .quEmptyState {
+    max-width: 320px;
     margin-top: 15rem;
   }
   
-  .quEmptyState img {
-    width: 3rem;
-    height: 3rem;
-  }
-  
   .quEmptyState p {
-    font-size: 0.9rem;
+    font-size: 1rem;
+  }
+
+  .quSkeletonWrapper {
+    margin: 1.5rem;
   }
 }
