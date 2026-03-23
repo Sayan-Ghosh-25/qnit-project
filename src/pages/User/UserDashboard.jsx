@@ -614,14 +614,17 @@ export default function UserDashboard() {
           <ul>
             <li>
               <strong>New Uploads:</strong>
-              <br />- 5th Semester's Previous Year Questions <br />- 5th Semester's Syllabus <br />- 5th Semester's Lab Cover Pages
+              {/* <br />- 6th Semester's Previous Year Questions */}
+              <br />- 6th Semester's Syllabus
+              <br />- 6th Semester's Lab Cover Pages
             </li>
             <li>
               <br />
             </li>
             <li>
               <strong>System:</strong>
-              <br />- Fixed Some Known Issues <br />- Improved Overall Performance
+              <br />- Fixed Some Known Issues
+              <br />- Improved Overall Performance
             </li>
           </ul>
         </div>
