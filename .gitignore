@@ -15,10 +15,10 @@ dist/
 build/
 
 # Environment files
-.env # Your local environment variables
-.env.local # Common practice for local env overrides
-.env.*.local # For specific local environments
-!.env.example # Keep example files for team collaboration
+.env
+.env.local
+.env.*.local
+!.env.example
 
 # Editor directories and files (apply to any OS/IDE)
 .vscode/ # VS Code specific settings, if not shared
