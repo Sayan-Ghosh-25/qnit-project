@@ -1,0 +1,385 @@
+/* ===== Enhanced Profile Section Styles ===== */
+:root {
+  --shadow-soft: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+  --shadow-med: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  --transition-med: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-fast: all 0.2s ease;
+  --radius: 0.625rem;
+  --radius-lg: 0.75rem;
+  --primary-button: linear-gradient(0deg, #001d4e, #022869);
+  --white: #e6f1ff;
+  --pink: #f57dff;
+  --blue: #57cbff;
+}
+
+.profileSection {
+  background: #001232;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-med);
+  width: 100%;
+  max-width: 45rem;
+  margin: 1.5rem auto;
+  transition: var(--transition-med);
+  border: 1px solid var(--blue);
+  overflow: hidden;
+  position: relative;
+}
+
+.profileSection h2 {
+  font-weight: 700;
+  margin: 0.5rem 0 1.5rem;
+  text-align: center;
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  color: var(--white);
+  transition: var(--transition-med);
+  position: relative;
+  padding-bottom: 0.75rem;
+}
+
+.profileSection h2::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 3px;
+  background: linear-gradient(45deg, var(--pink), var(--blue));
+  border-radius: 3px;
+}
+
+.profileSection table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  transition: var(--transition-med);
+}
+
+.profileSection th,
+.profileSection td {
+  padding: 0.45rem 1rem;
+  text-align: left;
+  transition: var(--transition-fast);
+}
+
+.profileSection th {
+  background: #001539;
+  color: var(--white);
+  font-weight: 500;
+  border-bottom: 0.8px solid var(--blue);
+  width: 35%;
+}
+
+.profileSection td {
+  border-bottom: 0.8px solid var(--blue);
+}
+
+.profileSection tr:hover td {
+  background-color: rgba(224, 231, 255, 0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.profileSection input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  color: var(--white);
+  font-size: 1rem;
+  font-weight: 400;
+  font-family: inherit;
+  transition: var(--transition-fast);
+}
+
+.profileSection input:disabled {
+  opacity: 0.7;
+}
+
+.profileSection input:focus {
+  outline: none;
+  border-color: var(--pink);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.profileSectionButtons {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+}
+
+.profileSectionButtons button {
+  height: 2.9rem;
+  color: var(--white);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 500;
+  transition: var(--transition-med);
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+  border: none;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.profileSectionButtons button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.profileSectionButtons button:active {
+  transform: scale(0.98);
+}
+
+.updateButton {
+  background: var(--primary-button);
+}
+
+.updateButton:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.cancelButton {
+  background: linear-gradient(0deg, #ff00007a, #ff0000aa);
+}
+
+.cancelButton:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.editButton {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.45rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  z-index: 50;
+  transition: var(--transition-med);
+  color: aqua;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+}
+
+.editButton:hover {
+  transform: scale(1.05);
+  background: #00e1ff14;
+}
+
+/* Animation */
+@keyframes fadeInRow {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profileSection tr {
+  animation: fadeInRow 0.4s ease forwards;
+}
+
+.profileSection tr:nth-child(1) { animation-delay: 0.05s; }
+.profileSection tr:nth-child(2) { animation-delay: 0.1s; }
+.profileSection tr:nth-child(3) { animation-delay: 0.15s; }
+.profileSection tr:nth-child(4) { animation-delay: 0.2s; }
+.profileSection tr:nth-child(5) { animation-delay: 0.25s; }
+.profileSection tr:nth-child(6) { animation-delay: 0.3s; }
+.profileSection tr:nth-child(7) { animation-delay: 0.35s; }
+.profileSection tr:nth-child(8) { animation-delay: 0.4s; }
+.profileSection tr:nth-child(9) { animation-delay: 0.45s; }
+
+/* =========================
+  Loading Animation
+  ========================= */
+  .skeletonWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .skeletonRow {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .skeletonLabel {
+    width: 100px;
+    height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #223253 25%, #2b3f6e 50%, #28395f 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  
+  .skeletonInput {
+    flex: 1;
+    height: 22px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #223253 25%, #2b3f6e 50%, #28395f 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+/* =========================
+  Light Theme
+  ========================= */
+:global(.light-theme) .profileSection {
+  background: #fff;
+  border: none;
+}
+:global(.light-theme) .profileSection h2 {
+  color: #000;
+}
+:global(.light-theme) .profileSection th {
+  background: #f9f9f9;
+  color: #111;
+}
+:global(.light-theme) .profileSection input {
+  color: #000;
+}
+:global(.light-theme) .profileSection input:disabled {
+  opacity: 0.6;
+}
+:global(.light-theme) input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+}
+:global(.light-theme) .profileSectionButtons button[disabled] {
+  opacity: 0.8;
+}
+:global(.light-theme) .updateButton {
+  background: #0038c5e6;
+}
+:global(.light-theme) .updateButton:hover {
+  background: #0030aae6;
+}
+:global(.light-theme) .cancelButton {
+  background: #222;
+}
+:global(.light-theme) .cancelButton:hover {
+  background: #000;
+}
+:global(.light-theme) .editButton {
+  color: #0037c2e6;
+}
+:global(.light-theme) .skeletonLabel,
+:global(.light-theme) .skeletonInput {
+  background: linear-gradient(90deg, #e2e2e2 25%, #f4f4f4 50%, #e2e2e2 75%);
+}
+
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 768px) {
+  .profileSection {
+    padding: 1.25rem;
+    margin: 1.25rem auto;
+    border-radius: var(--radius);
+  }
+
+  .profileSection table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .profileSection th,
+  .profileSection td {
+    padding: 0.75rem 0.6rem;
+    min-width: 150px;
+  }
+
+  .profileSection input {
+    font-size: 0.95rem;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .profileSectionButtons {
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 1.75rem;
+  }
+
+  .profileSectionButtons button {
+    width: 100%;
+    padding: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .profileSection {
+    padding: 1rem;
+    margin: 1rem auto;
+    width: 95%;
+    border-radius: var(--radius);
+  }
+
+  .profileSection table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .profileSection th,
+  .profileSection td {
+    padding: 0.4rem 0.55rem;
+    font-size: 0.95rem;
+    min-width: auto;
+  }
+
+  .profileSection h2 {
+    margin-bottom: 1rem;
+  }
+
+  .profileSection h2::after {
+    width: 150px;
+  }
+
+  .profileSection input {
+    font-size: 0.95rem;
+    padding: 0.4rem 0.55rem;
+  }
+
+  .profileSectionButtons {
+    width: 100%;
+    gap: 0.7rem;
+    margin-top: 1.25rem;
+  }
+}

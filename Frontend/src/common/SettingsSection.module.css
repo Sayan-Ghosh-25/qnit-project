@@ -1,0 +1,275 @@
+/* ===== Enhanced Settings Section Styles ===== */
+:root {
+  --navy: #001539;
+  --shadow-soft: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+  --shadow-med: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  --shadow-strong: 0 1rem 2.5rem rgba(0, 0, 0, 0.15);
+  --transition-med: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --radius: 0.625rem;
+  --radius-lg: 0.75rem;
+  --white: #e6f1ff;
+  --pink: #f57dff;
+  --blue: #57cbff;
+}
+
+.settingsSection {
+  background: var(--navy);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-med);
+  width: 100%;
+  max-width: 50rem;
+  margin: 1.5rem auto;
+  transition: var(--transition-med);
+  border: 1px solid var(--blue);
+  overflow: hidden;
+  position: relative;
+}
+
+.settingsSection h2 {
+  font-weight: 700;
+  margin: 0.5rem 0 1.5rem;
+  text-align: center;
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  color: var(--white);
+  transition: var(--transition-med);
+  position: relative;
+  padding-bottom: 0.75rem;
+ }
+
+ .settingsSection h2::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140px;
+  height: 3px;
+  background: linear-gradient(45deg, var(--pink), var(--blue));
+  border-radius: 3px;
+}
+
+.settingsContainer {
+  padding: 0.8rem 1.2rem;
+  background: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 10px rgba(60, 232, 255, 0.3);
+  margin-top: 1.5rem;
+}
+
+.settingsContainer h4 {
+  color: aqua;
+  font-weight: 500;
+  margin: 0.5rem 0 1.5rem;
+  text-align: left;
+  font-family: inherit;
+  font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+  transition: var(--transition-med);
+  position: relative;
+}
+
+.compartment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.compartment label {
+  font-size: 1.05rem;
+  color: var(--white);
+  font-weight: 500;
+}
+
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 3.2rem;
+    height: 1.5rem;
+  }
+  
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(0, 234, 255, 0.25);
+    border: 2px solid rgba(0, 234, 255, 1);
+    transition: all 0.4s ease-in-out;
+    border-radius: 2rem;
+  }
+  
+  .slider:before {
+    content: "";
+    position: absolute;
+    height: 1rem;
+    width: 1rem;
+    left: 0.25rem;
+    bottom: 0.15rem;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    transition: all 0.4s ease-in-out;
+    border-radius: 50%;
+  }
+  
+  input:checked + .slider:before {
+    transform: translateX(1.6rem);
+  }
+
+  .slider:hover {
+    box-shadow: 0 0 8px rgba(0, 234, 255, 0.7);
+  }
+
+  button {
+    background: none;
+    color: #f44336ed;
+    cursor: pointer;
+    font-size: clamp(1rem, 1.5vw, 1.15rem);
+    position: relative;
+    transition: all 0.2s ease-in-out;
+  }
+
+  button:hover {
+    transform: scale(1.1);
+  }
+
+/* =========================
+  Loading Animation
+  ========================= */
+  .skeletonWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 5rem;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .skeletonRow {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .skeletonLabel {
+    width: 100px;
+    height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #223253 25%, #2b3f6e 50%, #28395f 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  
+  .skeletonInput {
+    flex: 1;
+    height: 22px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #223253 25%, #2b3f6e 50%, #28395f 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* =========================
+  Light Theme
+  ========================= */
+  :global(.light-theme) .settingsSection {
+    background: #fff;
+    border: none;
+  }
+  :global(.light-theme) .settingsSection h2 {
+    color: #000;
+  }
+  :global(.light-theme) .settingsContainer {
+    box-shadow: none;
+    box-shadow: var(--shadow-soft);
+  }
+  :global(.light-theme) .settingsContainer h4 {
+    color: #005eff;
+    font-weight: 600;
+  }
+  :global(.light-theme) .compartment label {
+    color: #111;
+  }
+  :global(.light-theme) .slider {
+    border: none;
+  }
+  :global(.light-theme) .slider:before {
+    bottom: 0.25rem;
+  }
+  :global(.light-theme) .slider:hover {
+    box-shadow: none;
+  }
+  :global(.light-theme) input:checked + .slider {
+    background: rgba(20, 149, 255, 0.4);
+  }
+  :global(.light-theme) .skeletonLabel,
+  :global(.light-theme) .skeletonInput {
+    background: linear-gradient(90deg, #e2e2e2 25%, #f4f4f4 50%, #e2e2e2 75%);
+  }
+
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 768px) {
+  .settingsSection {
+    padding: 1.25rem;
+    margin: 1.25rem auto;
+    border-radius: var(--radius);
+  }
+  
+  .settingsSection h2 {
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .settingsSection {
+    padding: 1rem 1rem;
+    margin: 1rem auto;
+    width: 95%;
+    border-radius: var(--radius);
+  }
+  
+  .settingsSection h2 {
+    margin-bottom: 1.25rem;
+  }
+
+  .settingsSection h2::after {
+    width: 120px;
+  }
+
+  .settingsContainer {
+    padding: 0.8rem 0.8rem;
+  }
+
+  .compartment label {
+    font-size: 0.95rem;
+  }
+
+  .switch {
+    width: 3rem;
+  }
+
+  .slider {
+    border: 1.5px solid rgba(0, 234, 255, 1);
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(1.4rem);
+  }
+
+  .skeletonWrapper {
+    margin: 1rem;
+    margin-top: 3rem;
+  }
+}

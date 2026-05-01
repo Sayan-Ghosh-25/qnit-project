@@ -1,0 +1,142 @@
+.news h2 {
+  margin-top: 0.5rem;
+  font-weight: 700;
+  text-align: center;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  color: #fffb00;
+}
+
+.news p {
+  margin-top: 0.5rem;
+  font-style: italic;
+  margin-bottom: 2rem;
+  text-align: center;
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  color: #fff;
+}
+  
+  .newsList {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .newsItem {
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(205, 249, 255, 0.321);
+    padding-bottom: 8px;
+  }
+  
+  .newsItem a {
+    font-size: 1.1rem;
+    color: #00bfff;
+    text-decoration: none;
+  }
+  
+  .newsItem a:hover {
+    text-decoration: underline;
+  }
+  
+  .newsItem p {
+    font-size: 1rem;
+    margin: 4px 0;
+    text-align: start;
+  }
+  
+  .newsItem small {
+    color: #ccc;
+  }
+
+  .warning {
+    color: red;
+    font-weight: 500;
+    text-align: center;
+  }
+
+  /* =========================
+  Loading Animation
+  ========================= */
+  .skeletonWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .skeletonRow {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .skeletonLabel {
+    width: 100px;
+    height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #00376e 25%, #003b75 50%, #004080 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  
+  .skeletonInput {
+    flex: 1;
+    height: 22px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #00376e 25%, #003b75 50%, #004080 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+/* =========================
+  Light Theme
+  ========================= */
+  :global(.light-theme) .newsItem {
+    background-color: #fff;
+    padding: 1rem;
+    border: none;
+    border-radius: 0.625rem;
+    box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.1);
+  }
+
+  :global(.light-theme) .newsItem a {
+    color: #007bff;
+  }
+
+  :global(.light-theme) .newsItem p {
+    color: #222;
+  }
+
+  :global(.light-theme) .newsItem small {
+    color: #555;
+  }
+
+  :global(.light-theme) .news p {
+    color: #666;
+    font-weight: 500;
+  }
+  :global(.light-theme) .skeletonLabel,
+  :global(.light-theme) .skeletonInput {
+    background: linear-gradient(90deg, #d0fbff 25%, #d6fcff 50%, #ddfcff 75%);
+  }
+
+  /* =========================
+  Responsive Media
+  ========================= */
+  @media (max-width: 30rem) {
+    .newsItem a {
+      font-size: 1rem;
+    }
+    .newsItem p {
+      font-size: 0.9rem;
+    }
+  }

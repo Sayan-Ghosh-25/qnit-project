@@ -1,0 +1,248 @@
+/* ===== Enhanced Account Delete Modal Styles ===== */
+:root {
+  --text-primary: #ffffff;
+  --text-secondary: #fefefe;
+  --muted: rgba(255, 255, 255, 0.65);
+  --error: #ff4545;
+  --shadow-soft: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+  --shadow-med: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  --shadow-strong: 0 1rem 2.5rem rgba(0, 0, 0, 0.15);
+  --transition-med: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --radius: 0.625rem;
+}
+
+/* ===== Light Theme Overrides ===== */
+:global(.light-theme) {
+  --text-primary: #555;
+  --text-secondary: #222;
+  --error: #ff0000;
+  --muted: #777;
+}
+
+  .deleteModal {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    animation: fadeInOverlay 0.3s ease forwards;
+  }
+
+  .deleteModal.hiddenDelete {
+    display: none;
+  }
+  
+  .deleteContent {
+    background: #080808;
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    width: min(90vw, 25rem);
+    text-align: center;
+    box-shadow: var(--shadow-strong);
+    animation: modalIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    transform-origin: center;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+  
+  .deleteContent h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 1.25rem;
+    transition: var(--transition-med);
+  }
+
+  .deleteActions {
+    display: flex;
+    justify-content: center;
+    gap: 1.25rem;
+    margin-top: 1.25rem;
+    flex-wrap: wrap;
+  }
+  
+  .deleteBtn,
+  .cancelBtn {
+    height: 2.9rem;
+    padding: 0.75rem 2rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 1rem;
+    font-family: inherit;
+    font-weight: 500;
+    transition: var(--transition-med);
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .deleteBtn {
+    background: #d34300;
+    color: #fff;
+  }
+  
+  .deleteBtn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: 0 4px 10px rgba(2, 8, 40, 0.2) !important;
+  }
+
+  .deleteBtn:hover {
+    background: #d33500;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.075);
+  }
+  
+  .cancelBtn {
+    background: #222;
+    color: #fff;
+  }
+  
+  .cancelBtn:hover {
+    background: #181818;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .deleteBtn:active,
+  .cancelBtn:active {
+    transform: scale(0.95);
+  }
+  
+  .deleteModal.closing {
+    animation: fadeOutOverlay 0.3s ease forwards;
+  }
+  
+  .deleteContent.closing {
+    animation: modalOut 0.3s ease forwards;
+  }
+
+  .field {
+    margin-bottom: 1.2rem;
+    position: relative;
+  }
+  
+  .field label {
+    display: block;
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    transition: var(--transition-med);
+  }
+  
+  .field input, .field select {
+    appearance: none;
+    font-family: inherit;
+    width: 100%;
+    padding: 0.7rem 1.2rem;
+    border-radius: 0.5rem;
+    background: #111;
+    color: var(--text-secondary);
+    outline: none;
+    transition: var(--transition-med);
+    font-size: 1rem;
+  }
+
+  .field input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .hint {
+    font-family: Inter;
+    font-size: 0.9rem;
+    color: var(--muted);
+    display: block;
+    margin-left: 0.4rem;
+    transition: var(--transition-med);
+  }
+  
+  .hint.error {
+    color: var(--error);
+  }
+  
+  .pwdWrap {
+    position: relative;
+  }
+  
+  .pwdWrap .eye {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: var(--transition-med);
+    font-size: 0.9rem;
+  }
+  
+  /* Animations */
+  @keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes fadeOutOverlay {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+  }
+  @keyframes modalIn {
+    0%   { opacity: 0; transform: translateY(-20px) scale(0.95); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes modalOut {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-20px) scale(0.95); }
+  }
+
+  /* =========================
+  Light Theme
+  ========================= */
+  :global(.light-theme) .deleteContent {
+    background: #fff;
+  }
+  :global(.light-theme) .deleteContent h2 {
+    color: #333;
+  }
+  :global(.light-theme) .field input {
+    background: #efefef;
+    outline: 1px solid #ddd;
+  }
+
+  :global(.light-theme) .field input::placeholder {
+    color: #898989
+  }
+
+/* Responsive Media Queries */
+@media (max-width: 480px) {
+  .deleteContent h2 {
+    font-size: 1.25rem;
+  }
+
+  .field label {
+    font-size: 0.95rem;
+  }  
+
+  .field input, .field select {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Prevents Autofilling Service From Changing Input Field Background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0) inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+input:-moz-autofill {
+  box-shadow: 0 0 0 1000px rgba(0,0,0,0.2) inset !important;
+  -moz-text-fill-color: var(--text-primary) !important;
+}

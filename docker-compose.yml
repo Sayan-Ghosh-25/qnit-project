@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./Backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./Backend/.env
+    restart: always
+
+  frontend:
+    build:
+      context: ./Frontend
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY}
+        VITE_PASSWORD_RESET_REDIRECT: ${VITE_PASSWORD_RESET_REDIRECT}
+        VITE_WELCOME_REDIRECT: ${VITE_WELCOME_REDIRECT}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_NEWS_API_KEY: ${VITE_NEWS_API_KEY}
+    ports:
+      - "5173:80"
+    env_file:
+      - ./Frontend/.env
+    depends_on:
+      - backend
+    restart: always
